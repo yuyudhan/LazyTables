@@ -1,0 +1,35 @@
+# File: src/.editorconfig
+
+# Purpose: This file enforces consistent coding styles across the LazyTables project.
+# It defines formatting rules for Go source files and configuration files to ensure
+# readability, maintainability, and compatibility with tools like Neovim.
+#
+# Key Functionalities:
+# - Sets UTF-8 encoding and Unix-style line endings for all files.
+# - Specifies 4-space indentation for Go files, aligning with developer preference.
+# - Uses 2-space indentation for JSON/YAML configs for compactness.
+#
+# Maintenance Tips:
+# - Update indent_size if team preferences change, but keep consistent across files.
+# - Add new file patterns (e.g., [*.md]) as the project expands to include docs.
+
+# Top-most EditorConfig file to prevent overrides from parent directories
+root = true
+
+# Default settings applied to all files for consistency and reliability
+[*]
+charset = utf-8             # Enforces UTF-8 encoding for compatibility and emoji support
+end_of_line = lf            # Uses Unix-style line endings for cross-platform consistency
+insert_final_newline = true # Ensures POSIX compliance and clean diffs
+trim_trailing_whitespace = true # Removes unnecessary whitespace for cleaner files
+
+# Go-specific formatting for source code
+[*.go]
+indent_style = space        # Uses spaces over tabs for precise control in Neovim
+indent_size = 4             # Sets 4-space indentation per CTO preference
+
+# Formatting for configuration files (e.g., JSON, YAML)
+[*.{json,yaml,yml}]
+indent_style = space        # Uses spaces for standard config file formatting
+indent_size = 2             # Keeps configs compact and readable
+

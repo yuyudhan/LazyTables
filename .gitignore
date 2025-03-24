@@ -1,0 +1,69 @@
+#  FilePath: .gitignore
+
+# Purpose: This file specifies patterns for files and directories to be ignored by Git
+# in the LazyTables Go project. It ensures that temporary, build, or sensitive files
+# are excluded from version control, enhancing security, maintainability, and cleanliness.
+#
+# Key Functionalities:
+# - Excludes build artifacts, dependency directories, and temporary files.
+# - Protects sensitive data like logs, configs, and credentials from being committed.
+# - Organizes patterns into logical sections for clarity and future extension.
+#
+# Considerations:
+# - Patterns are designed for a Go project using standard tools (e.g., go mod, go build).
+# - Ensures compatibility with development environments like Neovim and CI/CD pipelines.
+#
+# Maintenance Guidance:
+# - Add new patterns under relevant sections as the project evolves (e.g., new tools, file types).
+# - Review periodically to ensure no critical files are accidentally ignored.
+# - Avoid overly broad patterns (e.g., '*') to prevent unintended exclusions.
+
+# Build Artifacts & Binaries
+/bin/
+/*.exe
+/*.exe~
+/*.dll
+/*.so
+/*.dylib
+# Go-specific build outputs
+*.test
+*.out
+# Coverage files
+coverage.txt
+profile.out
+
+# Dependency Directories
+/vendor/
+/go.sum  # Optional: include if you want to regenerate it frequently
+
+# Temporary Files
+*.tmp
+*.swp       # Neovim swap files
+*~.nib
+*.bak
+*.cache
+
+# Logs & Sensitive Data
+*.log
+debug.log
+error.log
+# Configuration files with secrets (untracked examples should be committed)
+config.secret.yaml
+secrets.json
+.env
+
+# Editor & IDE Files
+/.vscode/
+/.idea/
+/*.sublime-*
+
+# OS-Specific Files
+.DS_Store       # macOS
+Thumbs.db       # Windows
+
+# Documentation & Miscellaneous
+# Uncomment if you want to exclude generated docs
+# /docs/generated/
+#
+tmp/
+
