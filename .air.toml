@@ -1,0 +1,32 @@
+# FilePath: .air.toml
+
+# Air configuration for LazyTables
+# This file tells Air how to build and run your project.
+# Adjust the paths as needed to match your project structure.
+
+# The root for watching files (set to repository root)
+root = "."
+# Directory to output the built binary
+tmp_dir = "tmp"
+
+[build]
+# The build command: compile the main package from cmd/lazytables and output to tmp/main
+cmd = "go build -o tmp/main ./cmd/lazytables"
+# The binary to run
+bin = "tmp/main"
+# File extensions to watch for changes
+include_ext = ["go"]
+# Directories to exclude from watching
+exclude_dir = ["assets", "tmp", "vendor", "docs", "tests"]
+
+[log]
+# Optional logging settings
+time = true
+
+[color]
+# Optional: configure colors for Air's output
+main = "yellow"
+watcher = "cyan"
+build = "green"
+runner = "magenta"
+
