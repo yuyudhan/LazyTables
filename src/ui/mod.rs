@@ -64,6 +64,11 @@ impl UI {
         if state.show_help {
             self.draw_help_overlay(frame, frame.area());
         }
+        
+        // Draw command mode modal if in command mode
+        if state.mode == Mode::Command {
+            self.draw_command_modal(frame, frame.area(), state);
+        }
     }
 
     /// Draw the header bar
@@ -361,6 +366,142 @@ impl UI {
             .alignment(Alignment::Left);
         
         frame.render_widget(help, overlay_area);
+    }
+    
+    /// Draw command mode modal
+    fn draw_command_modal(&self, frame: &mut Frame, area: Rect, state: &AppState) {
+        
+        // Calculate modal position (center top, like lazyvim)
+        let modal_width = 60.min(area.width - 4);
+        let modal_height = 10;
+        let modal_x = (area.width - modal_width) / 2;
+        let modal_y = 2; // Near the top
+        
+        let modal_area = Rect::new(modal_x, modal_y, modal_width, modal_height);
+        
+        // Clear the background for the modal
+        frame.render_widget(Clear, modal_area);
+        
+        // Prepare command display with ':' prefix
+        let command_text = format!(":{}", state.command_buffer);
+        
+        // Get command suggestions based on current input
+        let suggestions = self.get_command_suggestions(&state.command_buffer);
+        
+        // Build the modal content
+        let mut lines = vec![
+            Line::from(""),
+            Line::from(vec![
+                Span::raw("  "),
+                Span::styled(
+                    command_text.as_str(),
+                    Style::default()
+                        .fg(self.theme.text)
+                        .add_modifier(Modifier::BOLD),
+                ),
+            ]),
+        ];
+        
+        // Add separator if there are suggestions
+        if !suggestions.is_empty() {
+            lines.push(Line::from(""));
+            lines.push(Line::from(vec![
+                Span::raw("  "),
+                Span::styled(
+                    "Suggestions:",
+                    Style::default()
+                        .fg(self.theme.header_fg)
+                        .add_modifier(Modifier::DIM),
+                ),
+            ]));
+            
+            // Add suggestions (max 5)
+            for (i, suggestion) in suggestions.iter().take(5).enumerate() {
+                let prefix = if i == 0 { "  › " } else { "    " };
+                let style = if i == 0 {
+                    Style::default().fg(self.theme.primary_highlight)
+                } else {
+                    Style::default().fg(self.theme.text).add_modifier(Modifier::DIM)
+                };
+                
+                lines.push(Line::from(vec![
+                    Span::raw(prefix),
+                    Span::styled(suggestion.as_str(), style),
+                ]));
+            }
+        }
+        
+        let command_modal = Paragraph::new(lines)
+            .block(
+                Block::default()
+                    .title(" Command ")
+                    .borders(Borders::ALL)
+                    .border_style(Style::default().fg(self.theme.active_border))
+                    .style(Style::default().bg(self.theme.background)),
+            )
+            .style(Style::default().fg(self.theme.text));
+        
+        frame.render_widget(command_modal, modal_area);
+        
+        // Show cursor position
+        let cursor_x = modal_area.x + 3 + command_text.len() as u16;
+        let cursor_y = modal_area.y + 2;
+        frame.set_cursor_position((cursor_x, cursor_y));
+    }
+    
+    /// Get command suggestions based on current input
+    fn get_command_suggestions(&self, input: &str) -> Vec<String> {
+        let all_commands = vec![
+            ("q", "Quit LazyTables"),
+            ("quit", "Quit LazyTables"),
+            ("w", "Write/Save current data"),
+            ("write", "Write/Save current data"),
+            ("wq", "Write and quit"),
+            ("e", "Edit connection"),
+            ("edit", "Edit connection"),
+            ("connect", "Connect to database"),
+            ("disconnect", "Disconnect from database"),
+            ("tables", "List all tables"),
+            ("refresh", "Refresh current view"),
+            ("export", "Export current data"),
+            ("import", "Import data from file"),
+            ("set", "Set configuration option"),
+            ("help", "Show help"),
+            ("version", "Show version information"),
+            ("schema", "Show table schema"),
+            ("query", "Execute SQL query"),
+            ("history", "Show command history"),
+            ("clear", "Clear current view"),
+        ];
+        
+        let mut suggestions = Vec::new();
+        
+        // If input is empty, show common commands
+        if input.is_empty() {
+            suggestions.push("q - Quit".to_string());
+            suggestions.push("w - Write/Save".to_string());
+            suggestions.push("help - Show help".to_string());
+            suggestions.push("connect - Connect to database".to_string());
+            suggestions.push("tables - List tables".to_string());
+        } else {
+            // Filter commands that start with the input
+            for (cmd, desc) in &all_commands {
+                if cmd.starts_with(input) {
+                    suggestions.push(format!("{} - {}", cmd, desc));
+                }
+            }
+            
+            // If no exact prefix matches, try fuzzy matching
+            if suggestions.is_empty() {
+                for (cmd, desc) in &all_commands {
+                    if cmd.contains(input) {
+                        suggestions.push(format!("{} - {}", cmd, desc));
+                    }
+                }
+            }
+        }
+        
+        suggestions
     }
 }
 
