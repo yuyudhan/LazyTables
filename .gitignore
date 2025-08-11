@@ -1,0 +1,37 @@
+# FilePath: .gitignore
+
+# Rust
+target/
+**/*.rs.bk
+*.pdb
+Cargo.lock
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+.DS_Store
+
+# Config and secrets
+config/config.toml
+*.env
+.env.local
+
+# Logs
+*.log
+logs/
+
+# Cache
+.cache/
+
+# Test databases
+*.db
+*.sqlite
+
+# OS specific
+Thumbs.db
+.DS_Store
+
+# Docker volumes
+postgres-data/
