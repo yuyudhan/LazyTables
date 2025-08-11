@@ -1,0 +1,35 @@
+# FilePath: .dockerignore
+
+# Git
+.git/
+.gitignore
+
+# Rust build artifacts
+target/
+Cargo.lock
+**/*.rs.bk
+*.pdb
+
+# Development files
+.vscode/
+.idea/
+*.swp
+*.swo
+.DS_Store
+
+# Documentation
+*.md
+LICENSE
+docs/
+
+# Docker files
+Dockerfile
+docker-compose.yml
+.dockerignore
+
+# Config files (will be mounted)
+config/
+
+# Test files
+tests/
+examples/
