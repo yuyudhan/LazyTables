@@ -1,0 +1,80 @@
+# FilePath: Cargo.toml
+
+[package]
+name = "lazytables"
+version = "0.1.0"
+edition = "2021"
+authors = ["LazyTables Team"]
+license = "WTFPL"
+description = "Terminal-based SQL database viewer and editor with vim-style navigation"
+repository = "https://github.com/yuyudhan/LazyTables"
+keywords = ["database", "sql", "tui", "terminal", "vim"]
+categories = ["command-line-utilities", "database"]
+
+[dependencies]
+# TUI framework
+ratatui = { version = "0.29", features = ["crossterm"] }
+crossterm = { version = "0.28", features = ["event-stream"] }
+
+# Async runtime
+tokio = { version = "1.41", features = ["full"] }
+
+# Error handling
+color-eyre = "0.6"
+thiserror = "2.0"
+anyhow = "1.0"
+
+# Database drivers (Phase 0 - PostgreSQL)
+sqlx = { version = "0.8", features = [
+  "runtime-tokio-rustls",
+  "postgres",
+  "chrono",
+  "uuid",
+] }
+async-trait = "0.1"
+
+# Configuration and serialization
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+toml = "0.8"
+
+# Security - credential storage
+keyring = { version = "3.6", optional = true }
+
+# Logging
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+
+# Date/time handling
+chrono = "0.4"
+
+# UUID support
+uuid = { version = "1.11", features = ["v4", "serde"] }
+
+# Directory management
+directories = "5.0"
+
+# Command line argument parsing
+clap = { version = "4.5", features = ["derive", "env"] }
+
+[dev-dependencies]
+tempfile = "3.14"
+pretty_assertions = "1.4"
+
+[features]
+default = ["secure-storage"]
+secure-storage = ["keyring"]
+# Future feature flags for additional databases
+mysql = []
+sqlite = []
+redis = []
+
+[profile.release]
+opt-level = 3
+lto = true
+codegen-units = 1
+strip = true
+
+[profile.dev]
+opt-level = 0
+
