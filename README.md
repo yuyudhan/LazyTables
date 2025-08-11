@@ -11,7 +11,8 @@
 ### macOS
 
 ```bash
-# Using Homebrew (coming soon)
+# Using Homebrew tap (coming soon)
+brew tap yuyudhan/lazytables
 brew install lazytables
 
 # Or build from source
@@ -24,12 +25,13 @@ sudo mv target/release/lazytables /usr/local/bin/
 ### Linux
 
 ```bash
-# Using package manager (coming soon)
+# Using custom repository (coming soon)
 # Ubuntu/Debian
+curl -fsSL https://repo.lazytables.dev/setup.sh | sudo bash
 sudo apt install lazytables
 
-# Arch Linux
-yay -S lazytables
+# Arch Linux (AUR)
+yay -S lazytables-git
 
 # Or build from source
 git clone git@github.com:yuyudhan/LazyTables.git
