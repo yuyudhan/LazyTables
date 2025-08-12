@@ -1,37 +1,59 @@
 # FilePath: .gitignore
 
-# Rust
+# Rust specific
 target/
 **/*.rs.bk
 *.pdb
 Cargo.lock
 
-# IDE
+# Go specific
+/bin/
+/*.exe
+/*.exe~
+/*.dll
+/*.so
+/*.dylib
+*.test
+*.out
+coverage.txt
+profile.out
+/vendor/
+
+# IDE and Editor files
 .vscode/
 .idea/
 *.swp
 *.swo
+*~.nib
+/*.sublime-*
+
+# OS specific
 .DS_Store
+Thumbs.db
 
 # Config and secrets
 config/config.toml
+config.secret.yaml
+secrets.json
 *.env
 .env.local
 
 # Logs
 *.log
+debug.log
+error.log
 logs/
 
-# Cache
+# Cache and temporary files
 .cache/
+*.tmp
+*.bak
+*.cache
+tmp/
 
 # Test databases
 *.db
 *.sqlite
-
-# OS specific
-Thumbs.db
-.DS_Store
 
 # Docker volumes
 postgres-data/
