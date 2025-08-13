@@ -90,6 +90,8 @@ pub struct AppState {
     pub connections: ConnectionStorage,
     /// Show connection creation modal
     pub show_add_connection_modal: bool,
+    /// Show connection edit modal
+    pub show_edit_connection_modal: bool,
     /// Connection modal state
     pub connection_modal_state: ConnectionModalState,
     /// SQL query editor content
@@ -132,6 +134,7 @@ impl AppState {
             leader_pressed: false,
             connections,
             show_add_connection_modal: false,
+            show_edit_connection_modal: false,
             connection_modal_state: ConnectionModalState::new(),
             query_content: String::new(),
             query_cursor_line: 0,
