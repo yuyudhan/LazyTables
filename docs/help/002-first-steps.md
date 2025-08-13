@@ -138,16 +138,31 @@ Esc                 # Return to normal mode
 
 ### Adding a Connection
 
+LazyTables uses a **two-step connection process** for clarity and flexibility:
+
+#### Step 1: Database Type Selection
 1. **Focus the Connections pane**: Press `c` or navigate with `Ctrl+h`
 2. **Add new connection**: Press `a`
-3. **Fill in connection details** in the dialog:
-   - Connection name (for display)
-   - Database type (PostgreSQL, MySQL, etc.)
-   - Host and port
-   - Username and password
-   - Database name (optional)
-4. **Test connection**: The dialog will test connectivity
-5. **Save connection**: Press `Enter` to save, `Esc` to cancel
+3. **Select database type**: Choose from PostgreSQL, MySQL, MariaDB, or SQLite
+4. **Continue**: Press `Enter` to proceed to connection details
+
+#### Step 2: Connection Configuration  
+Choose between two approaches:
+
+**Option A: Connection String (Recommended)**
+- **Enter connection string**: Use database-specific URI format
+- **Auto-parsing**: Fields populate automatically
+- **Examples**:
+  - PostgreSQL: `postgresql://user:pass@host:5432/database`
+  - MySQL: `mysql://user:pass@host:3306/database`
+  - SQLite: `sqlite:///path/to/database.db`
+
+**Option B: Individual Fields**
+- **Fill manually**: Connection name, host, port, username, password
+- **Database-specific defaults**: Ports auto-populate based on database type
+- **SSL configuration**: Choose appropriate SSL mode
+
+5. **Save connection**: Press `Enter` on Save button, `Esc` to go back
 
 ### Example Connection Setup
 

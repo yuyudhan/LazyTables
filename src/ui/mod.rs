@@ -65,12 +65,12 @@ impl UI {
 
         // Draw status bar
         self.draw_status_bar(frame, areas.status_bar, state);
-        
+
         // Draw help overlay if active
         if state.show_help {
             self.draw_help_overlay(frame, frame.area());
         }
-        
+
         // Draw command mode modal if in command mode
         if state.mode == Mode::Command {
             self.draw_command_modal(frame, frame.area(), state);
@@ -78,7 +78,11 @@ impl UI {
 
         // Draw connection creation modal if active
         if state.show_add_connection_modal {
-            crate::ui::components::render_connection_modal(frame, &state.connection_modal_state, frame.area());
+            crate::ui::components::render_connection_modal(
+                frame,
+                &state.connection_modal_state,
+                frame.area(),
+            );
         }
     }
 
@@ -106,27 +110,32 @@ impl UI {
         };
 
         // Create list items from stored connections
-        let mut items: Vec<ListItem> = state.connections.connections
+        let mut items: Vec<ListItem> = state
+            .connections
+            .connections
             .iter()
             .map(|connection| {
-                let status_indicator = if connection.is_connected { "●" } else { "○" };
+                let status_indicator = if connection.is_connected {
+                    "●"
+                } else {
+                    "○"
+                };
                 let display_text = format!("{} {}", status_indicator, connection.display_string());
                 let style = if connection.is_connected {
                     Style::default().fg(Color::Green)
                 } else {
                     Style::default().fg(Color::Gray)
                 };
-                ListItem::new(Line::from(vec![
-                    Span::styled(display_text, style)
-                ]))
+                ListItem::new(Line::from(vec![Span::styled(display_text, style)]))
             })
             .collect();
 
         // Add instruction text if no connections exist
         if items.is_empty() {
-            items.push(ListItem::new(Line::from(vec![
-                Span::styled("No connections configured", Style::default().fg(Color::Gray))
-            ])));
+            items.push(ListItem::new(Line::from(vec![Span::styled(
+                "No connections configured",
+                Style::default().fg(Color::Gray),
+            )])));
             items.push(ListItem::new(""));
         }
 
@@ -135,12 +144,22 @@ impl UI {
             items.push(ListItem::new(""));
             items.push(ListItem::new(Line::from(vec![
                 Span::styled("Press ", Style::default().fg(Color::Gray)),
-                Span::styled("a", Style::default().fg(Color::Yellow).add_modifier(Modifier::BOLD)),
+                Span::styled(
+                    "a",
+                    Style::default()
+                        .fg(Color::Yellow)
+                        .add_modifier(Modifier::BOLD),
+                ),
                 Span::styled(" to add connection", Style::default().fg(Color::Gray)),
             ])));
             items.push(ListItem::new(Line::from(vec![
                 Span::styled("Press ", Style::default().fg(Color::Gray)),
-                Span::styled("Enter", Style::default().fg(Color::Yellow).add_modifier(Modifier::BOLD)),
+                Span::styled(
+                    "Enter",
+                    Style::default()
+                        .fg(Color::Yellow)
+                        .add_modifier(Modifier::BOLD),
+                ),
                 Span::styled(" to connect", Style::default().fg(Color::Gray)),
             ])));
         }
@@ -171,33 +190,43 @@ impl UI {
         };
 
         // Check if there's an active connection
-        let has_active_connection = state.connections.connections
+        let has_active_connection = state
+            .connections
+            .connections
             .iter()
             .any(|conn| conn.is_connected);
 
         let items: Vec<ListItem> = if !has_active_connection {
             // Show "not connected" message
             vec![
-                ListItem::new(Line::from(vec![
-                    Span::styled("No database connected", Style::default().fg(Color::Gray))
-                ])),
+                ListItem::new(Line::from(vec![Span::styled(
+                    "No database connected",
+                    Style::default().fg(Color::Gray),
+                )])),
                 ListItem::new(""),
-                ListItem::new(Line::from(vec![
-                    Span::styled("Connect to a database", Style::default().fg(Color::Gray))
-                ])),
-                ListItem::new(Line::from(vec![
-                    Span::styled("to view tables and views", Style::default().fg(Color::Gray))
-                ])),
+                ListItem::new(Line::from(vec![Span::styled(
+                    "Connect to a database",
+                    Style::default().fg(Color::Gray),
+                )])),
+                ListItem::new(Line::from(vec![Span::styled(
+                    "to view tables and views",
+                    Style::default().fg(Color::Gray),
+                )])),
                 ListItem::new(""),
                 if is_focused {
                     ListItem::new(Line::from(vec![
                         Span::styled("Press ", Style::default().fg(Color::Gray)),
-                        Span::styled("c", Style::default().fg(Color::Yellow).add_modifier(Modifier::BOLD)),
+                        Span::styled(
+                            "c",
+                            Style::default()
+                                .fg(Color::Yellow)
+                                .add_modifier(Modifier::BOLD),
+                        ),
                         Span::styled(" to go to connections", Style::default().fg(Color::Gray)),
                     ]))
                 } else {
                     ListItem::new("")
-                }
+                },
             ]
         } else {
             // Show sample tables (this will be replaced with actual database tables later)
@@ -240,37 +269,44 @@ impl UI {
         };
 
         // Check if there's an active connection and table selected
-        let has_active_connection = state.connections.connections
+        let has_active_connection = state
+            .connections
+            .connections
             .iter()
             .any(|conn| conn.is_connected);
-        
+
         // For now, we'll assume no table is selected until database integration is complete
         let has_selected_table = false;
 
         let details_text = if !has_active_connection {
             vec![
                 Line::from(""),
-                Line::from(vec![
-                    Span::styled("No database connected", Style::default().fg(Color::Gray))
-                ]),
+                Line::from(vec![Span::styled(
+                    "No database connected",
+                    Style::default().fg(Color::Gray),
+                )]),
                 Line::from(""),
-                Line::from(vec![
-                    Span::styled("Connect to view table details", Style::default().fg(Color::Gray))
-                ]),
+                Line::from(vec![Span::styled(
+                    "Connect to view table details",
+                    Style::default().fg(Color::Gray),
+                )]),
             ]
         } else if !has_selected_table {
             vec![
                 Line::from(""),
-                Line::from(vec![
-                    Span::styled("No table selected", Style::default().fg(Color::Gray))
-                ]),
+                Line::from(vec![Span::styled(
+                    "No table selected",
+                    Style::default().fg(Color::Gray),
+                )]),
                 Line::from(""),
-                Line::from(vec![
-                    Span::styled("Select a table to view", Style::default().fg(Color::Gray))
-                ]),
-                Line::from(vec![
-                    Span::styled("its structure and metadata", Style::default().fg(Color::Gray))
-                ]),
+                Line::from(vec![Span::styled(
+                    "Select a table to view",
+                    Style::default().fg(Color::Gray),
+                )]),
+                Line::from(vec![Span::styled(
+                    "its structure and metadata",
+                    Style::default().fg(Color::Gray),
+                )]),
             ]
         } else {
             // Show actual table details (sample data for now)
@@ -311,10 +347,12 @@ impl UI {
         };
 
         // Check if there's an active connection and table selected
-        let has_active_connection = state.connections.connections
+        let has_active_connection = state
+            .connections
+            .connections
             .iter()
             .any(|conn| conn.is_connected);
-        
+
         // For now, we'll assume no table is selected until database integration is complete
         let has_selected_table = false;
 
@@ -323,25 +361,21 @@ impl UI {
             let message = vec![
                 Line::from(""),
                 Line::from(""),
-                Line::from(vec![
-                    Span::styled(
-                        "No database connection active",
-                        Style::default().fg(Color::Gray).add_modifier(Modifier::BOLD)
-                    )
-                ]),
+                Line::from(vec![Span::styled(
+                    "No database connection active",
+                    Style::default()
+                        .fg(Color::Gray)
+                        .add_modifier(Modifier::BOLD),
+                )]),
                 Line::from(""),
-                Line::from(vec![
-                    Span::styled(
-                        "Connect to a database from the Connections pane",
-                        Style::default().fg(Color::Gray)
-                    )
-                ]),
-                Line::from(vec![
-                    Span::styled(
-                        "Press 'c' to focus connections, then Enter to connect",
-                        Style::default().fg(Color::Gray)
-                    )
-                ]),
+                Line::from(vec![Span::styled(
+                    "Connect to a database from the Connections pane",
+                    Style::default().fg(Color::Gray),
+                )]),
+                Line::from(vec![Span::styled(
+                    "Press 'c' to focus connections, then Enter to connect",
+                    Style::default().fg(Color::Gray),
+                )]),
             ];
 
             let placeholder = Paragraph::new(message)
@@ -360,25 +394,21 @@ impl UI {
             let message = vec![
                 Line::from(""),
                 Line::from(""),
-                Line::from(vec![
-                    Span::styled(
-                        "No table selected",
-                        Style::default().fg(Color::Gray).add_modifier(Modifier::BOLD)
-                    )
-                ]),
+                Line::from(vec![Span::styled(
+                    "No table selected",
+                    Style::default()
+                        .fg(Color::Gray)
+                        .add_modifier(Modifier::BOLD),
+                )]),
                 Line::from(""),
-                Line::from(vec![
-                    Span::styled(
-                        "Select a table from the Tables pane to view its data",
-                        Style::default().fg(Color::Gray)
-                    )
-                ]),
-                Line::from(vec![
-                    Span::styled(
-                        "Or execute a query from the SQL editor below",
-                        Style::default().fg(Color::Gray)
-                    )
-                ]),
+                Line::from(vec![Span::styled(
+                    "Select a table from the Tables pane to view its data",
+                    Style::default().fg(Color::Gray),
+                )]),
+                Line::from(vec![Span::styled(
+                    "Or execute a query from the SQL editor below",
+                    Style::default().fg(Color::Gray),
+                )]),
             ];
 
             let placeholder = Paragraph::new(message)
@@ -437,7 +467,8 @@ impl UI {
         };
 
         // Create list items from SQL files
-        let mut items: Vec<ListItem> = state.saved_sql_files
+        let mut items: Vec<ListItem> = state
+            .saved_sql_files
             .iter()
             .enumerate()
             .map(|(i, filename)| {
@@ -446,35 +477,45 @@ impl UI {
                 } else {
                     "  "
                 };
-                
+
                 let style = if Some(filename) == state.current_sql_file.as_ref() {
-                    Style::default().fg(Color::Green).add_modifier(Modifier::BOLD)
+                    Style::default()
+                        .fg(Color::Green)
+                        .add_modifier(Modifier::BOLD)
                 } else if i == state.selected_sql_file && is_focused {
                     Style::default().fg(self.theme.primary_highlight)
                 } else {
                     Style::default().fg(self.theme.text)
                 };
-                
-                ListItem::new(Line::from(vec![
-                    Span::styled(format!("{}{}.sql", prefix, filename), style)
-                ]))
+
+                ListItem::new(Line::from(vec![Span::styled(
+                    format!("{prefix}{filename}.sql"),
+                    style,
+                )]))
             })
             .collect();
 
         // Add instruction text if no files exist
         if items.is_empty() {
-            items.push(ListItem::new(Line::from(vec![
-                Span::styled("No SQL files found", Style::default().fg(Color::Gray))
-            ])));
-            items.push(ListItem::new(Line::from(vec![
-                Span::styled("Create files with Ctrl+N", Style::default().fg(Color::Gray))
-            ])));
+            items.push(ListItem::new(Line::from(vec![Span::styled(
+                "No SQL files found",
+                Style::default().fg(Color::Gray),
+            )])));
+            items.push(ListItem::new(Line::from(vec![Span::styled(
+                "Create files with Ctrl+N",
+                Style::default().fg(Color::Gray),
+            )])));
         } else if is_focused {
             // Add keybinding help when focused
             items.push(ListItem::new(""));
             items.push(ListItem::new(Line::from(vec![
                 Span::styled("Press ", Style::default().fg(Color::Gray)),
-                Span::styled("Enter", Style::default().fg(Color::Yellow).add_modifier(Modifier::BOLD)),
+                Span::styled(
+                    "Enter",
+                    Style::default()
+                        .fg(Color::Yellow)
+                        .add_modifier(Modifier::BOLD),
+                ),
                 Span::styled(" to load file", Style::default().fg(Color::Gray)),
             ])));
         }
@@ -505,7 +546,9 @@ impl UI {
         };
 
         // Check if there's an active connection for better help messages
-        let has_active_connection = state.connections.connections
+        let has_active_connection = state
+            .connections
+            .connections
             .iter()
             .any(|conn| conn.is_connected);
 
@@ -514,56 +557,61 @@ impl UI {
             if !has_active_connection {
                 vec![
                     Line::from(Span::styled(
-                        "-- SQL Query Editor", 
-                        Style::default().fg(Color::Gray).add_modifier(Modifier::BOLD)
+                        "-- SQL Query Editor",
+                        Style::default()
+                            .fg(Color::Gray)
+                            .add_modifier(Modifier::BOLD),
                     )),
                     Line::from(""),
                     Line::from(Span::styled(
-                        "-- Connect to a database first", 
-                        Style::default().fg(Color::Gray)
+                        "-- Connect to a database first",
+                        Style::default().fg(Color::Gray),
                     )),
                     Line::from(Span::styled(
-                        "-- Then write your SQL queries here", 
-                        Style::default().fg(Color::Gray)
+                        "-- Then write your SQL queries here",
+                        Style::default().fg(Color::Gray),
                     )),
                     Line::from(""),
                     Line::from(Span::styled(
-                        "-- Example:", 
-                        Style::default().fg(Color::Gray)
+                        "-- Example:",
+                        Style::default().fg(Color::Gray),
                     )),
                     Line::from(Span::styled(
-                        "-- SELECT * FROM users LIMIT 10;", 
-                        Style::default().fg(Color::DarkGray)
+                        "-- SELECT * FROM users LIMIT 10;",
+                        Style::default().fg(Color::DarkGray),
                     )),
                 ]
             } else {
                 vec![
                     Line::from(Span::styled(
-                        "-- SQL Query Editor", 
-                        Style::default().fg(Color::Gray).add_modifier(Modifier::BOLD)
+                        "-- SQL Query Editor",
+                        Style::default()
+                            .fg(Color::Gray)
+                            .add_modifier(Modifier::BOLD),
                     )),
                     Line::from(""),
                     Line::from(Span::styled(
-                        "-- Write your SQL queries here", 
-                        Style::default().fg(Color::Gray)
+                        "-- Write your SQL queries here",
+                        Style::default().fg(Color::Gray),
                     )),
                     Line::from(Span::styled(
-                        "-- Press Ctrl+Enter to execute", 
-                        Style::default().fg(Color::Gray)
+                        "-- Press Ctrl+Enter to execute",
+                        Style::default().fg(Color::Gray),
                     )),
                     Line::from(""),
                     Line::from(Span::styled(
-                        "-- Example:", 
-                        Style::default().fg(Color::Gray)
+                        "-- Example:",
+                        Style::default().fg(Color::Gray),
                     )),
                     Line::from(Span::styled(
-                        "-- SELECT * FROM users LIMIT 10;", 
-                        Style::default().fg(Color::DarkGray)
+                        "-- SELECT * FROM users LIMIT 10;",
+                        Style::default().fg(Color::DarkGray),
                     )),
                 ]
             }
         } else {
-            state.query_content
+            state
+                .query_content
                 .lines()
                 .enumerate()
                 .map(|(i, line)| {
@@ -580,7 +628,7 @@ impl UI {
                                 } else {
                                     " "
                                 },
-                                Style::default().bg(Color::Gray).fg(Color::Black)
+                                Style::default().bg(Color::Gray).fg(Color::Black),
                             ));
                         }
                         if state.query_cursor_column + 1 < line.len() {
@@ -597,29 +645,50 @@ impl UI {
         // Add file info and keybinding help if focused
         if is_focused {
             query_lines.push(Line::from(""));
-            
+
             // Show current file info
             let file_info = if let Some(ref filename) = state.current_sql_file {
                 let modified_indicator = if state.query_modified { " [+]" } else { "" };
-                format!("File: {}.sql{}", filename, modified_indicator)
+                format!("File: {filename}.sql{modified_indicator}")
             } else {
                 "New file (unsaved)".to_string()
             };
-            
-            query_lines.push(Line::from(vec![
-                Span::styled(file_info, Style::default().fg(Color::Gray))
-            ]));
-            
+
+            query_lines.push(Line::from(vec![Span::styled(
+                file_info,
+                Style::default().fg(Color::Gray),
+            )]));
+
             // Add keybinding help
             query_lines.push(Line::from(""));
             query_lines.push(Line::from(vec![
-                Span::styled("Ctrl+S", Style::default().fg(Color::Yellow).add_modifier(Modifier::BOLD)),
+                Span::styled(
+                    "Ctrl+S",
+                    Style::default()
+                        .fg(Color::Yellow)
+                        .add_modifier(Modifier::BOLD),
+                ),
                 Span::styled(" save | ", Style::default().fg(Color::Gray)),
-                Span::styled("Ctrl+O", Style::default().fg(Color::Yellow).add_modifier(Modifier::BOLD)),
+                Span::styled(
+                    "Ctrl+O",
+                    Style::default()
+                        .fg(Color::Yellow)
+                        .add_modifier(Modifier::BOLD),
+                ),
                 Span::styled(" open | ", Style::default().fg(Color::Gray)),
-                Span::styled("Ctrl+N", Style::default().fg(Color::Yellow).add_modifier(Modifier::BOLD)),
+                Span::styled(
+                    "Ctrl+N",
+                    Style::default()
+                        .fg(Color::Yellow)
+                        .add_modifier(Modifier::BOLD),
+                ),
                 Span::styled(" new | ", Style::default().fg(Color::Gray)),
-                Span::styled("Ctrl+Enter", Style::default().fg(Color::Yellow).add_modifier(Modifier::BOLD)),
+                Span::styled(
+                    "Ctrl+Enter",
+                    Style::default()
+                        .fg(Color::Yellow)
+                        .add_modifier(Modifier::BOLD),
+                ),
                 Span::styled(" execute", Style::default().fg(Color::Gray)),
             ]));
         }
@@ -640,7 +709,7 @@ impl UI {
     /// Draw the status bar
     fn draw_status_bar(&self, frame: &mut Frame, area: Rect, state: &AppState) {
         let brand = format!("{} v{}", constants::APP_NAME, constants::VERSION);
-        
+
         let mode_text = format!(
             "[{}]",
             match state.mode {
@@ -654,7 +723,7 @@ impl UI {
 
         let connection_text = "Connected: production@localhost";
         let position_text = "Cell: B2 | Mode: Read-Only";
-        
+
         // Add help hint when not showing help
         let help_hint = if !state.show_help {
             " | Press ? for help"
@@ -691,29 +760,36 @@ impl UI {
 
         frame.render_widget(status_bar, area);
     }
-    
+
     /// Draw help overlay
     fn draw_help_overlay(&self, frame: &mut Frame, area: Rect) {
         use ratatui::layout::Alignment;
-        
+
         // Calculate centered overlay area
         let overlay_width = 80.min(area.width - 4);
         let overlay_height = 40.min(area.height - 4);
         let overlay_x = (area.width - overlay_width) / 2;
         let overlay_y = (area.height - overlay_height) / 2;
-        
+
         let overlay_area = Rect::new(overlay_x, overlay_y, overlay_width, overlay_height);
-        
+
         // Clear the background for the overlay
         frame.render_widget(Clear, overlay_area);
-        
+
         let help_text = vec![
             Line::from(""),
-            Line::from(vec![
-                Span::styled(format!("{} Help", constants::version_string()), Style::default().fg(self.theme.header_fg).add_modifier(Modifier::BOLD)),
-            ]).alignment(Alignment::Center),
+            Line::from(vec![Span::styled(
+                format!("{} Help", constants::version_string()),
+                Style::default()
+                    .fg(self.theme.header_fg)
+                    .add_modifier(Modifier::BOLD),
+            )])
+            .alignment(Alignment::Center),
             Line::from(""),
-            Line::from(vec![Span::styled("Navigation", Style::default().add_modifier(Modifier::BOLD | Modifier::UNDERLINED))]),
+            Line::from(vec![Span::styled(
+                "Navigation",
+                Style::default().add_modifier(Modifier::BOLD | Modifier::UNDERLINED),
+            )]),
             Line::from("  h/j/k/l        Navigate within panes"),
             Line::from("  Ctrl+h/j/k/l   Switch between panes"),
             Line::from("  Tab            Cycle through panes forward"),
@@ -721,14 +797,20 @@ impl UI {
             Line::from("  gg/G           Jump to first/last row"),
             Line::from("  0/$            Jump to first/last column"),
             Line::from(""),
-            Line::from(vec![Span::styled("Modes", Style::default().add_modifier(Modifier::BOLD | Modifier::UNDERLINED))]),
+            Line::from(vec![Span::styled(
+                "Modes",
+                Style::default().add_modifier(Modifier::BOLD | Modifier::UNDERLINED),
+            )]),
             Line::from("  i              Enter Insert mode (edit cells)"),
             Line::from("  v              Enter Visual mode (selection)"),
             Line::from("  :              Enter Command mode"),
             Line::from("  Space z q      Enter Query mode (SQL editor)"),
             Line::from("  ESC            Return to Normal mode"),
             Line::from(""),
-            Line::from(vec![Span::styled("Leader Commands (Space)", Style::default().add_modifier(Modifier::BOLD | Modifier::UNDERLINED))]),
+            Line::from(vec![Span::styled(
+                "Leader Commands (Space)",
+                Style::default().add_modifier(Modifier::BOLD | Modifier::UNDERLINED),
+            )]),
             Line::from("  Space c c      Change connection"),
             Line::from("  Space c d      Change database"),
             Line::from("  Space c r      Refresh connection"),
@@ -740,7 +822,10 @@ impl UI {
             Line::from("  Space e x      Export data"),
             Line::from("  Space e i      Import data"),
             Line::from(""),
-            Line::from(vec![Span::styled("General", Style::default().add_modifier(Modifier::BOLD | Modifier::UNDERLINED))]),
+            Line::from(vec![Span::styled(
+                "General",
+                Style::default().add_modifier(Modifier::BOLD | Modifier::UNDERLINED),
+            )]),
             Line::from("  ?              Toggle this help"),
             Line::from("  :q or :quit    Quit LazyTables (Command mode only)"),
             Line::from("  /              Search in current view"),
@@ -752,9 +837,10 @@ impl UI {
                 Span::styled(" or ", Style::default()),
                 Span::styled("ESC", Style::default().fg(self.theme.primary_highlight)),
                 Span::styled(" to close this help", Style::default()),
-            ]).alignment(Alignment::Center),
+            ])
+            .alignment(Alignment::Center),
         ];
-        
+
         let help = Paragraph::new(help_text)
             .block(
                 Block::default()
@@ -765,30 +851,29 @@ impl UI {
             )
             .style(Style::default().fg(self.theme.text))
             .alignment(Alignment::Left);
-        
+
         frame.render_widget(help, overlay_area);
     }
-    
+
     /// Draw command mode modal
     fn draw_command_modal(&self, frame: &mut Frame, area: Rect, state: &AppState) {
-        
         // Calculate modal position (center top, like lazyvim)
         let modal_width = 60.min(area.width - 4);
         let modal_height = 10;
         let modal_x = (area.width - modal_width) / 2;
         let modal_y = 2; // Near the top
-        
+
         let modal_area = Rect::new(modal_x, modal_y, modal_width, modal_height);
-        
+
         // Clear the background for the modal
         frame.render_widget(Clear, modal_area);
-        
+
         // Prepare command display with ':' prefix
         let command_text = format!(":{}", state.command_buffer);
-        
+
         // Get command suggestions based on current input
         let suggestions = self.get_command_suggestions(&state.command_buffer);
-        
+
         // Build the modal content
         let mut lines = vec![
             Line::from(""),
@@ -802,7 +887,7 @@ impl UI {
                 ),
             ]),
         ];
-        
+
         // Add separator if there are suggestions
         if !suggestions.is_empty() {
             lines.push(Line::from(""));
@@ -815,23 +900,25 @@ impl UI {
                         .add_modifier(Modifier::DIM),
                 ),
             ]));
-            
+
             // Add suggestions (max 5)
             for (i, suggestion) in suggestions.iter().take(5).enumerate() {
                 let prefix = if i == 0 { "  › " } else { "    " };
                 let style = if i == 0 {
                     Style::default().fg(self.theme.primary_highlight)
                 } else {
-                    Style::default().fg(self.theme.text).add_modifier(Modifier::DIM)
+                    Style::default()
+                        .fg(self.theme.text)
+                        .add_modifier(Modifier::DIM)
                 };
-                
+
                 lines.push(Line::from(vec![
                     Span::raw(prefix),
                     Span::styled(suggestion.as_str(), style),
                 ]));
             }
         }
-        
+
         let command_modal = Paragraph::new(lines)
             .block(
                 Block::default()
@@ -841,15 +928,15 @@ impl UI {
                     .style(Style::default().bg(self.theme.background)),
             )
             .style(Style::default().fg(self.theme.text));
-        
+
         frame.render_widget(command_modal, modal_area);
-        
+
         // Show cursor position
         let cursor_x = modal_area.x + 3 + command_text.len() as u16;
         let cursor_y = modal_area.y + 2;
         frame.set_cursor_position((cursor_x, cursor_y));
     }
-    
+
     /// Get command suggestions based on current input
     fn get_command_suggestions(&self, input: &str) -> Vec<String> {
         let all_commands = vec![
@@ -874,9 +961,9 @@ impl UI {
             ("history", "Show command history"),
             ("clear", "Clear current view"),
         ];
-        
+
         let mut suggestions = Vec::new();
-        
+
         // If input is empty, show common commands
         if input.is_empty() {
             suggestions.push("q - Quit".to_string());
@@ -888,20 +975,20 @@ impl UI {
             // Filter commands that start with the input
             for (cmd, desc) in &all_commands {
                 if cmd.starts_with(input) {
-                    suggestions.push(format!("{} - {}", cmd, desc));
+                    suggestions.push(format!("{cmd} - {desc}"));
                 }
             }
-            
+
             // If no exact prefix matches, try fuzzy matching
             if suggestions.is_empty() {
                 for (cmd, desc) in &all_commands {
                     if cmd.contains(input) {
-                        suggestions.push(format!("{} - {}", cmd, desc));
+                        suggestions.push(format!("{cmd} - {desc}"));
                     }
                 }
             }
         }
-        
+
         suggestions
     }
 }
@@ -936,16 +1023,15 @@ impl Theme {
 impl Default for Theme {
     fn default() -> Self {
         Self {
-            background: Color::Rgb(13, 13, 13),       // #0d0d0d
-            text: Color::Rgb(255, 255, 255),          // #ffffff
-            header_fg: Color::Rgb(203, 166, 247),     // #cba6f7
-            border: Color::Rgb(49, 50, 68),           // #313244
-            active_border: Color::Rgb(116, 199, 236), // #74c7ec
-            selection_bg: Color::Rgb(69, 71, 90),     // #45475a
-            status_bg: Color::Rgb(49, 50, 68),        // #313244
-            status_fg: Color::Rgb(205, 214, 244),     // #cdd6f4
+            background: Color::Rgb(13, 13, 13),           // #0d0d0d
+            text: Color::Rgb(255, 255, 255),              // #ffffff
+            header_fg: Color::Rgb(203, 166, 247),         // #cba6f7
+            border: Color::Rgb(49, 50, 68),               // #313244
+            active_border: Color::Rgb(116, 199, 236),     // #74c7ec
+            selection_bg: Color::Rgb(69, 71, 90),         // #45475a
+            status_bg: Color::Rgb(49, 50, 68),            // #313244
+            status_fg: Color::Rgb(205, 214, 244),         // #cdd6f4
             primary_highlight: Color::Rgb(116, 199, 236), // #74c7ec
         }
     }
 }
-

@@ -97,8 +97,12 @@ make clean            # Clean build artifacts
 - ✅ Directory structure creation on startup
 
 ### Connection Management
+- ✅ Two-step connection creation process (database type → configuration)
+- ✅ Connection string support with auto-parsing for PostgreSQL, MySQL, SQLite
+- ✅ Individual field input with database-specific defaults
+- ✅ Dynamic UI based on selected database type
 - ✅ Connection storage in ~/.lazytables directory
-- ✅ Connection creation modal with form validation
+- ✅ Elegant modal with step-by-step guidance
 - ✅ Display format showing "name (database_type)"
 - ✅ Secure credential storage (encrypted)
 

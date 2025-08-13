@@ -37,8 +37,8 @@ impl LayoutManager {
             connections_height_percent: 40,
             tables_height_percent: 40,
             details_height_percent: 20,
-            output_height_percent: 65,     // 65% for tabular output, 35% for SQL area
-            sql_files_width_percent: 25,  // 25% width for files column, 75% for editor
+            output_height_percent: 65, // 65% for tabular output, 35% for SQL area
+            sql_files_width_percent: 25, // 25% width for files column, 75% for editor
         }
     }
 
@@ -136,4 +136,3 @@ impl Default for LayoutManager {
         Self::new()
     }
 }
-

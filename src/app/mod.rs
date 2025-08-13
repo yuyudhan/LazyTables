@@ -86,7 +86,6 @@ impl App {
 
     /// Handle keyboard events based on current mode
     async fn handle_key_event(&mut self, key: KeyEvent) -> Result<()> {
-        
         // Handle ESC key globally to close help overlay
         if key.code == KeyCode::Esc && self.state.show_help {
             self.state.show_help = false;
@@ -141,7 +140,9 @@ impl App {
                     }
                     // Enter insert mode (or Query mode for query window)
                     (KeyModifiers::NONE, KeyCode::Char('i')) => {
-                        if self.state.focused_pane == FocusedPane::QueryWindow || self.state.focused_pane == FocusedPane::SqlFiles {
+                        if self.state.focused_pane == FocusedPane::QueryWindow
+                            || self.state.focused_pane == FocusedPane::SqlFiles
+                        {
                             self.state.mode = Mode::Query;
                         } else {
                             self.state.mode = Mode::Insert;
@@ -173,34 +174,46 @@ impl App {
                             // Load selected SQL file
                             if let Err(e) = self.state.load_selected_sql_file() {
                                 // TODO: Show error message
-                                eprintln!("Failed to load SQL file: {}", e);
+                                eprintln!("Failed to load SQL file: {e}");
                             }
                         }
                     }
                     // SQL Query operations - when query window or SQL files pane is focused
                     (KeyModifiers::CONTROL, KeyCode::Char('s')) => {
-                        if self.state.focused_pane == FocusedPane::QueryWindow || self.state.focused_pane == FocusedPane::SqlFiles {
+                        if self.state.focused_pane == FocusedPane::QueryWindow
+                            || self.state.focused_pane == FocusedPane::SqlFiles
+                        {
                             // Save current query
                             if let Err(e) = self.state.save_query() {
                                 // TODO: Show error message
-                                eprintln!("Failed to save query: {}", e);
+                                eprintln!("Failed to save query: {e}");
                             }
                         }
                     }
                     (KeyModifiers::CONTROL, KeyCode::Char('o')) => {
-                        if self.state.focused_pane == FocusedPane::QueryWindow || self.state.focused_pane == FocusedPane::SqlFiles {
+                        if self.state.focused_pane == FocusedPane::QueryWindow
+                            || self.state.focused_pane == FocusedPane::SqlFiles
+                        {
                             // Refresh SQL file list
                             self.state.refresh_sql_files();
                             self.state.clamp_sql_file_selection();
                         }
                     }
                     (KeyModifiers::CONTROL, KeyCode::Char('n')) => {
-                        if self.state.focused_pane == FocusedPane::QueryWindow || self.state.focused_pane == FocusedPane::SqlFiles {
+                        if self.state.focused_pane == FocusedPane::QueryWindow
+                            || self.state.focused_pane == FocusedPane::SqlFiles
+                        {
                             // Create new query file
-                            let filename = format!("query_{}", std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).unwrap().as_secs());
+                            let filename = format!(
+                                "query_{}",
+                                std::time::SystemTime::now()
+                                    .duration_since(std::time::UNIX_EPOCH)
+                                    .unwrap()
+                                    .as_secs()
+                            );
                             if let Err(e) = self.state.new_query_file(&filename) {
                                 // TODO: Show error message
-                                eprintln!("Failed to create new query: {}", e);
+                                eprintln!("Failed to create new query: {e}");
                             }
                         }
                     }
@@ -209,7 +222,7 @@ impl App {
                             // Execute SQL query under cursor
                             if let Some(statement) = self.state.get_statement_under_cursor() {
                                 // TODO: Execute the SQL statement
-                                println!("Executing SQL: {}", statement);
+                                println!("Executing SQL: {statement}");
                             }
                         }
                     }
@@ -281,7 +294,7 @@ impl App {
                         // Save current query
                         if let Err(e) = self.state.save_query() {
                             // TODO: Show error message
-                            eprintln!("Failed to save query: {}", e);
+                            eprintln!("Failed to save query: {e}");
                         }
                     }
                     KeyCode::Char('o') if key.modifiers.contains(KeyModifiers::CONTROL) => {
@@ -290,17 +303,23 @@ impl App {
                     }
                     KeyCode::Char('n') if key.modifiers.contains(KeyModifiers::CONTROL) => {
                         // Create new query file
-                        let filename = format!("query_{}", std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).unwrap().as_secs());
+                        let filename = format!(
+                            "query_{}",
+                            std::time::SystemTime::now()
+                                .duration_since(std::time::UNIX_EPOCH)
+                                .unwrap()
+                                .as_secs()
+                        );
                         if let Err(e) = self.state.new_query_file(&filename) {
                             // TODO: Show error message
-                            eprintln!("Failed to create new query: {}", e);
+                            eprintln!("Failed to create new query: {e}");
                         }
                     }
                     KeyCode::Enter if key.modifiers.contains(KeyModifiers::CONTROL) => {
                         // Execute SQL query under cursor
                         if let Some(statement) = self.state.get_statement_under_cursor() {
                             // TODO: Execute the SQL statement
-                            println!("Executing SQL: {}", statement);
+                            println!("Executing SQL: {statement}");
                         }
                     }
                     KeyCode::Enter => {
@@ -338,10 +357,17 @@ impl App {
     /// Handle connection modal key events
     async fn handle_connection_modal_key_event(&mut self, key: KeyEvent) -> Result<()> {
         use crate::ui::components::ConnectionField;
-        
+
         match key.code {
             KeyCode::Esc => {
-                self.state.close_add_connection_modal();
+                // In connection details step, Esc goes back to database type selection
+                if self.state.connection_modal_state.current_step
+                    == crate::ui::components::ModalStep::ConnectionDetails
+                {
+                    self.state.connection_modal_state.go_back();
+                } else {
+                    self.state.close_add_connection_modal();
+                }
             }
             KeyCode::Tab => {
                 self.state.connection_modal_state.next_field();
@@ -349,32 +375,66 @@ impl App {
             KeyCode::BackTab => {
                 self.state.connection_modal_state.previous_field();
             }
-            KeyCode::Down if matches!(self.state.connection_modal_state.focused_field, ConnectionField::DatabaseType | ConnectionField::SslMode) => {
+            KeyCode::Down
+                if matches!(
+                    self.state.connection_modal_state.focused_field,
+                    ConnectionField::DatabaseType | ConnectionField::SslMode
+                ) =>
+            {
                 // Handle dropdown navigation
                 match self.state.connection_modal_state.focused_field {
                     ConnectionField::DatabaseType => {
-                        let current = self.state.connection_modal_state.db_type_list_state.selected().unwrap_or(0);
+                        let current = self
+                            .state
+                            .connection_modal_state
+                            .db_type_list_state
+                            .selected()
+                            .unwrap_or(0);
                         let new_index = (current + 1).min(3); // 4 database types (0-3)
-                        self.state.connection_modal_state.select_database_type(new_index);
+                        self.state
+                            .connection_modal_state
+                            .select_database_type(new_index);
                     }
                     ConnectionField::SslMode => {
-                        let current = self.state.connection_modal_state.ssl_list_state.selected().unwrap_or(0);
+                        let current = self
+                            .state
+                            .connection_modal_state
+                            .ssl_list_state
+                            .selected()
+                            .unwrap_or(0);
                         let new_index = (current + 1).min(5); // 6 SSL modes (0-5)
                         self.state.connection_modal_state.select_ssl_mode(new_index);
                     }
                     _ => {}
                 }
             }
-            KeyCode::Up if matches!(self.state.connection_modal_state.focused_field, ConnectionField::DatabaseType | ConnectionField::SslMode) => {
+            KeyCode::Up
+                if matches!(
+                    self.state.connection_modal_state.focused_field,
+                    ConnectionField::DatabaseType | ConnectionField::SslMode
+                ) =>
+            {
                 // Handle dropdown navigation
                 match self.state.connection_modal_state.focused_field {
                     ConnectionField::DatabaseType => {
-                        let current = self.state.connection_modal_state.db_type_list_state.selected().unwrap_or(0);
+                        let current = self
+                            .state
+                            .connection_modal_state
+                            .db_type_list_state
+                            .selected()
+                            .unwrap_or(0);
                         let new_index = current.saturating_sub(1);
-                        self.state.connection_modal_state.select_database_type(new_index);
+                        self.state
+                            .connection_modal_state
+                            .select_database_type(new_index);
                     }
                     ConnectionField::SslMode => {
-                        let current = self.state.connection_modal_state.ssl_list_state.selected().unwrap_or(0);
+                        let current = self
+                            .state
+                            .connection_modal_state
+                            .ssl_list_state
+                            .selected()
+                            .unwrap_or(0);
                         let new_index = current.saturating_sub(1);
                         self.state.connection_modal_state.select_ssl_mode(new_index);
                     }
@@ -397,6 +457,16 @@ impl App {
                     }
                     ConnectionField::Cancel => {
                         self.state.close_add_connection_modal();
+                    }
+                    ConnectionField::DatabaseType => {
+                        // In database type selection step, Enter advances to next step
+                        if self.state.connection_modal_state.current_step
+                            == crate::ui::components::ModalStep::DatabaseTypeSelection
+                        {
+                            self.state.connection_modal_state.advance_step();
+                        } else {
+                            self.state.connection_modal_state.next_field();
+                        }
                     }
                     _ => {
                         // For regular fields, Enter moves to next field
@@ -421,4 +491,3 @@ impl App {
         Ok(())
     }
 }
-

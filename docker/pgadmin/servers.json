@@ -1,0 +1,26 @@
+{
+  "Servers": {
+    "1": {
+      "Name": "LazyTables Test Database",
+      "Group": "Test Servers",
+      "Host": "postgres",
+      "Port": 5432,
+      "MaintenanceDB": "test_db",
+      "Username": "lazytables",
+      "PassFile": "/tmp/pgpassfile",
+      "SSLMode": "prefer",
+      "SSLCert": "<STORAGE_DIR>/.postgresql/postgresql.crt",
+      "SSLKey": "<STORAGE_DIR>/.postgresql/postgresql.key",
+      "SSLCompression": 0,
+      "Timeout": 10,
+      "UseSSHTunnel": 0,
+      "TunnelPort": "22",
+      "TunnelAuthentication": 0,
+      "KerberosAuthentication": false,
+      "ConnectionParameters": {
+        "sslmode": "prefer",
+        "connect_timeout": "10"
+      }
+    }
+  }
+}

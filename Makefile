@@ -24,8 +24,11 @@ help:
 	@echo "  make docker-dev       - Run in Docker container"
 	@echo ""
 	@echo "Database:"
-	@echo "  make db-up            - Start test PostgreSQL"
-	@echo "  make db-down          - Stop test PostgreSQL"
+	@echo "  make db-up            - Start test databases (PostgreSQL + pgAdmin)"
+	@echo "  make db-down          - Stop test databases"
+	@echo "  make db-logs          - View database logs"
+	@echo "  make db-reset         - Reset databases with fresh data"
+	@echo "  make db-status        - Show database container status"
 	@echo ""
 	@echo "Cleanup:"
 	@echo "  make clean            - Clean build artifacts"
@@ -65,19 +68,27 @@ docker-dev:
 
 # Database (for testing)
 db-up:
-	docker run -d \
-		--name lazytables-postgres \
-		-e POSTGRES_USER=lazytables \
-		-e POSTGRES_PASSWORD=lazytables \
-		-e POSTGRES_DB=test_db \
-		-p 5432:5432 \
-		postgres:16-alpine
-	@echo "Test PostgreSQL started on port 5432"
+	docker-compose -f docker-compose.test.yml up -d
+	@echo "Test databases started:"
+	@echo "  PostgreSQL:      localhost:5432"
+	@echo "  pgAdmin:         http://localhost:8080"
+	@echo "  User/Pass:       lazytables / lazytables_dev"
+	@echo "  Admin User/Pass: admin@lazytables.dev / lazytables_admin"
 
 db-down:
-	docker stop lazytables-postgres || true
-	docker rm lazytables-postgres || true
-	@echo "Test PostgreSQL stopped"
+	docker-compose -f docker-compose.test.yml down
+	@echo "Test databases stopped"
+
+db-logs:
+	docker-compose -f docker-compose.test.yml logs -f
+
+db-reset:
+	docker-compose -f docker-compose.test.yml down -v
+	docker-compose -f docker-compose.test.yml up -d
+	@echo "Test databases reset with fresh data"
+
+db-status:
+	docker-compose -f docker-compose.test.yml ps
 
 # Cleanup
 clean:

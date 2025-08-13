@@ -51,4 +51,3 @@ impl Connection for PostgresConnection {
         &self.config
     }
 }
-

@@ -8,5 +8,5 @@ pub const APP_NAME: &str = "LazyTables";
 
 /// Full version string
 pub fn version_string() -> String {
-    format!("{} v{}", APP_NAME, VERSION)
+    format!("{APP_NAME} v{VERSION}")
 }

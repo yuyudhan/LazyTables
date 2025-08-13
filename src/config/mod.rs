@@ -79,39 +79,39 @@ impl Config {
             .map(|config| config.join("lazytables").join("config.toml"))
             .unwrap_or_else(|| PathBuf::from(".config/lazytables/config.toml"))
     }
-    
+
     /// Get data directory path - uses ~/.lazytables
     pub fn data_dir() -> PathBuf {
         dirs::home_dir()
             .map(|home| home.join(".lazytables"))
             .unwrap_or_else(|| PathBuf::from(".lazytables"))
     }
-    
+
     /// Get connections storage path
     pub fn connections_path() -> PathBuf {
         Self::data_dir().join("connections.json")
     }
-    
+
     /// Get SQL files directory
     pub fn sql_files_dir() -> PathBuf {
         Self::data_dir().join("sql_files")
     }
-    
+
     /// Get logs directory  
     pub fn logs_dir() -> PathBuf {
         Self::data_dir().join("logs")
     }
-    
+
     /// Get backups directory
     pub fn backups_dir() -> PathBuf {
         Self::data_dir().join("backups")
     }
-    
+
     /// Ensure all necessary directories exist
     pub fn ensure_directories() -> Result<()> {
         let data_dir = Self::data_dir();
         let config_dir = Self::default_path().parent().unwrap().to_path_buf();
-        
+
         // Create main directories
         fs::create_dir_all(&config_dir)?;
         fs::create_dir_all(&data_dir)?;
@@ -119,7 +119,7 @@ impl Config {
         fs::create_dir_all(Self::logs_dir())?;
         fs::create_dir_all(Self::backups_dir())?;
         fs::create_dir_all(data_dir.join("connections"))?;
-        
+
         // Create README.md if it doesn't exist
         let readme_path = data_dir.join("README.md");
         if !readme_path.exists() {
@@ -138,7 +138,7 @@ This directory is created automatically by LazyTables.
 ";
             fs::write(&readme_path, readme_content)?;
         }
-        
+
         // Create sample query file if sql_files is empty
         let sample_query_path = Self::sql_files_dir().join("sample_queries.sql");
         if !sample_query_path.exists() {
@@ -165,7 +165,7 @@ SELECT
 ";
             fs::write(&sample_query_path, sample_content)?;
         }
-        
+
         Ok(())
     }
 }
@@ -194,4 +194,3 @@ impl Default for Config {
         }
     }
 }
-
