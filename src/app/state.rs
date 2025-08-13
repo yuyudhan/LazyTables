@@ -108,6 +108,8 @@ pub struct AppState {
     pub current_sql_file: Option<String>,
     /// Whether query content has been modified
     pub query_modified: bool,
+    /// Last focused left column pane (for smarter navigation)
+    pub last_left_pane: FocusedPane,
 }
 
 impl AppState {
@@ -141,17 +143,90 @@ impl AppState {
             selected_sql_file: 0,
             current_sql_file: None,
             query_modified: false,
+            last_left_pane: FocusedPane::Connections,
         }
     }
 
     /// Cycle focus to the next pane
     pub fn cycle_focus_forward(&mut self) {
-        self.focused_pane = self.focused_pane.next();
+        let new_pane = self.focused_pane.next();
+        self.update_focus(new_pane);
     }
 
     /// Cycle focus to the previous pane
     pub fn cycle_focus_backward(&mut self) {
-        self.focused_pane = self.focused_pane.previous();
+        let new_pane = self.focused_pane.previous();
+        self.update_focus(new_pane);
+    }
+
+    /// Move focus left (Ctrl+h)
+    pub fn move_focus_left(&mut self) {
+        let new_pane = match self.focused_pane {
+            FocusedPane::TabularOutput => {
+                // Smart selection: go to the last focused left pane, defaulting to middle (Tables)
+                match self.last_left_pane {
+                    FocusedPane::Connections | FocusedPane::Tables | FocusedPane::Details => self.last_left_pane,
+                    _ => FocusedPane::Tables, // Default to middle pane
+                }
+            },
+            FocusedPane::QueryWindow => FocusedPane::Details,
+            FocusedPane::SqlFiles => FocusedPane::QueryWindow,
+            // Left column panes don't have anything to the left
+            _ => self.focused_pane,
+        };
+        
+        self.update_focus(new_pane);
+    }
+
+    /// Move focus down (Ctrl+j)
+    pub fn move_focus_down(&mut self) {
+        let new_pane = match self.focused_pane {
+            FocusedPane::Connections => FocusedPane::Tables,
+            FocusedPane::Tables => FocusedPane::Details,
+            FocusedPane::TabularOutput => FocusedPane::QueryWindow,
+            // Bottom panes don't have anything below
+            _ => self.focused_pane,
+        };
+        
+        self.update_focus(new_pane);
+    }
+
+    /// Move focus up (Ctrl+k)
+    pub fn move_focus_up(&mut self) {
+        let new_pane = match self.focused_pane {
+            FocusedPane::Tables => FocusedPane::Connections,
+            FocusedPane::Details => FocusedPane::Tables,
+            FocusedPane::QueryWindow => FocusedPane::TabularOutput,
+            FocusedPane::SqlFiles => FocusedPane::TabularOutput,
+            // Top panes don't have anything above
+            _ => self.focused_pane,
+        };
+        
+        self.update_focus(new_pane);
+    }
+
+    /// Move focus right (Ctrl+l)
+    pub fn move_focus_right(&mut self) {
+        let new_pane = match self.focused_pane {
+            FocusedPane::Connections => FocusedPane::TabularOutput,
+            FocusedPane::Tables => FocusedPane::TabularOutput,
+            FocusedPane::Details => FocusedPane::QueryWindow,
+            FocusedPane::QueryWindow => FocusedPane::SqlFiles,
+            // Right column panes don't have anything to the right
+            _ => self.focused_pane,
+        };
+        
+        self.update_focus(new_pane);
+    }
+
+    /// Update focus and track left pane usage for smart navigation
+    fn update_focus(&mut self, new_pane: FocusedPane) {
+        // Track the last focused left column pane for smart navigation
+        if matches!(self.focused_pane, FocusedPane::Connections | FocusedPane::Tables | FocusedPane::Details) {
+            self.last_left_pane = self.focused_pane;
+        }
+        
+        self.focused_pane = new_pane;
     }
 
     /// Move selection up based on current focus
