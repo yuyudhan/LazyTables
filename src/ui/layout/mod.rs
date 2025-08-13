@@ -9,11 +9,13 @@ pub struct LayoutAreas {
     pub connections: Rect,
     pub tables: Rect,
     pub details: Rect,
-    pub main_content: Rect,
+    pub tabular_output: Rect,
+    pub sql_files: Rect,
+    pub query_window: Rect,
     pub status_bar: Rect,
 }
 
-/// Manages the four-pane layout
+/// Manages the six-pane layout
 pub struct LayoutManager {
     /// Width percentage for left section (connections, tables, details)
     left_width_percent: u16,
@@ -21,6 +23,10 @@ pub struct LayoutManager {
     connections_height_percent: u16,
     tables_height_percent: u16,
     details_height_percent: u16,
+    /// Height percentage for tabular output (top of right area)
+    output_height_percent: u16,
+    /// Width percentage for SQL files column (right side of SQL area)
+    sql_files_width_percent: u16,
 }
 
 impl LayoutManager {
@@ -31,6 +37,8 @@ impl LayoutManager {
             connections_height_percent: 40,
             tables_height_percent: 40,
             details_height_percent: 20,
+            output_height_percent: 65,     // 65% for tabular output, 35% for SQL area
+            sql_files_width_percent: 25,  // 25% width for files column, 75% for editor
         }
     }
 
@@ -60,7 +68,7 @@ impl LayoutManager {
             .split(body);
 
         let left_section = body_chunks[0];
-        let main_content = body_chunks[1];
+        let right_section = body_chunks[1];
 
         // Split left section vertically into three panes
         let left_chunks = Layout::default()
@@ -76,12 +84,38 @@ impl LayoutManager {
         let tables = left_chunks[1];
         let details = left_chunks[2];
 
+        // Split right section vertically into tabular output and SQL area
+        let right_chunks = Layout::default()
+            .direction(Direction::Vertical)
+            .constraints([
+                Constraint::Percentage(self.output_height_percent),
+                Constraint::Min(0), // SQL area takes remaining space
+            ])
+            .split(right_section);
+
+        let tabular_output = right_chunks[0];
+        let sql_area = right_chunks[1];
+
+        // Split SQL area horizontally into query editor and files column
+        let sql_chunks = Layout::default()
+            .direction(Direction::Horizontal)
+            .constraints([
+                Constraint::Min(0), // Query window takes remaining space
+                Constraint::Percentage(self.sql_files_width_percent),
+            ])
+            .split(sql_area);
+
+        let query_window = sql_chunks[0];
+        let sql_files = sql_chunks[1];
+
         LayoutAreas {
             header,
             connections,
             tables,
             details,
-            main_content,
+            tabular_output,
+            sql_files,
+            query_window,
             status_bar,
         }
     }

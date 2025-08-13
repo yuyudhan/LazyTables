@@ -2,20 +2,20 @@
 
 use crate::{
     core::error::Result,
-    database::{Connection, ConnectionInfo},
+    database::{Connection, ConnectionConfig},
 };
 use sqlx::{postgres::PgPool, Pool, Postgres};
 
 /// PostgreSQL connection implementation
 pub struct PostgresConnection {
-    info: ConnectionInfo,
+    config: ConnectionConfig,
     pool: Option<Pool<Postgres>>,
 }
 
 impl PostgresConnection {
     /// Create a new PostgreSQL connection
-    pub fn new(info: ConnectionInfo) -> Self {
-        Self { info, pool: None }
+    pub fn new(config: ConnectionConfig) -> Self {
+        Self { config, pool: None }
     }
 }
 
@@ -24,11 +24,11 @@ impl Connection for PostgresConnection {
     async fn connect(&mut self) -> Result<()> {
         let connection_string = format!(
             "postgres://{}:{}@{}:{}/{}",
-            self.info.username,
-            self.info.password.as_deref().unwrap_or(""),
-            self.info.host,
-            self.info.port,
-            self.info.database
+            self.config.username,
+            self.config.password.as_deref().unwrap_or(""),
+            self.config.host,
+            self.config.port,
+            self.config.database.as_deref().unwrap_or("postgres")
         );
 
         let pool = PgPool::connect(&connection_string).await?;
@@ -47,8 +47,8 @@ impl Connection for PostgresConnection {
         self.pool.is_some()
     }
 
-    fn info(&self) -> &ConnectionInfo {
-        &self.info
+    fn config(&self) -> &ConnectionConfig {
+        &self.config
     }
 }
 

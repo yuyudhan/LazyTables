@@ -1,7 +1,7 @@
 // FilePath: src/config/mod.rs
 
 use crate::core::error::Result;
-use directories::ProjectDirs;
+// Removed directories crate, using dirs crate for home_dir
 use serde::{Deserialize, Serialize};
 use std::{fs, path::PathBuf};
 
@@ -73,11 +73,100 @@ impl Config {
         Ok(())
     }
 
-    /// Get default configuration path
+    /// Get default configuration path - uses ~/.config/lazytables/config.toml  
     pub fn default_path() -> PathBuf {
-        ProjectDirs::from("com", "lazytables", "LazyTables")
-            .map(|dirs| dirs.config_dir().join("config.toml"))
+        dirs::config_dir()
+            .map(|config| config.join("lazytables").join("config.toml"))
             .unwrap_or_else(|| PathBuf::from(".config/lazytables/config.toml"))
+    }
+    
+    /// Get data directory path - uses ~/.lazytables
+    pub fn data_dir() -> PathBuf {
+        dirs::home_dir()
+            .map(|home| home.join(".lazytables"))
+            .unwrap_or_else(|| PathBuf::from(".lazytables"))
+    }
+    
+    /// Get connections storage path
+    pub fn connections_path() -> PathBuf {
+        Self::data_dir().join("connections.json")
+    }
+    
+    /// Get SQL files directory
+    pub fn sql_files_dir() -> PathBuf {
+        Self::data_dir().join("sql_files")
+    }
+    
+    /// Get logs directory  
+    pub fn logs_dir() -> PathBuf {
+        Self::data_dir().join("logs")
+    }
+    
+    /// Get backups directory
+    pub fn backups_dir() -> PathBuf {
+        Self::data_dir().join("backups")
+    }
+    
+    /// Ensure all necessary directories exist
+    pub fn ensure_directories() -> Result<()> {
+        let data_dir = Self::data_dir();
+        let config_dir = Self::default_path().parent().unwrap().to_path_buf();
+        
+        // Create main directories
+        fs::create_dir_all(&config_dir)?;
+        fs::create_dir_all(&data_dir)?;
+        fs::create_dir_all(Self::sql_files_dir())?;
+        fs::create_dir_all(Self::logs_dir())?;
+        fs::create_dir_all(Self::backups_dir())?;
+        fs::create_dir_all(data_dir.join("connections"))?;
+        
+        // Create README.md if it doesn't exist
+        let readme_path = data_dir.join("README.md");
+        if !readme_path.exists() {
+            let readme_content = "# LazyTables Data Directory
+
+This directory contains all LazyTables application data:
+
+- `config.toml`: Main configuration file
+- `connections.json`: Database connection definitions  
+- `connections/`: Individual connection files
+- `sql_files/`: Saved SQL query files
+- `logs/`: Application log files
+- `backups/`: Backup files
+
+This directory is created automatically by LazyTables.
+";
+            fs::write(&readme_path, readme_content)?;
+        }
+        
+        // Create sample query file if sql_files is empty
+        let sample_query_path = Self::sql_files_dir().join("sample_queries.sql");
+        if !sample_query_path.exists() {
+            let sample_content = "-- Sample SQL queries for LazyTables
+-- Use Ctrl+Enter to execute queries
+
+-- Basic table information
+SELECT table_name, table_type 
+FROM information_schema.tables 
+WHERE table_schema = 'public'
+ORDER BY table_name;
+
+-- Count rows in all tables
+SELECT 
+    schemaname,
+    tablename,
+    n_tup_ins - n_tup_del as row_count
+FROM pg_stat_user_tables
+ORDER BY row_count DESC;
+
+-- Show database size
+SELECT 
+    pg_size_pretty(pg_database_size(current_database())) as database_size;
+";
+            fs::write(&sample_query_path, sample_content)?;
+        }
+        
+        Ok(())
     }
 }
 

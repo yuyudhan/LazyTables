@@ -31,18 +31,18 @@ lazytables --config /path/to/config.toml
 
 ## Understanding the Interface
 
-LazyTables uses a **four-pane layout** designed for efficient database navigation:
+LazyTables uses a **six-pane layout** designed for efficient database navigation and SQL querying:
 
 ```
 ┌─────────────┬─────────────────────────────┐
 │ Connections │                             │
-│             │                             │
-├─────────────┤        Main Content         │
-│ Tables/     │                             │
-│ Views       │                             │
+│             │      Query Results          │
 ├─────────────┤                             │
-│ Table       │                             │
-│ Details     │                             │
+│ Tables/     ├─────────────────────────────┤
+│ Views       │                       │Files│
+├─────────────┤   SQL Query Editor    │List │
+│ Table       │                       │     │
+│ Details     │                       │     │
 └─────────────┴─────────────────────────────┘
 ```
 
@@ -63,10 +63,22 @@ LazyTables uses a **four-pane layout** designed for efficient database navigatio
    - Column information, indexes, constraints
    - Access with focus shortcut: `d`
 
-4. **Main Content Area** (Right)
-   - Query editor and results display
-   - Primary workspace for data interaction
-   - Access with focus shortcut: `m`
+4. **Query Results Area** (Top Right)
+   - Displays tabular output from SQL queries
+   - Shows selected table data
+   - Access with focus shortcut: `r`
+
+5. **SQL Query Editor** (Bottom Left)
+   - Write and edit SQL queries
+   - Save queries to files
+   - Execute queries with cursor-based execution
+   - Access with focus shortcut: `q`
+
+6. **SQL Files Browser** (Bottom Right Column)
+   - Thin column listing all saved SQL files
+   - Shows currently loaded file with ● indicator
+   - Load files by pressing Enter
+   - Access with focus shortcut: `s`
 
 ## Basic Navigation
 
@@ -99,7 +111,9 @@ Quickly jump to specific panes:
 c                   # Focus Connections pane
 t                   # Focus Tables pane
 d                   # Focus Details pane
-m                   # Focus Main content area
+r                   # Focus Query Results area
+s                   # Focus SQL Files Browser
+q                   # Focus SQL Query Editor
 ```
 
 ### Essential Commands
@@ -188,28 +202,42 @@ When you select a table:
 
 ## Running Your First Query
 
-### Opening the Query Editor
+### Working with SQL Files
 
-1. **Focus Main Content area**: Press `m`
-2. **Enter Query mode**: Press `q` (switches to query editor)
+#### Opening the Query Editor
+
+1. **Focus SQL Query Editor**: Press `q` (bottom right pane)
+2. **Enter Insert mode**: Press `i` to start editing
 3. **Type your query**:
    ```sql
    SELECT * FROM users LIMIT 10;
    ```
-4. **Execute query**: Press `Ctrl+Enter`
-5. **View results**: Results display below the query editor
+4. **Execute query**: Press `Ctrl+Enter` (works in both Normal and Query mode)
+5. **View results**: Results display in the Query Results area above
+
+#### Managing SQL Files
+
+1. **Browse files**: Press `s` to focus SQL Files Browser
+2. **Load file**: Navigate to file with `j/k` and press `Enter`
+3. **Create new file**: Press `Ctrl+N` (from any SQL pane)
+4. **Save current query**: Press `Ctrl+S` (from query editor or files browser)
+5. **Refresh file list**: Press `Ctrl+O`
 
 ### Query Editor Features
 
 ```bash
-# Query editing
-Ctrl+Enter          # Execute query
-Ctrl+S              # Save query to file
-Ctrl+O              # Open query from file
-Ctrl+Z              # Undo
-Ctrl+Y              # Redo
+# Query editing (in Query mode - press 'i' when focused on query editor)
+Ctrl+Enter          # Execute SQL statement under cursor
+Ctrl+S              # Save current query to file
+Ctrl+O              # Open saved query file (TODO: file picker)
+Ctrl+N              # Create new query file
+Esc                 # Return to Normal mode
 
-# Result navigation
+# Navigation (in Normal mode)
+h, j, k, l          # Move cursor in query editor
+i                   # Enter Query mode for editing
+
+# Result navigation (in Query Results pane)
 j, k                # Scroll results up/down
 h, l                # Scroll results left/right
 gg, G               # Jump to top/bottom of results
@@ -269,8 +297,8 @@ SELECT * FROM your_table LIMIT 5;
 ### Basic Configuration
 
 LazyTables creates a config file at:
-- **macOS**: `~/Library/Application Support/LazyTables/config.toml`
-- **Linux**: `~/.config/lazytables/config.toml`
+- **macOS**: `~/.lazytables/config.toml`
+- **Linux**: `~/.lazytables/config.toml`
 
 ### Common Settings
 

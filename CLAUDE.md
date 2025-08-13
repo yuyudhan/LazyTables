@@ -6,7 +6,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 LazyTables is a terminal-based SQL database viewer and editor designed for developers who value keyboard-driven workflows. Built with Rust and featuring vim motions throughout, it provides a fast, intuitive interface for database management without leaving the terminal.
 
-**Current Status**: Early development phase - only PRD documentation exists. No implementation has begun.
+**Current Status**: Active development phase - core UI framework and SQL query editor functionality implemented. Basic navigation, connection management, and split-pane layout are working.
 
 ## Technical Stack
 
@@ -18,12 +18,14 @@ LazyTables is a terminal-based SQL database viewer and editor designed for devel
 
 ## Architecture Overview
 
-LazyTables will use a fixed four-pane layout optimized for database navigation:
+LazyTables uses a fixed six-pane layout optimized for database navigation and SQL querying:
 
 1. **Connections Pane** (Top Left): Manage database connections
 2. **Tables/Views Pane** (Middle Left): Navigate database objects  
 3. **Table Details Pane** (Bottom Left): Display metadata about selected table
-4. **Main Content Area** (Right): Primary workspace for viewing/editing data
+4. **Query Results Area** (Top Right): Display tabular query results
+5. **SQL Query Editor** (Bottom Left): Write, edit, and execute SQL queries
+6. **SQL Files Browser** (Bottom Right Column): Thin column to browse and load saved SQL files
 
 The application follows vim-style navigation with multiple modes:
 - **Normal Mode**: Navigation and commands (default)
@@ -75,6 +77,37 @@ make clean            # Clean build artifacts
 - MongoDB (document database support)
 - Additional databases based on community demand
 
+## Implemented Features (Current)
+
+### Core UI Framework
+- ✅ Five-pane layout with proper focus management
+- ✅ Vim-style navigation with h/j/k/l movement
+- ✅ Modal system for help and command entry
+- ✅ Theme support with default dark theme
+- ✅ Status bar with mode indicators
+
+### SQL Query Editor & File Management
+- ✅ Horizontal split layout: query editor with thin files column on right
+- ✅ SQL files browser with current file indicator
+- ✅ Basic text editing with cursor navigation
+- ✅ File management (save, load, create new queries)
+- ✅ Cursor-based SQL statement execution (Ctrl+Enter)
+- ✅ Query mode for full-screen SQL editing
+- ✅ Directory structure creation on startup
+
+### Connection Management
+- ✅ Connection storage in ~/.lazytables directory
+- ✅ Connection creation modal with form validation
+- ✅ Display format showing "name (database_type)"
+- ✅ Secure credential storage (encrypted)
+
+### Navigation & Key Bindings
+- ✅ Six-pane navigation with Ctrl+h/j/k/l and Tab/Shift+Tab
+- ✅ SQL file browser navigation (j/k to navigate, Enter to load)
+- ✅ Query editor key bindings (Ctrl+S/O/N for save/refresh/new)
+- ✅ Mode switching (Normal/Insert/Visual/Command/Query modes)
+- ✅ Help system with '?' key
+
 ## Key Features to Implement
 
 ### Core Functionality
@@ -96,14 +129,22 @@ make clean            # Clean build artifacts
 - Scrolling: 60 FPS smooth scrolling
 - Memory usage: < 50MB base
 
-## Configuration Structure (Future)
+## Configuration Structure
 
 ```
 ~/.config/lazytables/
-├── config.toml       # Main configuration
-├── plugins/          # Plugin directory
-├── themes/           # Theme files
-└── connections.toml  # Saved connections (encrypted)
+└── config.toml       # Main configuration file
+
+~/.lazytables/
+├── README.md         # Data directory documentation
+├── config.toml       # Legacy config location (deprecated)
+├── connections.json  # Database connection definitions
+├── connections/      # Individual connection files
+├── sql_files/        # Saved SQL query files
+│   └── sample_queries.sql  # Sample SQL queries
+├── logs/             # Application log files
+│   └── lazytables.log
+└── backups/          # Backup files
 ```
 
 ## Repository Structure (Planned)

@@ -384,8 +384,8 @@ Base Connection: Production DB
 ## Connection Configuration File
 
 LazyTables stores connections in:
-- **macOS**: `~/Library/Application Support/LazyTables/connections.toml`
-- **Linux**: `~/.config/lazytables/connections.toml`
+- **macOS**: `~/.lazytables/connections.toml`
+- **Linux**: `~/.lazytables/connections.toml`
 
 **Example configuration**:
 ```toml

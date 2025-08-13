@@ -10,7 +10,7 @@ use ratatui::{
     layout::{Constraint, Rect},
     style::{Color, Modifier, Style},
     text::{Line, Span},
-    widgets::{Block, Borders, Clear, List, ListItem, Paragraph, Row, Table},
+    widgets::{Block, Borders, Clear, List, ListItem, Paragraph, Row, Table, Wrap},
     Frame,
 };
 
@@ -54,8 +54,14 @@ impl UI {
         // Draw details pane
         self.draw_details_pane(frame, areas.details, state);
 
-        // Draw main content area
-        self.draw_main_content(frame, areas.main_content, state);
+        // Draw tabular output area
+        self.draw_tabular_output(frame, areas.tabular_output, state);
+
+        // Draw SQL files browser
+        self.draw_sql_files_pane(frame, areas.sql_files, state);
+
+        // Draw query window area
+        self.draw_query_window(frame, areas.query_window, state);
 
         // Draw status bar
         self.draw_status_bar(frame, areas.status_bar, state);
@@ -68,6 +74,13 @@ impl UI {
         // Draw command mode modal if in command mode
         if state.mode == Mode::Command {
             self.draw_command_modal(frame, frame.area(), state);
+        }
+
+        // Draw connection creation modal if active
+        if state.show_add_connection_modal {
+            // TODO: Implement modal state management
+            let modal_state = crate::ui::components::ConnectionModalState::new();
+            crate::ui::components::render_connection_modal(frame, &modal_state, frame.area());
         }
     }
 
@@ -94,15 +107,45 @@ impl UI {
             Style::default().fg(self.theme.border)
         };
 
-        let items: Vec<ListItem> = vec![
-            ListItem::new("▼ production"),
-            ListItem::new("  ● localhost"),
-            ListItem::new("  ○ staging_db"),
-            ListItem::new("▶ development"),
-            ListItem::new("  local_dev"),
-            ListItem::new(""),
-            ListItem::new("[+] Add New"),
-        ];
+        // Create list items from stored connections
+        let mut items: Vec<ListItem> = state.connections.connections
+            .iter()
+            .map(|connection| {
+                let status_indicator = if connection.is_connected { "●" } else { "○" };
+                let display_text = format!("{} {}", status_indicator, connection.display_string());
+                let style = if connection.is_connected {
+                    Style::default().fg(Color::Green)
+                } else {
+                    Style::default().fg(Color::Gray)
+                };
+                ListItem::new(Line::from(vec![
+                    Span::styled(display_text, style)
+                ]))
+            })
+            .collect();
+
+        // Add instruction text if no connections exist
+        if items.is_empty() {
+            items.push(ListItem::new(Line::from(vec![
+                Span::styled("No connections configured", Style::default().fg(Color::Gray))
+            ])));
+            items.push(ListItem::new(""));
+        }
+
+        // Add keybinding help
+        if is_focused {
+            items.push(ListItem::new(""));
+            items.push(ListItem::new(Line::from(vec![
+                Span::styled("Press ", Style::default().fg(Color::Gray)),
+                Span::styled("a", Style::default().fg(Color::Yellow).add_modifier(Modifier::BOLD)),
+                Span::styled(" to add connection", Style::default().fg(Color::Gray)),
+            ])));
+            items.push(ListItem::new(Line::from(vec![
+                Span::styled("Press ", Style::default().fg(Color::Gray)),
+                Span::styled("Enter", Style::default().fg(Color::Yellow).add_modifier(Modifier::BOLD)),
+                Span::styled(" to connect", Style::default().fg(Color::Gray)),
+            ])));
+        }
 
         let connections = List::new(items)
             .block(
@@ -192,9 +235,9 @@ impl UI {
         frame.render_widget(details, area);
     }
 
-    /// Draw the main content area
-    fn draw_main_content(&self, frame: &mut Frame, area: Rect, state: &AppState) {
-        let is_focused = state.focused_pane == FocusedPane::MainContent;
+    /// Draw the tabular output area
+    fn draw_tabular_output(&self, frame: &mut Frame, area: Rect, state: &AppState) {
+        let is_focused = state.focused_pane == FocusedPane::TabularOutput;
         let border_style = if is_focused {
             Style::default().fg(self.theme.active_border)
         } else {
@@ -225,13 +268,173 @@ impl UI {
             .header(header)
             .block(
                 Block::default()
-                    .title(" Main Content ")
+                    .title(" Query Results ")
                     .borders(Borders::ALL)
                     .border_style(border_style),
             )
             .row_highlight_style(Style::default().bg(self.theme.selection_bg));
 
         frame.render_widget(table, area);
+    }
+
+    /// Draw the SQL files browser pane
+    fn draw_sql_files_pane(&self, frame: &mut Frame, area: Rect, state: &AppState) {
+        let is_focused = state.focused_pane == FocusedPane::SqlFiles;
+        let border_style = if is_focused {
+            Style::default().fg(self.theme.active_border)
+        } else {
+            Style::default().fg(self.theme.border)
+        };
+
+        // Create list items from SQL files
+        let mut items: Vec<ListItem> = state.saved_sql_files
+            .iter()
+            .enumerate()
+            .map(|(i, filename)| {
+                let prefix = if Some(filename) == state.current_sql_file.as_ref() {
+                    "● " // Indicate currently loaded file
+                } else {
+                    "  "
+                };
+                
+                let style = if Some(filename) == state.current_sql_file.as_ref() {
+                    Style::default().fg(Color::Green).add_modifier(Modifier::BOLD)
+                } else if i == state.selected_sql_file && is_focused {
+                    Style::default().fg(self.theme.primary_highlight)
+                } else {
+                    Style::default().fg(self.theme.text)
+                };
+                
+                ListItem::new(Line::from(vec![
+                    Span::styled(format!("{}{}.sql", prefix, filename), style)
+                ]))
+            })
+            .collect();
+
+        // Add instruction text if no files exist
+        if items.is_empty() {
+            items.push(ListItem::new(Line::from(vec![
+                Span::styled("No SQL files found", Style::default().fg(Color::Gray))
+            ])));
+            items.push(ListItem::new(Line::from(vec![
+                Span::styled("Create files with Ctrl+N", Style::default().fg(Color::Gray))
+            ])));
+        } else if is_focused {
+            // Add keybinding help when focused
+            items.push(ListItem::new(""));
+            items.push(ListItem::new(Line::from(vec![
+                Span::styled("Press ", Style::default().fg(Color::Gray)),
+                Span::styled("Enter", Style::default().fg(Color::Yellow).add_modifier(Modifier::BOLD)),
+                Span::styled(" to load file", Style::default().fg(Color::Gray)),
+            ])));
+        }
+
+        let sql_files = List::new(items)
+            .block(
+                Block::default()
+                    .title(" SQL Files ")
+                    .borders(Borders::ALL)
+                    .border_style(border_style),
+            )
+            .highlight_style(
+                Style::default()
+                    .bg(self.theme.selection_bg)
+                    .add_modifier(Modifier::BOLD),
+            );
+
+        frame.render_widget(sql_files, area);
+    }
+
+    /// Draw the query window area
+    fn draw_query_window(&self, frame: &mut Frame, area: Rect, state: &AppState) {
+        let is_focused = state.focused_pane == FocusedPane::QueryWindow;
+        let border_style = if is_focused {
+            Style::default().fg(self.theme.active_border)
+        } else {
+            Style::default().fg(self.theme.border)
+        };
+
+        // Get query content lines
+        let mut query_lines: Vec<Line> = if state.query_content.is_empty() {
+            vec![
+                Line::from(Span::styled(
+                    "-- Enter your SQL query here", 
+                    Style::default().fg(Color::Gray)
+                ))
+            ]
+        } else {
+            state.query_content
+                .lines()
+                .enumerate()
+                .map(|(i, line)| {
+                    if i == state.query_cursor_line {
+                        // Highlight current line
+                        let mut spans = Vec::new();
+                        if state.query_cursor_column > 0 {
+                            spans.push(Span::raw(&line[..state.query_cursor_column]));
+                        }
+                        if is_focused {
+                            spans.push(Span::styled(
+                                if state.query_cursor_column < line.len() {
+                                    &line[state.query_cursor_column..state.query_cursor_column + 1]
+                                } else {
+                                    " "
+                                },
+                                Style::default().bg(Color::Gray).fg(Color::Black)
+                            ));
+                        }
+                        if state.query_cursor_column + 1 < line.len() {
+                            spans.push(Span::raw(&line[state.query_cursor_column + 1..]));
+                        }
+                        Line::from(spans)
+                    } else {
+                        Line::from(line)
+                    }
+                })
+                .collect()
+        };
+
+        // Add file info and keybinding help if focused
+        if is_focused {
+            query_lines.push(Line::from(""));
+            
+            // Show current file info
+            let file_info = if let Some(ref filename) = state.current_sql_file {
+                let modified_indicator = if state.query_modified { " [+]" } else { "" };
+                format!("File: {}.sql{}", filename, modified_indicator)
+            } else {
+                "New file (unsaved)".to_string()
+            };
+            
+            query_lines.push(Line::from(vec![
+                Span::styled(file_info, Style::default().fg(Color::Gray))
+            ]));
+            
+            // Add keybinding help
+            query_lines.push(Line::from(""));
+            query_lines.push(Line::from(vec![
+                Span::styled("Ctrl+S", Style::default().fg(Color::Yellow).add_modifier(Modifier::BOLD)),
+                Span::styled(" save | ", Style::default().fg(Color::Gray)),
+                Span::styled("Ctrl+O", Style::default().fg(Color::Yellow).add_modifier(Modifier::BOLD)),
+                Span::styled(" open | ", Style::default().fg(Color::Gray)),
+                Span::styled("Ctrl+N", Style::default().fg(Color::Yellow).add_modifier(Modifier::BOLD)),
+                Span::styled(" new | ", Style::default().fg(Color::Gray)),
+                Span::styled("Ctrl+Enter", Style::default().fg(Color::Yellow).add_modifier(Modifier::BOLD)),
+                Span::styled(" execute", Style::default().fg(Color::Gray)),
+            ]));
+        }
+
+        let query_editor = Paragraph::new(query_lines)
+            .block(
+                Block::default()
+                    .title(" SQL Query Editor ")
+                    .borders(Borders::ALL)
+                    .border_style(border_style),
+            )
+            .style(Style::default().fg(self.theme.text))
+            .wrap(Wrap { trim: false });
+
+        frame.render_widget(query_editor, area);
     }
 
     /// Draw the status bar
