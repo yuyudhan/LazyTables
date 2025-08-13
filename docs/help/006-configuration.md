@@ -16,8 +16,8 @@ LazyTables uses TOML configuration files for easy customization. Configuration i
 
 ### User Configuration
 
-**macOS**: `~/Library/Application Support/LazyTables/config.toml`
-**Linux**: `~/.config/lazytables/config.toml`
+**macOS**: `~/.lazytables/config.toml`
+**Linux**: `~/.lazytables/config.toml`
 
 ### System Configuration
 
@@ -38,7 +38,7 @@ lazytables
 LazyTables creates a default configuration on first run:
 
 ```toml
-# ~/.config/lazytables/config.toml
+# ~/.lazytables/config.toml
 
 [display]
 theme = "default"

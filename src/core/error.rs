@@ -3,11 +3,11 @@
 use thiserror::Error;
 
 /// Result type alias for LazyTables
-pub type Result<T> = std::result::Result<T, Error>;
+pub type Result<T> = std::result::Result<T, LazyTablesError>;
 
 /// Main error type for LazyTables
 #[derive(Error, Debug)]
-pub enum Error {
+pub enum LazyTablesError {
     #[error("IO error: {0}")]
     Io(#[from] std::io::Error),
 
@@ -38,13 +38,22 @@ pub enum Error {
     #[error("Operation not supported: {0}")]
     NotSupported(String),
 
+    #[error("Connection '{0}' already exists")]
+    ConnectionExists(String),
+
+    #[error("Connection '{0}' not found")]
+    ConnectionNotFound(String),
+
     #[error("{0}")]
     Other(String),
 }
 
-impl From<toml::ser::Error> for Error {
+impl From<toml::ser::Error> for LazyTablesError {
     fn from(err: toml::ser::Error) -> Self {
-        Error::Config(err.to_string())
+        LazyTablesError::Config(err.to_string())
     }
 }
+
+/// Legacy type alias for backwards compatibility
+pub type Error = LazyTablesError;
 
