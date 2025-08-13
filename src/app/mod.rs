@@ -6,7 +6,7 @@ use crate::{
     event::{Event, EventHandler},
     ui::UI,
 };
-use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
+use crossterm::event::{KeyCode, KeyEvent};
 use ratatui::{DefaultTerminal, Frame};
 use std::time::Duration;
 
@@ -92,6 +92,11 @@ impl App {
         if key.code == KeyCode::Esc && self.state.show_help {
             self.state.show_help = false;
             return Ok(());
+        }
+
+        // Handle connection modal if active
+        if self.state.show_add_connection_modal {
+            return self.handle_connection_modal_key_event(key).await;
         }
 
         match self.state.mode {
@@ -328,6 +333,86 @@ impl App {
             }
         }
 
+        Ok(())
+    }
+
+    /// Handle connection modal key events
+    async fn handle_connection_modal_key_event(&mut self, key: KeyEvent) -> Result<()> {
+        use crate::ui::components::ConnectionField;
+        
+        match key.code {
+            KeyCode::Esc => {
+                self.state.close_add_connection_modal();
+            }
+            KeyCode::Tab => {
+                self.state.connection_modal_state.next_field();
+            }
+            KeyCode::BackTab => {
+                self.state.connection_modal_state.previous_field();
+            }
+            KeyCode::Down if matches!(self.state.connection_modal_state.focused_field, ConnectionField::DatabaseType | ConnectionField::SslMode) => {
+                // Handle dropdown navigation
+                match self.state.connection_modal_state.focused_field {
+                    ConnectionField::DatabaseType => {
+                        let current = self.state.connection_modal_state.db_type_list_state.selected().unwrap_or(0);
+                        let new_index = (current + 1).min(3); // 4 database types (0-3)
+                        self.state.connection_modal_state.select_database_type(new_index);
+                    }
+                    ConnectionField::SslMode => {
+                        let current = self.state.connection_modal_state.ssl_list_state.selected().unwrap_or(0);
+                        let new_index = (current + 1).min(5); // 6 SSL modes (0-5)
+                        self.state.connection_modal_state.select_ssl_mode(new_index);
+                    }
+                    _ => {}
+                }
+            }
+            KeyCode::Up if matches!(self.state.connection_modal_state.focused_field, ConnectionField::DatabaseType | ConnectionField::SslMode) => {
+                // Handle dropdown navigation
+                match self.state.connection_modal_state.focused_field {
+                    ConnectionField::DatabaseType => {
+                        let current = self.state.connection_modal_state.db_type_list_state.selected().unwrap_or(0);
+                        let new_index = current.saturating_sub(1);
+                        self.state.connection_modal_state.select_database_type(new_index);
+                    }
+                    ConnectionField::SslMode => {
+                        let current = self.state.connection_modal_state.ssl_list_state.selected().unwrap_or(0);
+                        let new_index = current.saturating_sub(1);
+                        self.state.connection_modal_state.select_ssl_mode(new_index);
+                    }
+                    _ => {}
+                }
+            }
+            KeyCode::Down | KeyCode::Char('j') => {
+                self.state.connection_modal_state.next_field();
+            }
+            KeyCode::Up | KeyCode::Char('k') => {
+                self.state.connection_modal_state.previous_field();
+            }
+            KeyCode::Enter => {
+                match self.state.connection_modal_state.focused_field {
+                    ConnectionField::Save => {
+                        // Try to save the connection
+                        if let Err(error) = self.state.save_connection_from_modal() {
+                            self.state.connection_modal_state.error_message = Some(error);
+                        }
+                    }
+                    ConnectionField::Cancel => {
+                        self.state.close_add_connection_modal();
+                    }
+                    _ => {
+                        // For regular fields, Enter moves to next field
+                        self.state.connection_modal_state.next_field();
+                    }
+                }
+            }
+            KeyCode::Char(c) => {
+                self.state.connection_modal_state.handle_char_input(c);
+            }
+            KeyCode::Backspace => {
+                self.state.connection_modal_state.handle_backspace();
+            }
+            _ => {}
+        }
         Ok(())
     }
 

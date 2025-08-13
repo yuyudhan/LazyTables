@@ -6,7 +6,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 LazyTables is a terminal-based SQL database viewer and editor designed for developers who value keyboard-driven workflows. Built with Rust and featuring vim motions throughout, it provides a fast, intuitive interface for database management without leaving the terminal.
 
-**Current Status**: Active development phase - core UI framework and SQL query editor functionality implemented. Basic navigation, connection management, and split-pane layout are working.
+**Current Status**: Active development phase - core UI framework and SQL query editor functionality implemented. Basic navigation, connection management, split-pane layout, and contextual messaging system are working.
 
 ## Technical Stack
 
@@ -80,11 +80,12 @@ make clean            # Clean build artifacts
 ## Implemented Features (Current)
 
 ### Core UI Framework
-- ✅ Five-pane layout with proper focus management
+- ✅ Six-pane layout with proper focus management
 - ✅ Vim-style navigation with h/j/k/l movement
 - ✅ Modal system for help and command entry
 - ✅ Theme support with default dark theme
 - ✅ Status bar with mode indicators
+- ✅ Contextual messaging system with state-aware guidance
 
 ### SQL Query Editor & File Management
 - ✅ Horizontal split layout: query editor with thin files column on right
@@ -107,6 +108,7 @@ make clean            # Clean build artifacts
 - ✅ Query editor key bindings (Ctrl+S/O/N for save/refresh/new)
 - ✅ Mode switching (Normal/Insert/Visual/Command/Query modes)
 - ✅ Help system with '?' key
+- ✅ Context-aware help messages and state indicators in all panes
 
 ## Key Features to Implement
 

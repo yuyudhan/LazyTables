@@ -7,7 +7,7 @@ use crate::{
     core::error::Result,
 };
 use ratatui::{
-    layout::{Constraint, Rect},
+    layout::{Alignment, Constraint, Rect},
     style::{Color, Modifier, Style},
     text::{Line, Span},
     widgets::{Block, Borders, Clear, List, ListItem, Paragraph, Row, Table, Wrap},
@@ -78,9 +78,7 @@ impl UI {
 
         // Draw connection creation modal if active
         if state.show_add_connection_modal {
-            // TODO: Implement modal state management
-            let modal_state = crate::ui::components::ConnectionModalState::new();
-            crate::ui::components::render_connection_modal(frame, &modal_state, frame.area());
+            crate::ui::components::render_connection_modal(frame, &state.connection_modal_state, frame.area());
         }
     }
 
@@ -172,17 +170,49 @@ impl UI {
             Style::default().fg(self.theme.border)
         };
 
-        let items: Vec<ListItem> = vec![
-            ListItem::new("▼ public"),
-            ListItem::new("  ▶ users"),
-            ListItem::new("  ▶ products"),
-            ListItem::new("  ▶ orders"),
-            ListItem::new("  ▶ payments"),
-            ListItem::new("▼ analytics"),
-            ListItem::new("  events"),
-            ListItem::new("  sessions"),
-            ListItem::new("  metrics"),
-        ];
+        // Check if there's an active connection
+        let has_active_connection = state.connections.connections
+            .iter()
+            .any(|conn| conn.is_connected);
+
+        let items: Vec<ListItem> = if !has_active_connection {
+            // Show "not connected" message
+            vec![
+                ListItem::new(Line::from(vec![
+                    Span::styled("No database connected", Style::default().fg(Color::Gray))
+                ])),
+                ListItem::new(""),
+                ListItem::new(Line::from(vec![
+                    Span::styled("Connect to a database", Style::default().fg(Color::Gray))
+                ])),
+                ListItem::new(Line::from(vec![
+                    Span::styled("to view tables and views", Style::default().fg(Color::Gray))
+                ])),
+                ListItem::new(""),
+                if is_focused {
+                    ListItem::new(Line::from(vec![
+                        Span::styled("Press ", Style::default().fg(Color::Gray)),
+                        Span::styled("c", Style::default().fg(Color::Yellow).add_modifier(Modifier::BOLD)),
+                        Span::styled(" to go to connections", Style::default().fg(Color::Gray)),
+                    ]))
+                } else {
+                    ListItem::new("")
+                }
+            ]
+        } else {
+            // Show sample tables (this will be replaced with actual database tables later)
+            vec![
+                ListItem::new("▼ public"),
+                ListItem::new("  ▶ users"),
+                ListItem::new("  ▶ products"),
+                ListItem::new("  ▶ orders"),
+                ListItem::new("  ▶ payments"),
+                ListItem::new("▼ analytics"),
+                ListItem::new("  events"),
+                ListItem::new("  sessions"),
+                ListItem::new("  metrics"),
+            ]
+        };
 
         let tables = List::new(items)
             .block(
@@ -209,19 +239,55 @@ impl UI {
             Style::default().fg(self.theme.border)
         };
 
-        let details_text = vec![
-            Line::from("Schema: public"),
-            Line::from("Table: users"),
-            Line::from(""),
-            Line::from("Rows: 15,234"),
-            Line::from("Size: 2.4 MB"),
-            Line::from("Created: Jan'24"),
-            Line::from("Modified: Today"),
-            Line::from(""),
-            Line::from("Indexes: 3"),
-            Line::from("Constraints: 2"),
-            Line::from("Relations: 5"),
-        ];
+        // Check if there's an active connection and table selected
+        let has_active_connection = state.connections.connections
+            .iter()
+            .any(|conn| conn.is_connected);
+        
+        // For now, we'll assume no table is selected until database integration is complete
+        let has_selected_table = false;
+
+        let details_text = if !has_active_connection {
+            vec![
+                Line::from(""),
+                Line::from(vec![
+                    Span::styled("No database connected", Style::default().fg(Color::Gray))
+                ]),
+                Line::from(""),
+                Line::from(vec![
+                    Span::styled("Connect to view table details", Style::default().fg(Color::Gray))
+                ]),
+            ]
+        } else if !has_selected_table {
+            vec![
+                Line::from(""),
+                Line::from(vec![
+                    Span::styled("No table selected", Style::default().fg(Color::Gray))
+                ]),
+                Line::from(""),
+                Line::from(vec![
+                    Span::styled("Select a table to view", Style::default().fg(Color::Gray))
+                ]),
+                Line::from(vec![
+                    Span::styled("its structure and metadata", Style::default().fg(Color::Gray))
+                ]),
+            ]
+        } else {
+            // Show actual table details (sample data for now)
+            vec![
+                Line::from("Schema: public"),
+                Line::from("Table: users"),
+                Line::from(""),
+                Line::from("Rows: 15,234"),
+                Line::from("Size: 2.4 MB"),
+                Line::from("Created: Jan'24"),
+                Line::from("Modified: Today"),
+                Line::from(""),
+                Line::from("Indexes: 3"),
+                Line::from("Constraints: 2"),
+                Line::from("Relations: 5"),
+            ]
+        };
 
         let details = Paragraph::new(details_text)
             .block(
@@ -244,37 +310,121 @@ impl UI {
             Style::default().fg(self.theme.border)
         };
 
-        // Sample table data
-        let header = Row::new(vec!["id", "name", "email", "created"])
-            .style(Style::default().fg(self.theme.header_fg))
-            .height(1);
+        // Check if there's an active connection and table selected
+        let has_active_connection = state.connections.connections
+            .iter()
+            .any(|conn| conn.is_connected);
+        
+        // For now, we'll assume no table is selected until database integration is complete
+        let has_selected_table = false;
 
-        let rows = vec![
-            Row::new(vec!["1", "John", "john@example.com", "2024-01-15"]),
-            Row::new(vec!["2", "Jane", "jane@example.com", "2024-01-16"]),
-            Row::new(vec!["3", "Bob", "bob@example.com", "2024-01-17"]),
-            Row::new(vec!["4", "Alice", "alice@example.com", "2024-01-18"]),
-            Row::new(vec!["5", "Eve", "eve@example.com", "2024-01-19"]),
-        ];
+        if !has_active_connection {
+            // Show "no connection" message
+            let message = vec![
+                Line::from(""),
+                Line::from(""),
+                Line::from(vec![
+                    Span::styled(
+                        "No database connection active",
+                        Style::default().fg(Color::Gray).add_modifier(Modifier::BOLD)
+                    )
+                ]),
+                Line::from(""),
+                Line::from(vec![
+                    Span::styled(
+                        "Connect to a database from the Connections pane",
+                        Style::default().fg(Color::Gray)
+                    )
+                ]),
+                Line::from(vec![
+                    Span::styled(
+                        "Press 'c' to focus connections, then Enter to connect",
+                        Style::default().fg(Color::Gray)
+                    )
+                ]),
+            ];
 
-        let widths = [
-            Constraint::Length(5),
-            Constraint::Length(15),
-            Constraint::Length(25),
-            Constraint::Length(12),
-        ];
+            let placeholder = Paragraph::new(message)
+                .block(
+                    Block::default()
+                        .title(" Query Results ")
+                        .borders(Borders::ALL)
+                        .border_style(border_style),
+                )
+                .style(Style::default().fg(self.theme.text))
+                .alignment(Alignment::Center);
 
-        let table = Table::new(rows, widths)
-            .header(header)
-            .block(
-                Block::default()
-                    .title(" Query Results ")
-                    .borders(Borders::ALL)
-                    .border_style(border_style),
-            )
-            .row_highlight_style(Style::default().bg(self.theme.selection_bg));
+            frame.render_widget(placeholder, area);
+        } else if !has_selected_table {
+            // Show "no table selected" message
+            let message = vec![
+                Line::from(""),
+                Line::from(""),
+                Line::from(vec![
+                    Span::styled(
+                        "No table selected",
+                        Style::default().fg(Color::Gray).add_modifier(Modifier::BOLD)
+                    )
+                ]),
+                Line::from(""),
+                Line::from(vec![
+                    Span::styled(
+                        "Select a table from the Tables pane to view its data",
+                        Style::default().fg(Color::Gray)
+                    )
+                ]),
+                Line::from(vec![
+                    Span::styled(
+                        "Or execute a query from the SQL editor below",
+                        Style::default().fg(Color::Gray)
+                    )
+                ]),
+            ];
 
-        frame.render_widget(table, area);
+            let placeholder = Paragraph::new(message)
+                .block(
+                    Block::default()
+                        .title(" Query Results ")
+                        .borders(Borders::ALL)
+                        .border_style(border_style),
+                )
+                .style(Style::default().fg(self.theme.text))
+                .alignment(Alignment::Center);
+
+            frame.render_widget(placeholder, area);
+        } else {
+            // Show actual table data (sample data for now)
+            let header = Row::new(vec!["id", "name", "email", "created"])
+                .style(Style::default().fg(self.theme.header_fg))
+                .height(1);
+
+            let rows = vec![
+                Row::new(vec!["1", "John", "john@example.com", "2024-01-15"]),
+                Row::new(vec!["2", "Jane", "jane@example.com", "2024-01-16"]),
+                Row::new(vec!["3", "Bob", "bob@example.com", "2024-01-17"]),
+                Row::new(vec!["4", "Alice", "alice@example.com", "2024-01-18"]),
+                Row::new(vec!["5", "Eve", "eve@example.com", "2024-01-19"]),
+            ];
+
+            let widths = [
+                Constraint::Length(5),
+                Constraint::Length(15),
+                Constraint::Length(25),
+                Constraint::Length(12),
+            ];
+
+            let table = Table::new(rows, widths)
+                .header(header)
+                .block(
+                    Block::default()
+                        .title(" Query Results ")
+                        .borders(Borders::ALL)
+                        .border_style(border_style),
+                )
+                .row_highlight_style(Style::default().bg(self.theme.selection_bg));
+
+            frame.render_widget(table, area);
+        }
     }
 
     /// Draw the SQL files browser pane
@@ -354,14 +504,64 @@ impl UI {
             Style::default().fg(self.theme.border)
         };
 
+        // Check if there's an active connection for better help messages
+        let has_active_connection = state.connections.connections
+            .iter()
+            .any(|conn| conn.is_connected);
+
         // Get query content lines
         let mut query_lines: Vec<Line> = if state.query_content.is_empty() {
-            vec![
-                Line::from(Span::styled(
-                    "-- Enter your SQL query here", 
-                    Style::default().fg(Color::Gray)
-                ))
-            ]
+            if !has_active_connection {
+                vec![
+                    Line::from(Span::styled(
+                        "-- SQL Query Editor", 
+                        Style::default().fg(Color::Gray).add_modifier(Modifier::BOLD)
+                    )),
+                    Line::from(""),
+                    Line::from(Span::styled(
+                        "-- Connect to a database first", 
+                        Style::default().fg(Color::Gray)
+                    )),
+                    Line::from(Span::styled(
+                        "-- Then write your SQL queries here", 
+                        Style::default().fg(Color::Gray)
+                    )),
+                    Line::from(""),
+                    Line::from(Span::styled(
+                        "-- Example:", 
+                        Style::default().fg(Color::Gray)
+                    )),
+                    Line::from(Span::styled(
+                        "-- SELECT * FROM users LIMIT 10;", 
+                        Style::default().fg(Color::DarkGray)
+                    )),
+                ]
+            } else {
+                vec![
+                    Line::from(Span::styled(
+                        "-- SQL Query Editor", 
+                        Style::default().fg(Color::Gray).add_modifier(Modifier::BOLD)
+                    )),
+                    Line::from(""),
+                    Line::from(Span::styled(
+                        "-- Write your SQL queries here", 
+                        Style::default().fg(Color::Gray)
+                    )),
+                    Line::from(Span::styled(
+                        "-- Press Ctrl+Enter to execute", 
+                        Style::default().fg(Color::Gray)
+                    )),
+                    Line::from(""),
+                    Line::from(Span::styled(
+                        "-- Example:", 
+                        Style::default().fg(Color::Gray)
+                    )),
+                    Line::from(Span::styled(
+                        "-- SELECT * FROM users LIMIT 10;", 
+                        Style::default().fg(Color::DarkGray)
+                    )),
+                ]
+            }
         } else {
             state.query_content
                 .lines()

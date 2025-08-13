@@ -11,7 +11,7 @@ This guide will help you get started with LazyTables after installation, from la
 lazytables
 ```
 
-On first launch, you'll see the four-pane interface with empty connections.
+On first launch, you'll see the six-pane interface with contextual messages guiding you to create connections.
 
 ### Launch Options
 
@@ -46,6 +46,11 @@ LazyTables uses a **six-pane layout** designed for efficient database navigation
 └─────────────┴─────────────────────────────┘
 ```
 
+The interface shows contextual messages based on the current state:
+- **No connection**: Panes display appropriate guidance messages
+- **Connected but no table selected**: Clear prompts to select a table
+- **Table selected**: Full data and metadata display
+
 ### Pane Overview
 
 1. **Connections Pane** (Top Left)
@@ -56,22 +61,26 @@ LazyTables uses a **six-pane layout** designed for efficient database navigation
 2. **Tables/Views Pane** (Middle Left)  
    - Shows tables and views for selected database
    - Displays table types and schemas
+   - Shows "No database connected" when no active connection
    - Access with focus shortcut: `t`
 
 3. **Table Details Pane** (Bottom Left)
    - Shows metadata for selected table
    - Column information, indexes, constraints
+   - Shows contextual messages when no connection or table selected
    - Access with focus shortcut: `d`
 
 4. **Query Results Area** (Top Right)
    - Displays tabular output from SQL queries
    - Shows selected table data
+   - Shows "No database connection active" or "No table selected" messages
    - Access with focus shortcut: `r`
 
 5. **SQL Query Editor** (Bottom Left)
    - Write and edit SQL queries
    - Save queries to files
    - Execute queries with cursor-based execution
+   - Shows different help messages based on connection status
    - Access with focus shortcut: `q`
 
 6. **SQL Files Browser** (Bottom Right Column)
@@ -199,6 +208,11 @@ When you select a table:
 - **Column headers** show data types
 - **Navigation**: Use arrow keys to scroll
 - **Pagination**: Use `Page Up/Page Down` for more data
+
+The interface provides clear guidance at each step:
+- **Before connecting**: Shows "No database connection active"
+- **After connecting**: Prompts to "Select a table to view its data"
+- **Table selected**: Displays actual data
 
 ## Running Your First Query
 

@@ -1,6 +1,9 @@
 // FilePath: src/app/state.rs
 
-use crate::database::connection::ConnectionStorage;
+use crate::{
+    database::connection::ConnectionStorage,
+    ui::components::ConnectionModalState,
+};
 use serde::{Deserialize, Serialize};
 
 /// Application modes (vim-style)
@@ -90,6 +93,8 @@ pub struct AppState {
     pub connections: ConnectionStorage,
     /// Show connection creation modal
     pub show_add_connection_modal: bool,
+    /// Connection modal state
+    pub connection_modal_state: ConnectionModalState,
     /// SQL query editor content
     pub query_content: String,
     /// Current cursor position in query editor
@@ -128,6 +133,7 @@ impl AppState {
             leader_pressed: false,
             connections,
             show_add_connection_modal: false,
+            connection_modal_state: ConnectionModalState::new(),
             query_content: String::new(),
             query_cursor_line: 0,
             query_cursor_column: 0,
@@ -244,11 +250,28 @@ impl AppState {
     /// Open the add connection modal
     pub fn open_add_connection_modal(&mut self) {
         self.show_add_connection_modal = true;
+        self.connection_modal_state = ConnectionModalState::new(); // Reset state
     }
 
     /// Close the add connection modal
     pub fn close_add_connection_modal(&mut self) {
         self.show_add_connection_modal = false;
+        self.connection_modal_state.clear(); // Clear any input
+    }
+
+    /// Save connection from modal
+    pub fn save_connection_from_modal(&mut self) -> Result<(), String> {
+        let connection = self.connection_modal_state.try_create_connection()?;
+        let _ = self.connections.add_connection(connection);
+        
+        // Save to file
+        if let Err(e) = self.connections.save() {
+            return Err(format!("Failed to save connection: {}", e));
+        }
+
+        self.close_add_connection_modal();
+        self.clamp_connection_selection();
+        Ok(())
     }
 
     /// Ensure selected connection index is within bounds
