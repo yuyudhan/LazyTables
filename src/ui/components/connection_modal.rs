@@ -4,7 +4,8 @@ use crate::database::connection::{ConnectionConfig, DatabaseType, SslMode};
 use ratatui::{
     layout::{Alignment, Constraint, Direction, Layout, Margin, Rect},
     style::{Color, Modifier, Style},
-    widgets::{Block, Borders, Clear, List, ListItem, ListState, Paragraph, Wrap},
+    text::{Line, Span},
+    widgets::{Block, Borders, Clear, List, ListItem, ListState, Paragraph},
     Frame,
 };
 
@@ -290,115 +291,204 @@ impl ConnectionModalState {
 
 /// Render the connection creation modal
 pub fn render_connection_modal(f: &mut Frame, modal_state: &ConnectionModalState, area: Rect) {
-    // Create centered modal area
-    let modal_area = centered_rect(80, 90, area);
+    // Create centered modal area with better proportions
+    let modal_area = centered_rect(70, 85, area);
     
     // Clear the background
     f.render_widget(Clear, modal_area);
     
-    // Main modal block
+    // Main modal block with elegant styling
     let modal_block = Block::default()
-        .title("Add Database Connection")
+        .title(" 🗄️  New Database Connection ")
+        .title_style(Style::default()
+            .fg(Color::Rgb(116, 199, 236)) // LazyTables brand color
+            .add_modifier(Modifier::BOLD))
         .borders(Borders::ALL)
-        .style(Style::default().bg(Color::Black));
+        .border_style(Style::default().fg(Color::Rgb(116, 199, 236)))
+        .style(Style::default()
+            .bg(Color::Rgb(13, 13, 13))    // Dark background
+            .fg(Color::Rgb(255, 255, 255))); // White text
         
     f.render_widget(modal_block, modal_area);
     
-    // Inner area for content
-    let inner_area = modal_area.inner(Margin::new(2, 1));
+    // Inner area for content with better margins
+    let inner_area = modal_area.inner(Margin::new(3, 2));
     
-    // Split into main content and buttons
-    let chunks = Layout::default()
+    // Split into header, main content, and buttons
+    let main_chunks = Layout::default()
         .direction(Direction::Vertical)
-        .constraints([Constraint::Min(0), Constraint::Length(3)])
+        .constraints([
+            Constraint::Length(2),  // Header/instructions
+            Constraint::Min(0),     // Form fields
+            Constraint::Length(4),  // Buttons area
+        ])
         .split(inner_area);
     
+    // Render header/instructions
+    render_modal_header(f, main_chunks[0]);
+    
     // Render form fields
-    render_form_fields(f, modal_state, chunks[0]);
+    render_form_fields(f, modal_state, main_chunks[1]);
     
-    // Render buttons
-    render_modal_buttons(f, modal_state, chunks[1]);
+    // Render buttons and error area
+    render_modal_footer(f, modal_state, main_chunks[2]);
+}
+
+/// Render the modal header with instructions
+fn render_modal_header(f: &mut Frame, area: Rect) {
+    let instructions = vec![
+        Line::from(vec![
+            Span::styled("Navigate: ", Style::default().fg(Color::Gray)),
+            Span::styled("Tab/Shift+Tab", Style::default().fg(Color::Yellow).add_modifier(Modifier::BOLD)),
+            Span::styled(" or ", Style::default().fg(Color::Gray)),
+            Span::styled("j/k", Style::default().fg(Color::Yellow).add_modifier(Modifier::BOLD)),
+            Span::styled("  •  Save: ", Style::default().fg(Color::Gray)),
+            Span::styled("Enter", Style::default().fg(Color::Green).add_modifier(Modifier::BOLD)),
+            Span::styled("  •  Cancel: ", Style::default().fg(Color::Gray)),
+            Span::styled("Esc", Style::default().fg(Color::Red).add_modifier(Modifier::BOLD)),
+        ]),
+        Line::from(""),
+    ];
     
-    // Render error message if present
-    if let Some(error) = &modal_state.error_message {
-        let error_area = Rect::new(
-            modal_area.x + 2,
-            modal_area.y + modal_area.height - 3,
-            modal_area.width - 4,
-            1,
-        );
-        let error_paragraph = Paragraph::new(error.as_str())
-            .style(Style::default().fg(Color::Red))
-            .wrap(Wrap { trim: true });
-        f.render_widget(error_paragraph, error_area);
-    }
+    let header = Paragraph::new(instructions)
+        .style(Style::default().fg(Color::Rgb(205, 214, 244)))
+        .alignment(Alignment::Center);
+    
+    f.render_widget(header, area);
 }
 
 /// Render the form fields
 fn render_form_fields(f: &mut Frame, modal_state: &ConnectionModalState, area: Rect) {
-    // Create layout for all fields
-    let chunks = Layout::default()
+    // Split into two columns for better layout
+    let main_columns = Layout::default()
+        .direction(Direction::Horizontal)
+        .constraints([Constraint::Percentage(50), Constraint::Percentage(50)])
+        .split(area);
+
+    // Left column fields
+    let left_chunks = Layout::default()
         .direction(Direction::Vertical)
         .constraints([
             Constraint::Length(3), // Name
             Constraint::Length(3), // Database Type
-            Constraint::Length(3), // Host
+            Constraint::Length(3), // Host  
             Constraint::Length(3), // Port
+        ])
+        .split(main_columns[0]);
+
+    // Right column fields
+    let right_chunks = Layout::default()
+        .direction(Direction::Vertical)
+        .constraints([
             Constraint::Length(3), // Database
             Constraint::Length(3), // Username
             Constraint::Length(3), // Password
             Constraint::Length(3), // SSL Mode
         ])
-        .split(area);
+        .split(main_columns[1]);
 
-    // Render each field
-    render_text_field(f, "Connection Name", &modal_state.name, modal_state.focused_field == ConnectionField::Name, chunks[0]);
-    render_dropdown_field(f, "Database Type", &get_database_types(), modal_state.focused_field == ConnectionField::DatabaseType, &modal_state.db_type_list_state, chunks[1]);
-    render_text_field(f, "Host", &modal_state.host, modal_state.focused_field == ConnectionField::Host, chunks[2]);
-    render_text_field(f, "Port", &modal_state.port_input, modal_state.focused_field == ConnectionField::Port, chunks[3]);
-    render_text_field(f, "Database", &modal_state.database, modal_state.focused_field == ConnectionField::Database, chunks[4]);
-    render_text_field(f, "Username", &modal_state.username, modal_state.focused_field == ConnectionField::Username, chunks[5]);
-    render_password_field(f, "Password", &modal_state.password, modal_state.focused_field == ConnectionField::Password, chunks[6]);
-    render_dropdown_field(f, "SSL Mode", &get_ssl_modes(), modal_state.focused_field == ConnectionField::SslMode, &modal_state.ssl_list_state, chunks[7]);
+    // Render left column fields
+    render_text_field(f, "Connection Name", &modal_state.name, modal_state.focused_field == ConnectionField::Name, left_chunks[0]);
+    render_dropdown_field(f, "Database Type", &get_database_types(), modal_state.focused_field == ConnectionField::DatabaseType, &modal_state.db_type_list_state, left_chunks[1]);
+    render_text_field(f, "Host", &modal_state.host, modal_state.focused_field == ConnectionField::Host, left_chunks[2]);
+    render_text_field(f, "Port", &modal_state.port_input, modal_state.focused_field == ConnectionField::Port, left_chunks[3]);
+
+    // Render right column fields
+    render_text_field(f, "Database (Optional)", &modal_state.database, modal_state.focused_field == ConnectionField::Database, right_chunks[0]);
+    render_text_field(f, "Username", &modal_state.username, modal_state.focused_field == ConnectionField::Username, right_chunks[1]);
+    render_password_field(f, "Password (Optional)", &modal_state.password, modal_state.focused_field == ConnectionField::Password, right_chunks[2]);
+    render_dropdown_field(f, "SSL Mode", &get_ssl_modes(), modal_state.focused_field == ConnectionField::SslMode, &modal_state.ssl_list_state, right_chunks[3]);
 }
 
 /// Render a text input field
 fn render_text_field(f: &mut Frame, label: &str, value: &str, focused: bool, area: Rect) {
-    let style = if focused {
-        Style::default().fg(Color::Yellow).add_modifier(Modifier::BOLD)
+    let (border_style, title_style) = if focused {
+        (
+            Style::default().fg(Color::Rgb(116, 199, 236)).add_modifier(Modifier::BOLD),
+            Style::default().fg(Color::Rgb(116, 199, 236)).add_modifier(Modifier::BOLD)
+        )
     } else {
-        Style::default()
+        (
+            Style::default().fg(Color::Rgb(69, 71, 90)),
+            Style::default().fg(Color::Gray)
+        )
     };
     
     let block = Block::default()
-        .title(label)
+        .title(format!(" {} ", label))
+        .title_style(title_style)
         .borders(Borders::ALL)
-        .style(style);
+        .border_style(border_style);
         
-    let paragraph = Paragraph::new(value)
-        .block(block);
+    let display_value = if focused && !value.is_empty() {
+        format!("{}│", value) // Add cursor indicator
+    } else if focused {
+        "│".to_string() // Just cursor when empty
+    } else {
+        value.to_string()
+    };
+        
+    let paragraph = Paragraph::new(display_value)
+        .block(block)
+        .style(Style::default().fg(Color::White));
         
     f.render_widget(paragraph, area);
 }
 
 /// Render a password field (masked)
 fn render_password_field(f: &mut Frame, label: &str, value: &str, focused: bool, area: Rect) {
-    let masked_value = "*".repeat(value.len());
-    render_text_field(f, label, &masked_value, focused, area);
+    let masked_value = if focused && !value.is_empty() {
+        format!("{}│", "*".repeat(value.len())) // Show cursor after masking
+    } else if focused {
+        "│".to_string() // Just cursor when empty
+    } else {
+        "*".repeat(value.len())
+    };
+    
+    let (border_style, title_style) = if focused {
+        (
+            Style::default().fg(Color::Rgb(116, 199, 236)).add_modifier(Modifier::BOLD),
+            Style::default().fg(Color::Rgb(116, 199, 236)).add_modifier(Modifier::BOLD)
+        )
+    } else {
+        (
+            Style::default().fg(Color::Rgb(69, 71, 90)),
+            Style::default().fg(Color::Gray)
+        )
+    };
+    
+    let block = Block::default()
+        .title(format!(" {} ", label))
+        .title_style(title_style)
+        .borders(Borders::ALL)
+        .border_style(border_style);
+        
+    let paragraph = Paragraph::new(masked_value)
+        .block(block)
+        .style(Style::default().fg(Color::White));
+        
+    f.render_widget(paragraph, area);
 }
 
 /// Render a dropdown field
 fn render_dropdown_field(f: &mut Frame, label: &str, items: &[String], focused: bool, list_state: &ListState, area: Rect) {
-    let style = if focused {
-        Style::default().fg(Color::Yellow).add_modifier(Modifier::BOLD)
+    let (border_style, title_style) = if focused {
+        (
+            Style::default().fg(Color::Rgb(116, 199, 236)).add_modifier(Modifier::BOLD),
+            Style::default().fg(Color::Rgb(116, 199, 236)).add_modifier(Modifier::BOLD)
+        )
     } else {
-        Style::default()
+        (
+            Style::default().fg(Color::Rgb(69, 71, 90)),
+            Style::default().fg(Color::Gray)
+        )
     };
     
     let block = Block::default()
-        .title(label)
+        .title(format!(" {} ", label))
+        .title_style(title_style)
         .borders(Borders::ALL)
-        .style(style);
+        .border_style(border_style);
         
     let list_items: Vec<ListItem> = items
         .iter()
@@ -408,42 +498,80 @@ fn render_dropdown_field(f: &mut Frame, label: &str, items: &[String], focused: 
     let mut list_state = list_state.clone();
     let list = List::new(list_items)
         .block(block)
-        .highlight_style(Style::default().bg(Color::DarkGray));
+        .style(Style::default().fg(Color::White))
+        .highlight_style(Style::default()
+            .bg(Color::Rgb(116, 199, 236))
+            .fg(Color::Black)
+            .add_modifier(Modifier::BOLD));
         
     f.render_stateful_widget(list, area, &mut list_state);
 }
 
-/// Render the modal buttons
-fn render_modal_buttons(f: &mut Frame, modal_state: &ConnectionModalState, area: Rect) {
-    let chunks = Layout::default()
-        .direction(Direction::Horizontal)
-        .constraints([Constraint::Percentage(50), Constraint::Percentage(50)])
+/// Render the modal footer with buttons and error messages
+fn render_modal_footer(f: &mut Frame, modal_state: &ConnectionModalState, area: Rect) {
+    // Split footer into buttons and error area
+    let footer_chunks = Layout::default()
+        .direction(Direction::Vertical)
+        .constraints([
+            Constraint::Length(3), // Buttons
+            Constraint::Length(1), // Error message
+        ])
         .split(area);
+
+    // Render buttons
+    let button_chunks = Layout::default()
+        .direction(Direction::Horizontal)
+        .constraints([
+            Constraint::Percentage(40),
+            Constraint::Percentage(20),
+            Constraint::Percentage(40),
+        ])
+        .split(footer_chunks[0]);
     
     let save_style = if modal_state.focused_field == ConnectionField::Save {
         Style::default().fg(Color::Black).bg(Color::Green).add_modifier(Modifier::BOLD)
     } else {
-        Style::default().fg(Color::Green)
+        Style::default().fg(Color::Green).add_modifier(Modifier::BOLD)
     };
     
     let cancel_style = if modal_state.focused_field == ConnectionField::Cancel {
         Style::default().fg(Color::Black).bg(Color::Red).add_modifier(Modifier::BOLD)
     } else {
-        Style::default().fg(Color::Red)
+        Style::default().fg(Color::Red).add_modifier(Modifier::BOLD)
     };
     
-    let save_button = Paragraph::new("Save")
+    let save_button = Paragraph::new("💾 Save Connection")
         .style(save_style)
         .alignment(Alignment::Center)
-        .block(Block::default().borders(Borders::ALL));
+        .block(Block::default()
+            .borders(Borders::ALL)
+            .border_style(if modal_state.focused_field == ConnectionField::Save {
+                Style::default().fg(Color::Green)
+            } else {
+                Style::default().fg(Color::Rgb(69, 71, 90))
+            }));
         
-    let cancel_button = Paragraph::new("Cancel")
+    let cancel_button = Paragraph::new("❌ Cancel")
         .style(cancel_style)
         .alignment(Alignment::Center)
-        .block(Block::default().borders(Borders::ALL));
+        .block(Block::default()
+            .borders(Borders::ALL)
+            .border_style(if modal_state.focused_field == ConnectionField::Cancel {
+                Style::default().fg(Color::Red)
+            } else {
+                Style::default().fg(Color::Rgb(69, 71, 90))
+            }));
         
-    f.render_widget(save_button, chunks[0]);
-    f.render_widget(cancel_button, chunks[1]);
+    f.render_widget(save_button, button_chunks[0]);
+    f.render_widget(cancel_button, button_chunks[2]);
+
+    // Render error message if present
+    if let Some(error) = &modal_state.error_message {
+        let error_paragraph = Paragraph::new(format!("❗ {}", error))
+            .style(Style::default().fg(Color::Red).add_modifier(Modifier::BOLD))
+            .alignment(Alignment::Center);
+        f.render_widget(error_paragraph, footer_chunks[1]);
+    }
 }
 
 /// Helper function to create a centered rectangle
