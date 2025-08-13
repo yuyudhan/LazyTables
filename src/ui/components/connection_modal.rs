@@ -575,7 +575,7 @@ impl ConnectionModalState {
 /// Render the connection creation modal
 pub fn render_connection_modal(f: &mut Frame, modal_state: &ConnectionModalState, area: Rect) {
     // Create centered modal area with better proportions
-    let modal_area = centered_rect(70, 85, area);
+    let modal_area = centered_rect(55, 75, area);
 
     // Clear the background
     f.render_widget(Clear, modal_area);
