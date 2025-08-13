@@ -36,4 +36,3 @@ pub fn init(level: LogLevel) -> Result<()> {
 fn get_log_dir() -> Result<PathBuf> {
     Ok(Config::data_dir().join("logs"))
 }
-

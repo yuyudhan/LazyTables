@@ -1,9 +1,6 @@
 // FilePath: src/app/state.rs
 
-use crate::{
-    database::connection::ConnectionStorage,
-    ui::components::ConnectionModalState,
-};
+use crate::{database::connection::ConnectionStorage, ui::components::ConnectionModalState};
 use serde::{Deserialize, Serialize};
 
 /// Application modes (vim-style)
@@ -117,10 +114,10 @@ impl AppState {
     pub fn new() -> Self {
         // Ensure all directories exist
         let _ = crate::config::Config::ensure_directories();
-        
+
         let connections = ConnectionStorage::load().unwrap_or_default();
         let saved_sql_files = Self::load_sql_files();
-        
+
         Self {
             mode: Mode::Normal,
             focused_pane: FocusedPane::Connections,
@@ -165,16 +162,18 @@ impl AppState {
             FocusedPane::TabularOutput => {
                 // Smart selection: go to the last focused left pane, defaulting to middle (Tables)
                 match self.last_left_pane {
-                    FocusedPane::Connections | FocusedPane::Tables | FocusedPane::Details => self.last_left_pane,
+                    FocusedPane::Connections | FocusedPane::Tables | FocusedPane::Details => {
+                        self.last_left_pane
+                    }
                     _ => FocusedPane::Tables, // Default to middle pane
                 }
-            },
+            }
             FocusedPane::QueryWindow => FocusedPane::Details,
             FocusedPane::SqlFiles => FocusedPane::QueryWindow,
             // Left column panes don't have anything to the left
             _ => self.focused_pane,
         };
-        
+
         self.update_focus(new_pane);
     }
 
@@ -187,7 +186,7 @@ impl AppState {
             // Bottom panes don't have anything below
             _ => self.focused_pane,
         };
-        
+
         self.update_focus(new_pane);
     }
 
@@ -201,7 +200,7 @@ impl AppState {
             // Top panes don't have anything above
             _ => self.focused_pane,
         };
-        
+
         self.update_focus(new_pane);
     }
 
@@ -215,17 +214,20 @@ impl AppState {
             // Right column panes don't have anything to the right
             _ => self.focused_pane,
         };
-        
+
         self.update_focus(new_pane);
     }
 
     /// Update focus and track left pane usage for smart navigation
     fn update_focus(&mut self, new_pane: FocusedPane) {
         // Track the last focused left column pane for smart navigation
-        if matches!(self.focused_pane, FocusedPane::Connections | FocusedPane::Tables | FocusedPane::Details) {
+        if matches!(
+            self.focused_pane,
+            FocusedPane::Connections | FocusedPane::Tables | FocusedPane::Details
+        ) {
             self.last_left_pane = self.focused_pane;
         }
-        
+
         self.focused_pane = new_pane;
     }
 
@@ -313,13 +315,19 @@ impl AppState {
     }
 
     /// Get currently selected connection
-    pub fn get_selected_connection(&self) -> Option<&crate::database::connection::ConnectionConfig> {
+    pub fn get_selected_connection(
+        &self,
+    ) -> Option<&crate::database::connection::ConnectionConfig> {
         self.connections.connections.get(self.selected_connection)
     }
 
     /// Get currently selected connection (mutable)
-    pub fn get_selected_connection_mut(&mut self) -> Option<&mut crate::database::connection::ConnectionConfig> {
-        self.connections.connections.get_mut(self.selected_connection)
+    pub fn get_selected_connection_mut(
+        &mut self,
+    ) -> Option<&mut crate::database::connection::ConnectionConfig> {
+        self.connections
+            .connections
+            .get_mut(self.selected_connection)
     }
 
     /// Open the add connection modal
@@ -338,10 +346,10 @@ impl AppState {
     pub fn save_connection_from_modal(&mut self) -> Result<(), String> {
         let connection = self.connection_modal_state.try_create_connection()?;
         let _ = self.connections.add_connection(connection);
-        
+
         // Save to file
         if let Err(e) = self.connections.save() {
-            return Err(format!("Failed to save connection: {}", e));
+            return Err(format!("Failed to save connection: {e}"));
         }
 
         self.close_add_connection_modal();
@@ -389,8 +397,8 @@ impl AppState {
 
     /// Load list of saved SQL files for current project
     fn load_sql_files() -> Vec<String> {
-        use std::fs;
         use crate::config::Config;
+        use std::fs;
 
         let sql_dir = Config::sql_files_dir();
         if let Ok(entries) = fs::read_dir(sql_dir) {
@@ -398,7 +406,7 @@ impl AppState {
                 .filter_map(|entry| entry.ok())
                 .filter_map(|entry| {
                     let path = entry.path();
-                    if path.is_file() && path.extension().map_or(false, |ext| ext == "sql") {
+                    if path.is_file() && path.extension().is_some_and(|ext| ext == "sql") {
                         path.file_stem()
                             .and_then(|name| name.to_str())
                             .map(|s| s.to_string())
@@ -420,13 +428,13 @@ impl AppState {
 
     /// Save current query content to a file
     pub fn save_query_as(&mut self, filename: &str) -> Result<(), Box<dyn std::error::Error>> {
-        use std::fs;
         use crate::config::Config;
+        use std::fs;
 
         let sql_dir = Config::sql_files_dir();
         fs::create_dir_all(&sql_dir)?;
 
-        let file_path = sql_dir.join(format!("{}.sql", filename));
+        let file_path = sql_dir.join(format!("{filename}.sql"));
         fs::write(&file_path, &self.query_content)?;
 
         self.current_sql_file = Some(filename.to_string());
@@ -447,11 +455,11 @@ impl AppState {
 
     /// Load a SQL file into the query editor
     pub fn load_query_file(&mut self, filename: &str) -> Result<(), Box<dyn std::error::Error>> {
-        use std::fs;
         use crate::config::Config;
+        use std::fs;
 
         let sql_dir = Config::sql_files_dir();
-        let file_path = sql_dir.join(format!("{}.sql", filename));
+        let file_path = sql_dir.join(format!("{filename}.sql"));
 
         let content = fs::read_to_string(&file_path)?;
         self.query_content = content;
@@ -478,7 +486,7 @@ impl AppState {
     /// Insert character at current cursor position in query editor
     pub fn insert_char_at_cursor(&mut self, c: char) {
         let lines: Vec<&str> = self.query_content.lines().collect();
-        
+
         if self.query_cursor_line >= lines.len() {
             // Add new lines if needed
             while self.query_content.lines().count() <= self.query_cursor_line {
@@ -488,7 +496,7 @@ impl AppState {
 
         let lines: Vec<&str> = self.query_content.lines().collect();
         let mut new_lines: Vec<String> = lines.iter().map(|s| s.to_string()).collect();
-        
+
         if let Some(line) = new_lines.get_mut(self.query_cursor_line) {
             let mut chars: Vec<char> = line.chars().collect();
             chars.insert(self.query_cursor_column, c);
@@ -505,7 +513,7 @@ impl AppState {
         if self.query_cursor_column > 0 {
             let lines: Vec<&str> = self.query_content.lines().collect();
             let mut new_lines: Vec<String> = lines.iter().map(|s| s.to_string()).collect();
-            
+
             if let Some(line) = new_lines.get_mut(self.query_cursor_line) {
                 let mut chars: Vec<char> = line.chars().collect();
                 if self.query_cursor_column <= chars.len() && self.query_cursor_column > 0 {

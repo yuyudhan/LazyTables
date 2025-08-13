@@ -56,4 +56,3 @@ impl From<toml::ser::Error> for LazyTablesError {
 
 /// Legacy type alias for backwards compatibility
 pub type Error = LazyTablesError;
-

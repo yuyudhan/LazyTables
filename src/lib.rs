@@ -23,4 +23,3 @@ pub mod prelude {
     pub use crate::core::error::{Error, Result};
     pub use crate::event::{Event, EventHandler};
 }
-

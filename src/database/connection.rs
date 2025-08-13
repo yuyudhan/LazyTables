@@ -1,7 +1,7 @@
 // FilePath: src/database/connection.rs
 
-use crate::core::error::Result;
 use crate::config::Config;
+use crate::core::error::Result;
 use serde::{Deserialize, Serialize};
 use std::fs;
 
@@ -80,7 +80,13 @@ pub struct ConnectionConfig {
 
 impl ConnectionConfig {
     /// Create a new connection configuration
-    pub fn new(name: String, database_type: DatabaseType, host: String, port: u16, username: String) -> Self {
+    pub fn new(
+        name: String,
+        database_type: DatabaseType,
+        host: String,
+        port: u16,
+        username: String,
+    ) -> Self {
         Self {
             id: uuid::Uuid::new_v4().to_string(),
             name,
@@ -119,7 +125,7 @@ impl ConnectionStorage {
     /// Load connections from storage
     pub fn load() -> Result<Self> {
         let path = Config::connections_path();
-        
+
         if path.exists() {
             let contents = fs::read_to_string(&path)?;
             let storage: ConnectionStorage = toml::from_str(&contents)?;
@@ -132,7 +138,7 @@ impl ConnectionStorage {
     /// Save connections to storage
     pub fn save(&self) -> Result<()> {
         let path = Config::connections_path();
-        
+
         // Create parent directory if it doesn't exist
         if let Some(parent) = path.parent() {
             fs::create_dir_all(parent)?;
@@ -147,9 +153,11 @@ impl ConnectionStorage {
     pub fn add_connection(&mut self, connection: ConnectionConfig) -> Result<()> {
         // Check for duplicate names
         if self.connections.iter().any(|c| c.name == connection.name) {
-            return Err(crate::core::error::LazyTablesError::ConnectionExists(connection.name));
+            return Err(crate::core::error::LazyTablesError::ConnectionExists(
+                connection.name,
+            ));
         }
-        
+
         self.connections.push(connection);
         self.save()
     }
@@ -166,7 +174,9 @@ impl ConnectionStorage {
             self.connections[index] = connection;
             self.save()
         } else {
-            Err(crate::core::error::LazyTablesError::ConnectionNotFound(connection.id))
+            Err(crate::core::error::LazyTablesError::ConnectionNotFound(
+                connection.id,
+            ))
         }
     }
 
@@ -196,4 +206,3 @@ pub trait Connection: Send + Sync {
     /// Get connection config
     fn config(&self) -> &ConnectionConfig;
 }
-
