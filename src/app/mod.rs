@@ -97,9 +97,10 @@ impl App {
         match self.state.mode {
             Mode::Normal => {
                 match (key.modifiers, key.code) {
-                    // Quit application
-                    (KeyModifiers::NONE, KeyCode::Char('q')) => {
-                        self.should_quit = true;
+                    // Enter command mode with ':'
+                    (KeyModifiers::NONE, KeyCode::Char(':')) => {
+                        self.state.mode = Mode::Command;
+                        self.state.command_buffer.clear();
                     }
                     // Pane navigation with Ctrl+h/j/k/l
                     (KeyModifiers::CONTROL, KeyCode::Char('h')) => {
@@ -138,10 +139,6 @@ impl App {
                     (KeyModifiers::NONE, KeyCode::Char('i')) => {
                         self.state.mode = Mode::Insert;
                     }
-                    // Enter command mode
-                    (KeyModifiers::NONE, KeyCode::Char(':')) => {
-                        self.state.mode = Mode::Command;
-                    }
                     // Enter visual mode
                     (KeyModifiers::NONE, KeyCode::Char('v')) => {
                         self.state.mode = Mode::Visual;
@@ -159,10 +156,8 @@ impl App {
                         // Handle leader key combinations
                         if self.state.leader_pressed {
                             self.state.leader_pressed = false;
-                            if key.code == KeyCode::Char('q') {
-                                // Space q - Quit application
-                                self.should_quit = true;
-                            }
+                            // Leader key combinations can be added here for future features
+                            // For now, just reset the leader state
                         }
                     }
                 }
