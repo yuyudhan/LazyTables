@@ -6,7 +6,7 @@ use crate::{
     event::{Event, EventHandler},
     ui::UI,
 };
-use crossterm::event::{KeyCode, KeyEvent};
+use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
 use ratatui::{DefaultTerminal, Frame};
 use std::time::Duration;
 
@@ -86,7 +86,6 @@ impl App {
 
     /// Handle keyboard events based on current mode
     async fn handle_key_event(&mut self, key: KeyEvent) -> Result<()> {
-        use crossterm::event::{KeyCode, KeyModifiers};
         
         // Handle ESC key globally to close help overlay
         if key.code == KeyCode::Esc && self.state.show_help {
@@ -107,18 +106,18 @@ impl App {
                         self.state.mode = Mode::Command;
                         self.state.command_buffer.clear();
                     }
-                    // Pane navigation with Ctrl+h/j/k/l
+                    // Pane navigation with Ctrl+h/j/k/l (directional movement)
                     (KeyModifiers::CONTROL, KeyCode::Char('h')) => {
-                        self.state.focused_pane = FocusedPane::Connections;
+                        self.state.move_focus_left();
                     }
                     (KeyModifiers::CONTROL, KeyCode::Char('j')) => {
-                        self.state.focused_pane = FocusedPane::Tables;
+                        self.state.move_focus_down();
                     }
                     (KeyModifiers::CONTROL, KeyCode::Char('k')) => {
-                        self.state.focused_pane = FocusedPane::Details;
+                        self.state.move_focus_up();
                     }
                     (KeyModifiers::CONTROL, KeyCode::Char('l')) => {
-                        self.state.focused_pane = FocusedPane::TabularOutput;
+                        self.state.move_focus_right();
                     }
                     // Tab to cycle through panes
                     (KeyModifiers::NONE, KeyCode::Tab) => {

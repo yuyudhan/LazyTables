@@ -103,7 +103,7 @@ make clean            # Clean build artifacts
 - ✅ Secure credential storage (encrypted)
 
 ### Navigation & Key Bindings
-- ✅ Six-pane navigation with Ctrl+h/j/k/l and Tab/Shift+Tab
+- ✅ Six-pane directional navigation with Ctrl+h/j/k/l (true spatial movement) and Tab/Shift+Tab
 - ✅ SQL file browser navigation (j/k to navigate, Enter to load)
 - ✅ Query editor key bindings (Ctrl+S/O/N for save/refresh/new)
 - ✅ Mode switching (Normal/Insert/Visual/Command/Query modes)

@@ -103,11 +103,11 @@ G                   # Go to bottom
 0                   # Go to beginning of line
 $                   # Go to end of line
 
-# Switch between panes
-Ctrl+h              # Move to left pane
-Ctrl+j              # Move to pane below
-Ctrl+k              # Move to pane above  
-Ctrl+l              # Move to right pane
+# Switch between panes (directional movement)
+Ctrl+h              # Move focus left (west)
+Ctrl+j              # Move focus down (south)  
+Ctrl+k              # Move focus up (north)
+Ctrl+l              # Move focus right (east)
 Tab                 # Cycle to next pane
 Shift+Tab           # Cycle to previous pane
 ```
