@@ -23,10 +23,6 @@ indent_style = tab
 [*.rs]
 max_line_length = 80
 
-[*.go]
-indent_style = space
-indent_size = 4
-
 [*.{json,yaml,yml}]
 indent_style = space
 indent_size = 2
