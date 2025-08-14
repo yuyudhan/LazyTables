@@ -681,7 +681,7 @@ impl App {
                                     // Double 'y' detected - copy row to clipboard
                                     match self.state.table_viewer_state.copy_row_csv() {
                                         Ok(()) => {
-                                            self.state.toast_manager.success("Row copied to clipboard (CSV format)");
+                                            self.state.toast_manager.info("Row copied to clipboard");
                                         }
                                         Err(e) => {
                                             self.state.toast_manager.error(format!("Failed to copy row: {e}"));
