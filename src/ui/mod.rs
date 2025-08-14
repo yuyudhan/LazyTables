@@ -116,14 +116,35 @@ impl UI {
             .connections
             .iter()
             .map(|connection| {
-                let (status_indicator, style) = match &connection.status {
-                    ConnectionStatus::Connected => ("✓", Style::default().fg(Color::Green)),
-                    ConnectionStatus::Connecting => ("⟳", Style::default().fg(Color::Yellow)),
-                    ConnectionStatus::Failed(_) => ("✗", Style::default().fg(Color::Red)),
-                    ConnectionStatus::Disconnected => ("○", Style::default().fg(Color::Gray)),
+                // Get status symbol and color based on connection status
+                let (symbol_style, text_style) = match &connection.status {
+                    ConnectionStatus::Connected => (
+                        Style::default().fg(Color::Green).add_modifier(Modifier::BOLD),
+                        Style::default().fg(Color::Green),
+                    ),
+                    ConnectionStatus::Connecting => (
+                        Style::default().fg(Color::Yellow).add_modifier(Modifier::BOLD),
+                        Style::default().fg(Color::Yellow),
+                    ),
+                    ConnectionStatus::Failed(_) => (
+                        Style::default().fg(Color::Red).add_modifier(Modifier::BOLD),
+                        Style::default().fg(Color::Red),
+                    ),
+                    ConnectionStatus::Disconnected => (
+                        Style::default().fg(Color::DarkGray),
+                        Style::default().fg(Color::Gray),
+                    ),
                 };
-                let display_text = format!("{} {}", status_indicator, connection.display_string());
-                ListItem::new(Line::from(vec![Span::styled(display_text, style)]))
+                
+                // Format: "✓ ConnectionName: Connected"
+                let line = Line::from(vec![
+                    Span::styled(format!("{} ", connection.status_symbol()), symbol_style),
+                    Span::styled(connection.display_string(), Style::default().fg(Color::White)),
+                    Span::styled(": ", Style::default().fg(Color::DarkGray)),
+                    Span::styled(connection.status_text(), text_style),
+                ]);
+                
+                ListItem::new(line)
             })
             .collect();
 
@@ -170,7 +191,31 @@ impl UI {
                     ),
                     Span::styled(" to edit connection", Style::default().fg(Color::Gray)),
                 ])));
+                
+                // Show error message if the selected connection has failed
+                if let Some(connection) = state.connections.connections.get(state.selected_connection) {
+                    if let Some(error) = connection.get_error() {
+                        items.push(ListItem::new(""));
+                        items.push(ListItem::new(Line::from(vec![
+                            Span::styled("Error: ", Style::default().fg(Color::Red).add_modifier(Modifier::BOLD)),
+                            Span::styled(error, Style::default().fg(Color::Red)),
+                        ])));
+                    }
+                }
             }
+        }
+        
+        // Add legend for status symbols at the bottom if there are connections
+        if !state.connections.connections.is_empty() && !is_focused {
+            items.push(ListItem::new(""));
+            items.push(ListItem::new(Line::from(vec![
+                Span::styled("✓ ", Style::default().fg(Color::Green)),
+                Span::styled("Connected  ", Style::default().fg(Color::DarkGray).add_modifier(Modifier::DIM)),
+                Span::styled("— ", Style::default().fg(Color::DarkGray)),
+                Span::styled("Not connected  ", Style::default().fg(Color::DarkGray).add_modifier(Modifier::DIM)),
+                Span::styled("✗ ", Style::default().fg(Color::Red)),
+                Span::styled("Failed", Style::default().fg(Color::DarkGray).add_modifier(Modifier::DIM)),
+            ])));
         }
 
         let connections = List::new(items)
