@@ -34,7 +34,7 @@ impl SqliteConnection {
             }
         }
         
-        format!("sqlite://{}", db_path)
+        format!("sqlite://{db_path}")
     }
 }
 
@@ -48,7 +48,7 @@ impl Connection for SqliteConnection {
             .connect(&connection_string)
             .await
             .map_err(|e| {
-                LazyTablesError::Connection(format!("Failed to connect to SQLite: {}", e))
+                LazyTablesError::Connection(format!("Failed to connect to SQLite: {e}"))
             })?;
 
         // Enable foreign key constraints
@@ -80,7 +80,7 @@ impl Connection for SqliteConnection {
             sqlx::query("SELECT 1")
                 .fetch_one(pool)
                 .await
-                .map_err(|e| LazyTablesError::Connection(format!("Connection test failed: {}", e)))?;
+                .map_err(|e| LazyTablesError::Connection(format!("Connection test failed: {e}")))?;
             Ok(())
         } else {
             Err(LazyTablesError::Connection(
@@ -112,7 +112,7 @@ impl Connection for SqliteConnection {
             )
             .fetch_all(pool)
             .await
-            .map_err(|e| LazyTablesError::Connection(format!("Failed to list tables: {}", e)))?;
+            .map_err(|e| LazyTablesError::Connection(format!("Failed to list tables: {e}")))?;
 
             let tables = rows
                 .iter()
@@ -130,15 +130,15 @@ impl Connection for SqliteConnection {
     async fn get_table_metadata(&self, table_name: &str) -> Result<TableMetadata> {
         if let Some(pool) = &self.pool {
             // Get row count
-            let count_query = format!("SELECT COUNT(*) FROM \"{}\"", table_name);
+            let count_query = format!("SELECT COUNT(*) FROM \"{table_name}\"");
             let count_row = sqlx::query(&count_query)
                 .fetch_one(pool)
                 .await
-                .map_err(|e| LazyTablesError::Connection(format!("Failed to get row count: {}", e)))?;
+                .map_err(|e| LazyTablesError::Connection(format!("Failed to get row count: {e}")))?;
             let row_count: i64 = count_row.get(0);
 
             // Get column info
-            let pragma_query = format!("PRAGMA table_info(\"{}\")", table_name);
+            let pragma_query = format!("PRAGMA table_info(\"{table_name}\")");
             let col_rows = sqlx::query(&pragma_query)
                 .fetch_all(pool)
                 .await?;
@@ -152,7 +152,7 @@ impl Connection for SqliteConnection {
                 .collect();
 
             // Get foreign keys
-            let fk_query = format!("PRAGMA foreign_key_list(\"{}\")", table_name);
+            let fk_query = format!("PRAGMA foreign_key_list(\"{table_name}\")");
             let fk_rows = sqlx::query(&fk_query)
                 .fetch_all(pool)
                 .await?;
@@ -163,12 +163,12 @@ impl Connection for SqliteConnection {
                     let from: String = row.get("from");
                     let table: String = row.get("table");
                     let to: String = row.get("to");
-                    format!("{} → {}.{}", from, table, to)
+                    format!("{from} → {table}.{to}")
                 })
                 .collect();
 
             // Get indexes
-            let index_query = format!("PRAGMA index_list(\"{}\")", table_name);
+            let index_query = format!("PRAGMA index_list(\"{table_name}\")");
             let index_rows = sqlx::query(&index_query)
                 .fetch_all(pool)
                 .await?;
@@ -180,10 +180,8 @@ impl Connection for SqliteConnection {
 
             // SQLite doesn't track table size in the same way
             // We can estimate based on page count
-            let page_count_query = format!(
-                "SELECT COUNT(*) * (SELECT page_size FROM pragma_page_size()) as size 
-                 FROM dbstat WHERE name = ?",
-            );
+            let page_count_query = "SELECT COUNT(*) * (SELECT page_size FROM pragma_page_size()) as size 
+                 FROM dbstat WHERE name = ?".to_string();
             
             let size = if let Ok(size_row) = sqlx::query(&page_count_query)
                 .bind(table_name)
@@ -215,7 +213,7 @@ impl Connection for SqliteConnection {
 
     async fn get_table_columns(&self, table_name: &str) -> Result<Vec<TableColumn>> {
         if let Some(pool) = &self.pool {
-            let query = format!("PRAGMA table_info(\"{}\")", table_name);
+            let query = format!("PRAGMA table_info(\"{table_name}\")");
 
             let rows = sqlx::query(&query)
                 .fetch_all(pool)
@@ -250,7 +248,7 @@ impl Connection for SqliteConnection {
 
     async fn get_table_row_count(&self, table_name: &str) -> Result<usize> {
         if let Some(pool) = &self.pool {
-            let query = format!("SELECT COUNT(*) FROM \"{}\"", table_name);
+            let query = format!("SELECT COUNT(*) FROM \"{table_name}\"");
             let row = sqlx::query(&query)
                 .fetch_one(pool)
                 .await?;
@@ -271,7 +269,7 @@ impl Connection for SqliteConnection {
     ) -> Result<Vec<Vec<String>>> {
         if let Some(pool) = &self.pool {
             // Get column names first to maintain order
-            let pragma_query = format!("PRAGMA table_info(\"{}\")", table_name);
+            let pragma_query = format!("PRAGMA table_info(\"{table_name}\")");
             let column_rows = sqlx::query(&pragma_query)
                 .fetch_all(pool)
                 .await?;
@@ -288,13 +286,12 @@ impl Connection for SqliteConnection {
             // Build SELECT query with all columns
             let select_list = column_names
                 .iter()
-                .map(|col| format!("\"{}\"", col))
+                .map(|col| format!("\"{col}\""))
                 .collect::<Vec<_>>()
                 .join(", ");
 
             let query = format!(
-                "SELECT {} FROM \"{}\" LIMIT {} OFFSET {}",
-                select_list, table_name, limit, offset
+                "SELECT {select_list} FROM \"{table_name}\" LIMIT {limit} OFFSET {offset}"
             );
 
             let rows = sqlx::query(&query).fetch_all(pool).await?;

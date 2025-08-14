@@ -109,14 +109,14 @@ impl DataType {
             DataType::Text => "TEXT".to_string(),
             DataType::Varchar(len) => {
                 if let Some(l) = len {
-                    format!("VARCHAR({})", l)
+                    format!("VARCHAR({l})")
                 } else {
                     "VARCHAR".to_string()
                 }
             }
             DataType::Char(len) => {
                 if let Some(l) = len {
-                    format!("CHAR({})", l)
+                    format!("CHAR({l})")
                 } else {
                     "CHAR".to_string()
                 }

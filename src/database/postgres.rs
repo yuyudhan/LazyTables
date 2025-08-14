@@ -30,9 +30,9 @@ impl PostgresConnection {
         let password = self.config.password.as_deref().unwrap_or("");
 
         if !password.is_empty() {
-            format!("postgresql://{}:{}@{}:{}/{}", username, password, host, port, database)
+            format!("postgresql://{username}:{password}@{host}:{port}/{database}")
         } else {
-            format!("postgresql://{}@{}:{}/{}", username, host, port, database)
+            format!("postgresql://{username}@{host}:{port}/{database}")
         }
     }
 }
@@ -47,7 +47,7 @@ impl Connection for PostgresConnection {
             .connect(&connection_string)
             .await
             .map_err(|e| {
-                LazyTablesError::Connection(format!("Failed to connect to PostgreSQL: {}", e))
+                LazyTablesError::Connection(format!("Failed to connect to PostgreSQL: {e}"))
             })?;
 
         self.pool = Some(pool);
@@ -74,7 +74,7 @@ impl Connection for PostgresConnection {
             sqlx::query("SELECT 1")
                 .fetch_one(pool)
                 .await
-                .map_err(|e| LazyTablesError::Connection(format!("Connection test failed: {}", e)))?;
+                .map_err(|e| LazyTablesError::Connection(format!("Connection test failed: {e}")))?;
             Ok(())
         } else {
             Err(LazyTablesError::Connection(
@@ -88,7 +88,7 @@ impl Connection for PostgresConnection {
             let rows = sqlx::query("SELECT datname FROM pg_database WHERE datistemplate = false")
                 .fetch_all(pool)
                 .await
-                .map_err(|e| LazyTablesError::Connection(format!("Failed to list databases: {}", e)))?;
+                .map_err(|e| LazyTablesError::Connection(format!("Failed to list databases: {e}")))?;
 
             let databases = rows
                 .iter()
@@ -116,7 +116,7 @@ impl Connection for PostgresConnection {
             let rows = sqlx::query(query)
                 .fetch_all(pool)
                 .await
-                .map_err(|e| LazyTablesError::Connection(format!("Failed to list tables: {}", e)))?;
+                .map_err(|e| LazyTablesError::Connection(format!("Failed to list tables: {e}")))?;
 
             let tables = rows
                 .iter()
@@ -134,11 +134,11 @@ impl Connection for PostgresConnection {
     async fn get_table_metadata(&self, table_name: &str) -> Result<TableMetadata> {
         if let Some(pool) = &self.pool {
             // Get row count
-            let count_query = format!("SELECT COUNT(*) FROM \"{}\"", table_name);
+            let count_query = format!("SELECT COUNT(*) FROM \"{table_name}\"");
             let count_row = sqlx::query(&count_query)
                 .fetch_one(pool)
                 .await
-                .map_err(|e| LazyTablesError::Connection(format!("Failed to get row count: {}", e)))?;
+                .map_err(|e| LazyTablesError::Connection(format!("Failed to get row count: {e}")))?;
             let row_count: i64 = count_row.get(0);
 
             // Get column count
@@ -160,7 +160,7 @@ impl Connection for PostgresConnection {
                 pg_indexes_size($1) as index_bytes";
             
             let size_row = sqlx::query(size_query)
-                .bind(format!("public.{}", table_name))
+                .bind(format!("public.{table_name}"))
                 .fetch_one(pool)
                 .await?;
             
@@ -177,7 +177,7 @@ impl Connection for PostgresConnection {
                            AND i.indisprimary";
             
             let pk_rows = sqlx::query(pk_query)
-                .bind(format!("public.{}", table_name))
+                .bind(format!("public.{table_name}"))
                 .fetch_all(pool)
                 .await?;
             
@@ -231,7 +231,7 @@ impl Connection for PostgresConnection {
             let comment_query = "SELECT obj_description($1::regclass, 'pg_class') as comment";
             
             let comment_row = sqlx::query(comment_query)
-                .bind(format!("public.{}", table_name))
+                .bind(format!("public.{table_name}"))
                 .fetch_one(pool)
                 .await?;
             
@@ -315,7 +315,7 @@ impl Connection for PostgresConnection {
 
     async fn get_table_row_count(&self, table_name: &str) -> Result<usize> {
         if let Some(pool) = &self.pool {
-            let query = format!("SELECT COUNT(*) FROM \"{}\"", table_name);
+            let query = format!("SELECT COUNT(*) FROM \"{table_name}\"");
             let row = sqlx::query(&query)
                 .fetch_one(pool)
                 .await?;
@@ -360,13 +360,12 @@ impl Connection for PostgresConnection {
             // Build SELECT query with all columns
             let select_list = column_names
                 .iter()
-                .map(|col| format!("\"{}\"::text", col))
+                .map(|col| format!("\"{col}\"::text"))
                 .collect::<Vec<_>>()
                 .join(", ");
 
             let query = format!(
-                "SELECT {} FROM \"{}\" ORDER BY 1 LIMIT {} OFFSET {}",
-                select_list, table_name, limit, offset
+                "SELECT {select_list} FROM \"{table_name}\" ORDER BY 1 LIMIT {limit} OFFSET {offset}"
             );
 
             let rows = sqlx::query(&query).fetch_all(pool).await?;
