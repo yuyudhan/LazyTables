@@ -129,6 +129,17 @@ make clean            # Clean build artifacts
 - Context-sensitive help system
 - Pane navigation with `Ctrl+h/j/k/l`
 
+### Input Mode System
+- **Vim-like insert mode requirement**: All text input fields require pressing 'i' to enter insert mode
+- Press ESC to exit insert mode and return to normal navigation
+- Arrow keys are used for dropdown/list navigation (e.g., selecting database type, column type)
+- Visual feedback shows when in insert mode (e.g., "[INSERT]" indicator, cursor display)
+- This applies to all forms:
+  - Connection creation/editing forms
+  - Table creation forms
+  - Query editing windows
+  - Any future text input fields
+
 ### Performance Requirements
 - Startup time: < 100ms
 - Query execution: Display first results within 50ms
