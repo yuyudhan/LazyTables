@@ -63,18 +63,30 @@ impl PostgresConnection {
                 AND table_type = 'BASE TABLE'
                 ORDER BY table_name
             ";
-            
+
             let rows = sqlx::query(query).fetch_all(pool).await?;
-            
+
             let tables: Vec<String> = rows
                 .iter()
                 .map(|row| row.get::<String, _>("table_name"))
                 .collect();
-                
+
             Ok(tables)
         } else {
             Err(crate::core::error::LazyTablesError::Connection(
-                "Not connected to database".to_string()
+                "Not connected to database".to_string(),
+            ))
+        }
+    }
+
+    /// Execute SQL statement (for DDL operations like CREATE TABLE)
+    pub async fn execute_sql(&self, sql: &str) -> Result<()> {
+        if let Some(pool) = &self.pool {
+            sqlx::query(sql).execute(pool).await?;
+            Ok(())
+        } else {
+            Err(crate::core::error::LazyTablesError::Connection(
+                "Not connected to database".to_string(),
             ))
         }
     }

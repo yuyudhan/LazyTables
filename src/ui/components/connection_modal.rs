@@ -377,9 +377,7 @@ impl ConnectionModalState {
     }
 
     /// Parse connection string and extract connection details
-    fn parse_connection_string(
-        &self,
-    ) -> ParseResult {
+    fn parse_connection_string(&self) -> ParseResult {
         let conn_str = self.connection_string.trim();
 
         // Handle different connection string formats based on database type
@@ -581,15 +579,16 @@ impl ConnectionModalState {
         self.username = connection.username.clone();
         self.password = connection.password.as_deref().unwrap_or("").to_string();
         self.ssl_mode = connection.ssl_mode.clone();
-        
+
         // Set up list state for database type
         let db_types = get_database_types();
-        if let Some(index) = db_types.iter().position(|db| {
-            db.to_lowercase() == connection.database_type.display_name()
-        }) {
+        if let Some(index) = db_types
+            .iter()
+            .position(|db| db.to_lowercase() == connection.database_type.display_name())
+        {
             self.db_type_list_state.select(Some(index));
         }
-        
+
         // Set up SSL mode list state
         let ssl_modes = [
             SslMode::Disable,
@@ -604,7 +603,7 @@ impl ConnectionModalState {
         }) {
             self.ssl_list_state.select(Some(index));
         }
-        
+
         // Start in connection details step for editing
         self.current_step = ModalStep::ConnectionDetails;
         self.focused_field = ConnectionField::Name;

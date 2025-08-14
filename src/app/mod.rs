@@ -97,6 +97,11 @@ impl App {
             return self.handle_connection_modal_key_event(key).await;
         }
 
+        // Handle table creator if active
+        if self.state.show_table_creator {
+            return self.handle_table_creator_key_event(key).await;
+        }
+
         match self.state.mode {
             Mode::Normal => {
                 match (key.modifiers, key.code) {
@@ -164,16 +169,41 @@ impl App {
                     }
                     // Edit connection (only in connections pane)
                     (KeyModifiers::NONE, KeyCode::Char('e')) => {
-                        if self.state.focused_pane == crate::app::state::FocusedPane::Connections 
-                            && !self.state.connections.connections.is_empty() {
+                        if self.state.focused_pane == crate::app::state::FocusedPane::Connections
+                            && !self.state.connections.connections.is_empty()
+                        {
                             self.state.open_edit_connection_modal();
+                        }
+                    }
+                    // Create new table (only in tables pane when connected)
+                    (KeyModifiers::NONE, KeyCode::Char('n')) => {
+                        if self.state.focused_pane == crate::app::state::FocusedPane::Tables {
+                            // Check if we have an active connection
+                            if let Some(connection) = self
+                                .state
+                                .connections
+                                .connections
+                                .get(self.state.selected_connection)
+                            {
+                                if matches!(
+                                    connection.status,
+                                    crate::database::ConnectionStatus::Connected
+                                ) {
+                                    self.state.open_table_creator();
+                                }
+                            }
                         }
                     }
                     // Connect/select action
                     (KeyModifiers::NONE, KeyCode::Enter) => {
                         if self.state.focused_pane == crate::app::state::FocusedPane::Connections {
                             // Handle database connection
-                            if let Some(connection) = self.state.connections.connections.get(self.state.selected_connection) {
+                            if let Some(connection) = self
+                                .state
+                                .connections
+                                .connections
+                                .get(self.state.selected_connection)
+                            {
                                 match &connection.status {
                                     crate::database::ConnectionStatus::Connected => {
                                         // Disconnect if already connected
@@ -557,6 +587,163 @@ impl App {
             }
             _ => {}
         }
+        Ok(())
+    }
+
+    /// Handle table creator key events
+    async fn handle_table_creator_key_event(&mut self, key: KeyEvent) -> Result<()> {
+        use crate::ui::components::{ColumnField, TableCreatorField};
+
+        match key.code {
+            KeyCode::Esc => {
+                // Close table creator
+                self.state.close_table_creator();
+            }
+            KeyCode::Tab => {
+                self.state.table_creator_state.next_field();
+            }
+            KeyCode::BackTab => {
+                self.state.table_creator_state.previous_field();
+            }
+            KeyCode::Down | KeyCode::Char('j') => {
+                // Special handling for data type dropdown
+                if let TableCreatorField::Column(idx, ColumnField::DataType) =
+                    self.state.table_creator_state.focused_field
+                {
+                    // Navigate data type dropdown
+                    let current = self
+                        .state
+                        .table_creator_state
+                        .data_type_list_state
+                        .selected()
+                        .unwrap_or(0);
+                    let types = crate::ui::components::PostgresDataType::common_types();
+                    let new_index = (current + 1).min(types.len() - 1);
+                    self.state
+                        .table_creator_state
+                        .data_type_list_state
+                        .select(Some(new_index));
+
+                    // Update the column's data type
+                    if let Some(column) = self.state.table_creator_state.columns.get_mut(idx) {
+                        if let Some(new_type) = types.get(new_index) {
+                            column.data_type = new_type.clone();
+                        }
+                    }
+                } else {
+                    self.state.table_creator_state.next_field();
+                }
+            }
+            KeyCode::Up | KeyCode::Char('k') => {
+                // Special handling for data type dropdown
+                if let TableCreatorField::Column(idx, ColumnField::DataType) =
+                    self.state.table_creator_state.focused_field
+                {
+                    // Navigate data type dropdown
+                    let current = self
+                        .state
+                        .table_creator_state
+                        .data_type_list_state
+                        .selected()
+                        .unwrap_or(0);
+                    let new_index = current.saturating_sub(1);
+                    self.state
+                        .table_creator_state
+                        .data_type_list_state
+                        .select(Some(new_index));
+
+                    // Update the column's data type
+                    let types = crate::ui::components::PostgresDataType::common_types();
+                    if let Some(column) = self.state.table_creator_state.columns.get_mut(idx) {
+                        if let Some(new_type) = types.get(new_index) {
+                            column.data_type = new_type.clone();
+                        }
+                    }
+                } else {
+                    self.state.table_creator_state.previous_field();
+                }
+            }
+            KeyCode::Enter | KeyCode::Char(' ') => {
+                // Handle different field actions
+                match self.state.table_creator_state.focused_field {
+                    TableCreatorField::Column(_, field) => {
+                        match field {
+                            ColumnField::Nullable
+                            | ColumnField::PrimaryKey
+                            | ColumnField::Unique => {
+                                // Toggle boolean fields
+                                self.state.table_creator_state.toggle_boolean_field();
+                            }
+                            ColumnField::Delete => {
+                                // Delete the current column
+                                self.state.table_creator_state.delete_current_column();
+                            }
+                            _ => {
+                                // Move to next field for other columns
+                                self.state.table_creator_state.next_field();
+                            }
+                        }
+                    }
+                    TableCreatorField::AddColumn => {
+                        self.state.table_creator_state.add_column();
+                    }
+                    TableCreatorField::Save => {
+                        // Save the table
+                        if let Err(error) = self.state.create_table_from_creator().await {
+                            self.state.table_creator_state.error_message = Some(error);
+                        }
+                    }
+                    TableCreatorField::Cancel => {
+                        self.state.close_table_creator();
+                    }
+                    _ => {
+                        self.state.table_creator_state.next_field();
+                    }
+                }
+            }
+            KeyCode::Char('a') => {
+                // Quick add column
+                self.state.table_creator_state.add_column();
+            }
+            KeyCode::Char('d') => {
+                // Quick delete column when on a column row
+                if let TableCreatorField::Column(_, _) =
+                    self.state.table_creator_state.focused_field
+                {
+                    self.state.table_creator_state.delete_current_column();
+                }
+            }
+            KeyCode::Char('s') => {
+                // Quick save
+                if let Err(error) = self.state.create_table_from_creator().await {
+                    self.state.table_creator_state.error_message = Some(error);
+                }
+            }
+            KeyCode::Char('c') => {
+                // Quick cancel - but only if not typing in a text field
+                match self.state.table_creator_state.focused_field {
+                    TableCreatorField::TableName
+                    | TableCreatorField::Column(_, ColumnField::Name)
+                    | TableCreatorField::Column(_, ColumnField::Default) => {
+                        // Let 'c' pass through as text input
+                        self.state.table_creator_state.handle_char_input('c');
+                    }
+                    _ => {
+                        // Cancel the table creator
+                        self.state.close_table_creator();
+                    }
+                }
+            }
+            KeyCode::Char(ch) => {
+                // Handle text input for appropriate fields
+                self.state.table_creator_state.handle_char_input(ch);
+            }
+            KeyCode::Backspace => {
+                self.state.table_creator_state.handle_backspace();
+            }
+            _ => {}
+        }
+
         Ok(())
     }
 

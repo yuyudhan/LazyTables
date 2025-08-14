@@ -125,6 +125,26 @@ impl ConnectionConfig {
     pub fn display_string(&self) -> String {
         format!("{} ({})", self.name, self.database_type.display_name())
     }
+    
+    /// Get status display text
+    pub fn status_text(&self) -> &str {
+        match &self.status {
+            ConnectionStatus::Disconnected => "Disconnected",
+            ConnectionStatus::Connecting => "Connecting...",
+            ConnectionStatus::Connected => "Connected",
+            ConnectionStatus::Failed(_) => "Failed",
+        }
+    }
+    
+    /// Get status indicator symbol
+    pub fn status_symbol(&self) -> &str {
+        match &self.status {
+            ConnectionStatus::Disconnected => "—",  // Em dash for disconnected
+            ConnectionStatus::Connecting => "⟳",    // Rotation symbol for connecting
+            ConnectionStatus::Connected => "✓",     // Check mark for connected
+            ConnectionStatus::Failed(_) => "✗",     // X mark for failed
+        }
+    }
 
     /// Check if connection is currently connected
     pub fn is_connected(&self) -> bool {

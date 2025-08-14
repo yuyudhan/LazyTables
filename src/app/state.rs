@@ -1,6 +1,9 @@
 // FilePath: src/app/state.rs
 
-use crate::{database::{connection::ConnectionStorage, ConnectionConfig, ConnectionStatus, DatabaseType}, ui::components::ConnectionModalState};
+use crate::{
+    database::{connection::ConnectionStorage, ConnectionConfig, ConnectionStatus, DatabaseType},
+    ui::components::{ConnectionModalState, TableCreatorState},
+};
 use ratatui::widgets::ListState;
 use serde::{Deserialize, Serialize};
 
@@ -118,6 +121,10 @@ pub struct AppState {
     pub tables: Vec<String>,
     /// Error message for table loading
     pub table_load_error: Option<String>,
+    /// Table creator state
+    pub table_creator_state: TableCreatorState,
+    /// Show table creator view
+    pub show_table_creator: bool,
 }
 
 impl AppState {
@@ -128,13 +135,13 @@ impl AppState {
 
         let connections = ConnectionStorage::load().unwrap_or_default();
         let saved_sql_files = Self::load_sql_files();
-        
+
         // Initialize connections list state
         let mut connections_list_state = ListState::default();
         if !connections.connections.is_empty() {
             connections_list_state.select(Some(0));
         }
-        
+
         // Initialize tables list state
         let tables_list_state = ListState::default();
 
@@ -166,6 +173,8 @@ impl AppState {
             last_left_pane: FocusedPane::Connections,
             tables: Vec::new(),
             table_load_error: None,
+            table_creator_state: TableCreatorState::new(),
+            show_table_creator: false,
         }
     }
 
@@ -367,7 +376,8 @@ impl AppState {
     /// Open the edit connection modal for the currently selected connection
     pub fn open_edit_connection_modal(&mut self) {
         if let Some(connection) = self.connections.connections.get(self.selected_connection) {
-            self.connection_modal_state.populate_from_connection(connection);
+            self.connection_modal_state
+                .populate_from_connection(connection);
             self.show_edit_connection_modal = true;
         }
     }
@@ -381,7 +391,7 @@ impl AppState {
     /// Save connection from modal
     pub fn save_connection_from_modal(&mut self) -> Result<(), String> {
         let mut connection = self.connection_modal_state.try_create_connection()?;
-        
+
         if self.show_edit_connection_modal {
             // Update existing connection - preserve ID
             if let Some(existing) = self.connections.connections.get(self.selected_connection) {
@@ -410,7 +420,8 @@ impl AppState {
             if self.selected_connection > max_index {
                 self.selected_connection = max_index;
             }
-            self.connections_list_state.select(Some(self.selected_connection));
+            self.connections_list_state
+                .select(Some(self.selected_connection));
         } else {
             self.selected_connection = 0;
             self.connections_list_state.select(None);
@@ -422,7 +433,8 @@ impl AppState {
         if !self.connections.connections.is_empty() {
             let len = self.connections.connections.len();
             self.selected_connection = (self.selected_connection + 1) % len;
-            self.connections_list_state.select(Some(self.selected_connection));
+            self.connections_list_state
+                .select(Some(self.selected_connection));
         }
     }
 
@@ -435,7 +447,8 @@ impl AppState {
             } else {
                 len - 1
             };
-            self.connections_list_state.select(Some(self.selected_connection));
+            self.connections_list_state
+                .select(Some(self.selected_connection));
         }
     }
 
@@ -474,21 +487,34 @@ impl AppState {
 
     /// Attempt to connect to the selected database
     pub async fn connect_to_selected_database(&mut self) {
-        if let Some(connection) = self.connections.connections.get(self.selected_connection).cloned() {
+        if let Some(connection) = self
+            .connections
+            .connections
+            .get(self.selected_connection)
+            .cloned()
+        {
             // Set connection status to connecting
-            if let Some(conn) = self.connections.connections.get_mut(self.selected_connection) {
+            if let Some(conn) = self
+                .connections
+                .connections
+                .get_mut(self.selected_connection)
+            {
                 conn.status = ConnectionStatus::Connecting;
             }
-            
+
             // Clear previous tables and errors
             self.tables.clear();
             self.table_load_error = None;
-            
+
             // Attempt connection based on database type
             let result = self.try_connect_to_database(&connection).await;
-            
+
             // Update connection status based on result
-            if let Some(conn) = self.connections.connections.get_mut(self.selected_connection) {
+            if let Some(conn) = self
+                .connections
+                .connections
+                .get_mut(self.selected_connection)
+            {
                 match result {
                     Ok(tables) => {
                         conn.status = ConnectionStatus::Connected;
@@ -500,53 +526,67 @@ impl AppState {
                     }
                 }
             }
-            
+
             // Save updated connection status
             let _ = self.connections.save();
         }
     }
 
     /// Try to connect to a specific database and return tables
-    async fn try_connect_to_database(&self, connection: &ConnectionConfig) -> Result<Vec<String>, String> {
+    async fn try_connect_to_database(
+        &self,
+        connection: &ConnectionConfig,
+    ) -> Result<Vec<String>, String> {
         match connection.database_type {
-            DatabaseType::PostgreSQL => {
-                self.connect_postgresql(connection).await
-            }
-            _ => {
-                Err(format!("Database type {} not yet supported", connection.database_type.display_name()))
-            }
+            DatabaseType::PostgreSQL => self.connect_postgresql(connection).await,
+            _ => Err(format!(
+                "Database type {} not yet supported",
+                connection.database_type.display_name()
+            )),
         }
     }
 
     /// Connect to PostgreSQL and retrieve table list
-    async fn connect_postgresql(&self, connection: &ConnectionConfig) -> Result<Vec<String>, String> {
+    async fn connect_postgresql(
+        &self,
+        connection: &ConnectionConfig,
+    ) -> Result<Vec<String>, String> {
         use crate::database::postgres::PostgresConnection;
         use crate::database::Connection;
-        
+
         // Create connection config
         let mut pg_connection = PostgresConnection::new(connection.clone());
-        
+
         // Try to connect
-        pg_connection.connect().await.map_err(|e| format!("Connection failed: {e}"))?;
-        
+        pg_connection
+            .connect()
+            .await
+            .map_err(|e| format!("Connection failed: {e}"))?;
+
         // Query actual tables from the database
-        let tables = pg_connection.get_tables().await
+        let tables = pg_connection
+            .get_tables()
+            .await
             .map_err(|e| format!("Failed to retrieve tables: {e}"))?;
-        
+
         // Clean up connection
         let _ = pg_connection.disconnect().await;
-        
+
         Ok(tables)
     }
 
     /// Disconnect from current database
     pub fn disconnect_from_database(&mut self) {
-        if let Some(connection) = self.connections.connections.get_mut(self.selected_connection) {
+        if let Some(connection) = self
+            .connections
+            .connections
+            .get_mut(self.selected_connection)
+        {
             connection.status = ConnectionStatus::Disconnected;
             self.tables.clear();
             self.table_load_error = None;
             self.update_table_selection();
-            
+
             // Save updated connection status
             let _ = self.connections.save();
         }
@@ -708,6 +748,84 @@ impl AppState {
             }
 
             self.query_content = new_lines.join("\n");
+        }
+    }
+
+    /// Open table creator view
+    pub fn open_table_creator(&mut self) {
+        self.show_table_creator = true;
+        self.table_creator_state = TableCreatorState::new();
+    }
+
+    /// Close table creator view
+    pub fn close_table_creator(&mut self) {
+        self.show_table_creator = false;
+        self.table_creator_state.clear();
+    }
+
+    /// Create table from table creator state
+    pub async fn create_table_from_creator(&mut self) -> Result<(), String> {
+        // Generate SQL
+        let sql = self.table_creator_state.generate_create_table_sql()?;
+
+        // Get the current connection
+        if let Some(connection) = self
+            .connections
+            .connections
+            .get(self.selected_connection)
+            .cloned()
+        {
+            match &connection.status {
+                ConnectionStatus::Connected => {
+                    // Execute the CREATE TABLE statement
+                    self.execute_create_table_sql(&connection, &sql).await?;
+
+                    // Refresh tables list
+                    self.connect_to_selected_database().await;
+
+                    // Close table creator
+                    self.close_table_creator();
+
+                    Ok(())
+                }
+                _ => Err("No active database connection".to_string()),
+            }
+        } else {
+            Err("No connection selected".to_string())
+        }
+    }
+
+    /// Execute CREATE TABLE SQL on PostgreSQL
+    async fn execute_create_table_sql(
+        &self,
+        connection: &ConnectionConfig,
+        sql: &str,
+    ) -> Result<(), String> {
+        match connection.database_type {
+            DatabaseType::PostgreSQL => {
+                use crate::database::postgres::PostgresConnection;
+                use crate::database::Connection;
+
+                let mut pg_connection = PostgresConnection::new(connection.clone());
+                pg_connection
+                    .connect()
+                    .await
+                    .map_err(|e| format!("Connection failed: {e}"))?;
+
+                // Execute the CREATE TABLE statement
+                pg_connection
+                    .execute_sql(sql)
+                    .await
+                    .map_err(|e| format!("Failed to create table: {e}"))?;
+
+                let _ = pg_connection.disconnect().await;
+
+                Ok(())
+            }
+            _ => Err(format!(
+                "Database type {} not yet supported",
+                connection.database_type.display_name()
+            )),
         }
     }
 
