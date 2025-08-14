@@ -1,8 +1,8 @@
 // FilePath: src/app/state.rs
 
 use crate::{
-    database::{connection::ConnectionStorage, ConnectionConfig, ConnectionStatus, DatabaseType},
-    ui::components::{ConnectionModalState, TableCreatorState},
+    database::{connection::ConnectionStorage, ConnectionConfig, ConnectionStatus, DatabaseType, TableMetadata},
+    ui::components::{ConnectionModalState, TableCreatorState, TableEditorState, TableViewerState, ToastManager},
 };
 use ratatui::widgets::ListState;
 use serde::{Deserialize, Serialize};
@@ -125,6 +125,16 @@ pub struct AppState {
     pub table_creator_state: TableCreatorState,
     /// Show table creator view
     pub show_table_creator: bool,
+    /// Table editor state
+    pub table_editor_state: TableEditorState,
+    /// Show table editor view
+    pub show_table_editor: bool,
+    /// Table viewer state
+    pub table_viewer_state: TableViewerState,
+    /// Toast notifications manager
+    pub toast_manager: ToastManager,
+    /// Current table metadata (for the details pane)
+    pub current_table_metadata: Option<TableMetadata>,
 }
 
 impl AppState {
@@ -175,6 +185,11 @@ impl AppState {
             table_load_error: None,
             table_creator_state: TableCreatorState::new(),
             show_table_creator: false,
+            table_editor_state: TableEditorState::new("table".to_string()),
+            show_table_editor: false,
+            table_viewer_state: TableViewerState::new(),
+            toast_manager: ToastManager::new(),
+            current_table_metadata: None,
         }
     }
 
@@ -275,7 +290,11 @@ impl AppState {
                 self.table_up();
             }
             FocusedPane::TabularOutput => {
-                self.current_row = self.current_row.saturating_sub(1);
+                if let Some(tab) = self.table_viewer_state.current_tab_mut() {
+                    if !tab.in_edit_mode {
+                        tab.move_up();
+                    }
+                }
             }
             FocusedPane::SqlFiles => {
                 self.selected_sql_file = self.selected_sql_file.saturating_sub(1);
@@ -297,7 +316,11 @@ impl AppState {
                 self.table_down();
             }
             FocusedPane::TabularOutput => {
-                self.current_row += 1;
+                if let Some(tab) = self.table_viewer_state.current_tab_mut() {
+                    if !tab.in_edit_mode {
+                        tab.move_down();
+                    }
+                }
             }
             FocusedPane::SqlFiles => {
                 let max_files = self.saved_sql_files.len().saturating_sub(1);
@@ -319,7 +342,11 @@ impl AppState {
     pub fn move_left(&mut self) {
         match self.focused_pane {
             FocusedPane::TabularOutput => {
-                self.current_column = self.current_column.saturating_sub(1);
+                if let Some(tab) = self.table_viewer_state.current_tab_mut() {
+                    if !tab.in_edit_mode {
+                        tab.move_left();
+                    }
+                }
             }
             FocusedPane::QueryWindow => {
                 self.query_cursor_column = self.query_cursor_column.saturating_sub(1);
@@ -332,7 +359,11 @@ impl AppState {
     pub fn move_right(&mut self) {
         match self.focused_pane {
             FocusedPane::TabularOutput => {
-                self.current_column += 1;
+                if let Some(tab) = self.table_viewer_state.current_tab_mut() {
+                    if !tab.in_edit_mode {
+                        tab.move_right();
+                    }
+                }
             }
             FocusedPane::QueryWindow => {
                 if let Some(current_line) = self.query_content.lines().nth(self.query_cursor_line) {
@@ -457,7 +488,11 @@ impl AppState {
         if !self.tables.is_empty() {
             let len = self.tables.len();
             self.selected_table = (self.selected_table + 1) % len;
-            self.tables_list_state.select(Some(self.selected_table));
+            // Add 1 to account for the "▼ Tables" header in the UI
+            self.tables_list_state.select(Some(self.selected_table + 1));
+            
+            // Clear metadata when selection changes (will load when Enter is pressed)
+            self.current_table_metadata = None;
         }
     }
 
@@ -470,15 +505,24 @@ impl AppState {
             } else {
                 len - 1
             };
-            self.tables_list_state.select(Some(self.selected_table));
+            // Add 1 to account for the "▼ Tables" header in the UI
+            self.tables_list_state.select(Some(self.selected_table + 1));
+            
+            // Clear metadata when selection changes (will load when Enter is pressed)
+            self.current_table_metadata = None;
         }
     }
 
     /// Update table list state when tables change
     pub fn update_table_selection(&mut self) {
         if !self.tables.is_empty() {
-            self.selected_table = 0;
-            self.tables_list_state.select(Some(0));
+            // Preserve selection if possible, otherwise clamp to valid range
+            let max_index = self.tables.len() - 1;
+            if self.selected_table > max_index {
+                self.selected_table = max_index;
+            }
+            // Add 1 to account for the "▼ Tables" header in the UI
+            self.tables_list_state.select(Some(self.selected_table + 1));
         } else {
             self.selected_table = 0;
             self.tables_list_state.select(None);
@@ -507,9 +551,12 @@ impl AppState {
             self.table_load_error = None;
 
             // Attempt connection based on database type
+            let connection_name = connection.name.clone();
             let result = self.try_connect_to_database(&connection).await;
 
             // Update connection status based on result
+            let connection_succeeded = matches!(result, Ok(_));
+            
             if let Some(conn) = self
                 .connections
                 .connections
@@ -519,12 +566,19 @@ impl AppState {
                     Ok(tables) => {
                         conn.status = ConnectionStatus::Connected;
                         self.tables = tables;
-                        self.update_table_selection();
                     }
                     Err(error) => {
-                        conn.status = ConnectionStatus::Failed(error);
+                        let error_msg = error.clone();
+                        conn.status = ConnectionStatus::Failed(error.clone());
+                        self.toast_manager.error(format!("Connection failed: {}", error_msg));
                     }
                 }
+            }
+            
+            // Handle post-connection tasks after mutable borrow ends
+            if connection_succeeded {
+                self.update_table_selection();
+                self.toast_manager.success(format!("Connected to {}", connection_name));
             }
 
             // Save updated connection status
@@ -763,6 +817,153 @@ impl AppState {
         self.table_creator_state.clear();
     }
 
+    /// Open table editor view
+    pub async fn open_table_editor(&mut self) {
+        if let Some(table_name) = self.tables.get(self.selected_table).cloned() {
+            self.show_table_editor = true;
+            self.table_editor_state = TableEditorState::new(table_name.clone());
+
+            // Load table schema from database
+            if let Err(e) = self.load_table_schema_for_editor(&table_name).await {
+                self.table_editor_state.error_message =
+                    Some(format!("Failed to load table schema: {e}"));
+            }
+        }
+    }
+
+    /// Close table editor view
+    pub fn close_table_editor(&mut self) {
+        self.show_table_editor = false;
+        self.table_editor_state.clear();
+    }
+
+    /// Load table schema for the editor
+    async fn load_table_schema_for_editor(&mut self, table_name: &str) -> Result<(), String> {
+        // Get the current connection
+        if let Some(connection) = self
+            .connections
+            .connections
+            .get(self.selected_connection)
+            .cloned()
+        {
+            match &connection.status {
+                ConnectionStatus::Connected => {
+                    // Load table schema based on database type
+                    match connection.database_type {
+                        DatabaseType::PostgreSQL => {
+                            self.load_postgres_table_schema(&connection, table_name)
+                                .await
+                        }
+                        _ => Err(format!(
+                            "Database type {} not yet supported for table editing",
+                            connection.database_type.display_name()
+                        )),
+                    }
+                }
+                _ => Err("No active database connection".to_string()),
+            }
+        } else {
+            Err("No connection selected".to_string())
+        }
+    }
+
+    /// Load PostgreSQL table schema
+    async fn load_postgres_table_schema(
+        &mut self,
+        connection: &ConnectionConfig,
+        table_name: &str,
+    ) -> Result<(), String> {
+        use crate::database::postgres::PostgresConnection;
+        use crate::database::Connection;
+
+        let mut pg_connection = PostgresConnection::new(connection.clone());
+        pg_connection
+            .connect()
+            .await
+            .map_err(|e| format!("Connection failed: {e}"))?;
+
+        // Query table columns from information_schema
+        let columns = pg_connection
+            .get_table_columns(table_name)
+            .await
+            .map_err(|e| format!("Failed to retrieve table columns: {e}"))?;
+
+        // Populate the table editor state with column information
+        self.table_editor_state.columns = columns;
+        self.table_editor_state.original_columns = self.table_editor_state.columns.clone();
+
+        let _ = pg_connection.disconnect().await;
+
+        Ok(())
+    }
+
+    /// Apply table edits from table editor state
+    pub async fn apply_table_edits_from_editor(&mut self) -> Result<(), String> {
+        // Generate ALTER TABLE SQL statements
+        let sql_statements = self.table_editor_state.generate_alter_table_sql()?;
+
+        // Get the current connection
+        if let Some(connection) = self
+            .connections
+            .connections
+            .get(self.selected_connection)
+            .cloned()
+        {
+            match &connection.status {
+                ConnectionStatus::Connected => {
+                    // Execute the ALTER TABLE statements
+                    for sql in &sql_statements {
+                        self.execute_alter_table_sql(&connection, sql).await?;
+                    }
+
+                    // Refresh tables list
+                    self.connect_to_selected_database().await;
+
+                    // Close table editor
+                    self.close_table_editor();
+
+                    Ok(())
+                }
+                _ => Err("No active database connection".to_string()),
+            }
+        } else {
+            Err("No connection selected".to_string())
+        }
+    }
+
+    /// Execute ALTER TABLE SQL on PostgreSQL
+    async fn execute_alter_table_sql(
+        &self,
+        connection: &ConnectionConfig,
+        sql: &str,
+    ) -> Result<(), String> {
+        match connection.database_type {
+            DatabaseType::PostgreSQL => {
+                use crate::database::postgres::PostgresConnection;
+                use crate::database::Connection;
+
+                let mut pg_connection = PostgresConnection::new(connection.clone());
+                pg_connection
+                    .connect()
+                    .await
+                    .map_err(|e| format!("Connection failed: {e}"))?;
+
+                pg_connection
+                    .execute_sql(sql)
+                    .await
+                    .map_err(|e| format!("Failed to execute ALTER TABLE: {e}"))?;
+
+                let _ = pg_connection.disconnect().await;
+
+                Ok(())
+            }
+            _ => Err(format!(
+                "Database type {} not yet supported",
+                connection.database_type.display_name()
+            )),
+        }
+    }
+
     /// Create table from table creator state
     pub async fn create_table_from_creator(&mut self) -> Result<(), String> {
         // Generate SQL
@@ -826,6 +1027,280 @@ impl AppState {
                 "Database type {} not yet supported",
                 connection.database_type.display_name()
             )),
+        }
+    }
+
+    /// Open a table for viewing
+    pub async fn open_table_for_viewing(&mut self) {
+        if let Some(table_name) = self.tables.get(self.selected_table).cloned() {
+            // Add tab to viewer
+            let tab_idx = self.table_viewer_state.add_tab(table_name.clone());
+
+            // Load table data
+            if let Err(e) = self.load_table_data(tab_idx).await {
+                if let Some(tab) = self.table_viewer_state.tabs.get_mut(tab_idx) {
+                    tab.error = Some(format!("Failed to load table: {e}"));
+                    tab.loading = false;
+                }
+            }
+            
+            // Load table metadata for the details pane
+            if let Err(e) = self.load_table_metadata(&table_name).await {
+                self.toast_manager.error(format!("Failed to load table metadata: {}", e));
+            }
+
+            // Switch focus to tabular output
+            self.focused_pane = FocusedPane::TabularOutput;
+        }
+    }
+
+    /// Load table data for a specific tab
+    pub async fn load_table_data(&mut self, tab_idx: usize) -> Result<(), String> {
+        if let Some(tab) = self.table_viewer_state.tabs.get_mut(tab_idx) {
+            let table_name = tab.table_name.clone();
+            let page = tab.current_page;
+            let limit = tab.rows_per_page;
+            let offset = page * limit;
+
+            // Get the current connection
+            if let Some(connection) = self
+                .connections
+                .connections
+                .get(self.selected_connection)
+                .cloned()
+            {
+                match &connection.status {
+                    ConnectionStatus::Connected => {
+                        // Load table data based on database type
+                        match connection.database_type {
+                            DatabaseType::PostgreSQL => {
+                                self.load_postgres_table_data(
+                                    &connection,
+                                    &table_name,
+                                    limit,
+                                    offset,
+                                    tab_idx,
+                                )
+                                .await
+                            }
+                            _ => Err(format!(
+                                "Database type {} not yet supported for table viewing",
+                                connection.database_type.display_name()
+                            )),
+                        }
+                    }
+                    _ => Err("No active database connection".to_string()),
+                }
+            } else {
+                Err("No connection selected".to_string())
+            }
+        } else {
+            Err("Invalid tab index".to_string())
+        }
+    }
+
+    /// Load PostgreSQL table data
+    async fn load_postgres_table_data(
+        &mut self,
+        connection: &ConnectionConfig,
+        table_name: &str,
+        limit: usize,
+        offset: usize,
+        tab_idx: usize,
+    ) -> Result<(), String> {
+        use crate::database::postgres::PostgresConnection;
+        use crate::database::Connection;
+
+        let mut pg_connection = PostgresConnection::new(connection.clone());
+        pg_connection
+            .connect()
+            .await
+            .map_err(|e| format!("Connection failed: {e}"))?;
+
+        // Get table columns
+        let columns = pg_connection
+            .get_table_columns(table_name)
+            .await
+            .map_err(|e| format!("Failed to retrieve columns: {e}"))?;
+
+        // Get total row count
+        let total_rows = pg_connection
+            .get_table_row_count(table_name)
+            .await
+            .map_err(|e| format!("Failed to get row count: {e}"))?;
+
+        // Get table data
+        let rows = pg_connection
+            .get_table_data(table_name, limit, offset)
+            .await
+            .map_err(|e| format!("Failed to retrieve data: {e}"))?;
+
+        // Update the tab with loaded data
+        if let Some(tab) = self.table_viewer_state.tabs.get_mut(tab_idx) {
+            // Convert columns to ColumnInfo
+            tab.columns = columns
+                .iter()
+                .map(|col| crate::ui::components::table_viewer::ColumnInfo {
+                    name: col.name.clone(),
+                    data_type: col.data_type.to_sql(),
+                    is_nullable: col.is_nullable,
+                    is_primary_key: col.is_primary_key,
+                    max_display_width: col.name.len().max(15),
+                })
+                .collect();
+
+            // Find primary key columns
+            tab.primary_key_columns = columns
+                .iter()
+                .enumerate()
+                .filter(|(_, col)| col.is_primary_key)
+                .map(|(idx, _)| idx)
+                .collect();
+
+            tab.rows = rows;
+            tab.total_rows = total_rows;
+            tab.loading = false;
+            tab.error = None;
+        }
+
+        let _ = pg_connection.disconnect().await;
+
+        Ok(())
+    }
+    
+    /// Load table metadata for the details pane
+    pub async fn load_table_metadata(&mut self, table_name: &str) -> Result<(), String> {
+        // Get the current connection
+        if let Some(connection) = self
+            .connections
+            .connections
+            .get(self.selected_connection)
+            .cloned()
+        {
+            match &connection.status {
+                ConnectionStatus::Connected => {
+                    // Load metadata based on database type
+                    match connection.database_type {
+                        DatabaseType::PostgreSQL => {
+                            use crate::database::postgres::PostgresConnection;
+                            use crate::database::Connection;
+                            
+                            let mut pg_connection = PostgresConnection::new(connection.clone());
+                            pg_connection
+                                .connect()
+                                .await
+                                .map_err(|e| format!("Connection failed: {e}"))?;
+                            
+                            // Get table metadata
+                            let metadata = pg_connection
+                                .get_table_metadata(table_name)
+                                .await
+                                .map_err(|e| format!("Failed to retrieve metadata: {e}"))?;
+                            
+                            self.current_table_metadata = Some(metadata);
+                            
+                            let _ = pg_connection.disconnect().await;
+                            Ok(())
+                        }
+                        _ => Err(format!(
+                            "Database type {} not yet supported for metadata",
+                            connection.database_type.display_name()
+                        )),
+                    }
+                }
+                _ => Err("No active database connection".to_string()),
+            }
+        } else {
+            Err("No connection selected".to_string())
+        }
+    }
+
+    /// Update a cell in the database
+    pub async fn update_table_cell(
+        &mut self,
+        update: crate::ui::components::table_viewer::CellUpdate,
+    ) -> Result<(), String> {
+        // Get the current connection
+        if let Some(connection) = self
+            .connections
+            .connections
+            .get(self.selected_connection)
+            .cloned()
+        {
+            match &connection.status {
+                ConnectionStatus::Connected => {
+                    // Update cell based on database type
+                    match connection.database_type {
+                        DatabaseType::PostgreSQL => {
+                            self.update_postgres_cell(&connection, update).await
+                        }
+                        _ => Err(format!(
+                            "Database type {} not yet supported for cell updates",
+                            connection.database_type.display_name()
+                        )),
+                    }
+                }
+                _ => Err("No active database connection".to_string()),
+            }
+        } else {
+            Err("No connection selected".to_string())
+        }
+    }
+
+    /// Update a cell in PostgreSQL
+    async fn update_postgres_cell(
+        &self,
+        connection: &ConnectionConfig,
+        update: crate::ui::components::table_viewer::CellUpdate,
+    ) -> Result<(), String> {
+        use crate::database::postgres::PostgresConnection;
+        use crate::database::Connection;
+
+        let mut pg_connection = PostgresConnection::new(connection.clone());
+        pg_connection
+            .connect()
+            .await
+            .map_err(|e| format!("Connection failed: {e}"))?;
+
+        // Build UPDATE SQL
+        let mut where_clauses = Vec::new();
+        for (pk_col, pk_val) in &update.primary_key_values {
+            where_clauses.push(format!("{pk_col} = '{pk_val}'"));
+        }
+
+        if where_clauses.is_empty() {
+            return Err("Cannot update row without primary key".to_string());
+        }
+
+        let sql = format!(
+            "UPDATE {} SET {} = '{}' WHERE {}",
+            update.table_name,
+            update.column_name,
+            update.new_value,
+            where_clauses.join(" AND ")
+        );
+
+        pg_connection
+            .execute_sql(&sql)
+            .await
+            .map_err(|e| format!("Failed to update cell: {e}"))?;
+
+        let _ = pg_connection.disconnect().await;
+
+        Ok(())
+    }
+
+    /// Reload current table tab data
+    pub async fn reload_current_table_tab(&mut self) -> Result<(), String> {
+        if let Some(tab_idx) = self
+            .table_viewer_state
+            .tabs
+            .get(self.table_viewer_state.active_tab)
+            .map(|_| self.table_viewer_state.active_tab)
+        {
+            self.load_table_data(tab_idx).await
+        } else {
+            Ok(())
         }
     }
 
