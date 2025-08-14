@@ -1,0 +1,30 @@
+TASK:
+Ensure that the help that opens after pressing ? does not comedy background, keep it elegant only.
+
+Task:
+Instead of getting into the command mode and pressing :q i should be able to quit using pressing q. Pressing the ? should show help. Pressing ? should show the help of the pane that i am in. Remove the global edit normal insertion model and remove it from the status line as well. In each of the pane's help, we should also see the global commands like q, ? etc as needed. Write this feature properly so it scales properly once we add more features.
+
+Task:
+When the application starts I don't want it to auto connect to any connection. Also I want that pressing enter or space both should trigger connecting. When i start the application the first view in the tables pane is showing as loading tables, it should just show the correct status now, that choose a connection from connections pane.
+
+Task:
+In the connections pane, can you also write the database which it connects to. Can use Format CONN: <connection name>, DB: <database name> along with the existing things already showing like status etc.
+
+Task:
+Till now we have supported postgres. Can you also get the Mysql, sqlite, mariadb supported as well please. First create the test database dockers for these databases, and then update the code to support the above databases as well.
+
+Task:
+In the sql writing option i should be able to create new sql file for this database connection, these should get saved at the relevant place in the ~/.lazytables directory. Also in the sql writing option put the feature of vim, to navigate around the words and also hjkl keys. Also pressing i should take me to writing mode. To save sql file, I press :w to close, I press :q.
+
+TASK:
+The tabs after the more than one table opens in the main data area, pressing S and D does not take to tab in left or right.
+
+TASK:
+I hope that you are not loading the entire table when showing, it should load only the values that need to be shown, so we don't hang up the system for large tables.
+
+TASK:
+in the table viewing i want you to add the option of pressing G which takes to the last item in the visible. pressing gg takes to the first line.
+
+TASK:
+In the table viewing, if the deletion of row using dd requires cascading, then ask for confirmation to cascade. if cascading not required then delete it directly.
+
