@@ -12,7 +12,17 @@ use std::time::Duration;
 
 pub mod state;
 
-pub use state::{AppState, FocusedPane, Mode};
+pub use state::{AppState, FocusedPane};
+
+// Simplified internal mode for compatibility - not shown to user
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum Mode {
+    Normal,
+    Insert,
+    Visual,
+    Command,
+    Query,
+}
 
 /// Main application structure
 pub struct App {
@@ -26,6 +36,12 @@ pub struct App {
     _config: Config,
     /// Flag to quit the application
     should_quit: bool,
+    /// Internal mode for key handling (not shown to user)
+    mode: Mode,
+    /// Command buffer for : commands
+    command_buffer: String,
+    /// Leader key state for compound commands
+    leader_pressed: bool,
 }
 
 impl App {
@@ -41,6 +57,9 @@ impl App {
             ui,
             _config: config,
             should_quit: false,
+            mode: Mode::Normal,
+            command_buffer: String::new(),
+            leader_pressed: false,
         })
     }
 
@@ -84,26 +103,105 @@ impl App {
         Ok(())
     }
 
-    /// Handle keyboard events based on current mode
+    /// Handle keyboard events
     async fn handle_key_event(&mut self, key: KeyEvent) -> Result<()> {
         // Handle ESC key globally to close help overlay
-        if key.code == KeyCode::Esc && self.state.show_help {
-            self.state.show_help = false;
+        if key.code == KeyCode::Esc && self.state.help_mode != crate::app::state::HelpMode::None {
+            self.state.help_mode = crate::app::state::HelpMode::None;
             return Ok(());
         }
 
+        // Handle '?' key globally for context-aware help
+        if key.code == KeyCode::Char('?') && key.modifiers == KeyModifiers::NONE {
+            use crate::app::state::HelpMode;
+            // Toggle help based on current pane
+            if self.state.help_mode != HelpMode::None {
+                self.state.help_mode = HelpMode::None;
+            } else {
+                self.state.help_mode = match self.state.focused_pane {
+                    FocusedPane::Connections => HelpMode::Connections,
+                    FocusedPane::Tables => HelpMode::Tables,
+                    FocusedPane::Details => HelpMode::Details,
+                    FocusedPane::TabularOutput => HelpMode::TabularOutput,
+                    FocusedPane::SqlFiles => HelpMode::SqlFiles,
+                    FocusedPane::QueryWindow => HelpMode::QueryWindow,
+                };
+            }
+            return Ok(());
+        }
+
+        // Handle delete confirmation dialog in table viewer
+        if let Some(confirmation) = &self.state.table_viewer_state.delete_confirmation {
+            match key.code {
+                KeyCode::Enter | KeyCode::Char('y') | KeyCode::Char('Y') => {
+                    // Confirm delete
+                    let confirmation = confirmation.clone();
+                    if let Err(e) = self.state.delete_table_row(confirmation).await {
+                        self.state.toast_manager.error(format!("Failed to delete row: {e}"));
+                    } else {
+                        self.state.toast_manager.success("Row deleted successfully");
+                        // Reload table data
+                        let tab_idx = self.state.table_viewer_state.active_tab;
+                        let _ = self.state.load_table_data(tab_idx).await;
+                    }
+                    self.state.table_viewer_state.delete_confirmation = None;
+                    return Ok(());
+                }
+                KeyCode::Esc | KeyCode::Char('n') | KeyCode::Char('N') => {
+                    // Cancel delete
+                    self.state.table_viewer_state.delete_confirmation = None;
+                    self.state.toast_manager.info("Delete cancelled");
+                    return Ok(());
+                }
+                _ => {
+                    // Ignore other keys while confirmation is shown
+                    return Ok(());
+                }
+            }
+        }
+
+        // Handle 'q' key globally to quit (except when in modals or editing)
+        if key.code == KeyCode::Char('q') && key.modifiers == KeyModifiers::NONE {
+            // Don't quit if we're in a modal or editing
+            if !self.state.show_add_connection_modal
+                && !self.state.show_edit_connection_modal
+                && !self.state.show_table_creator
+                && !self.state.show_table_editor
+            {
+                // Check if we're editing in table viewer
+                if self.state.focused_pane == FocusedPane::TabularOutput {
+                    if let Some(tab) = self.state.table_viewer_state.current_tab() {
+                        if !tab.in_edit_mode && !tab.in_search_mode {
+                            self.should_quit = true;
+                            return Ok(());
+                        }
+                    } else {
+                        self.should_quit = true;
+                        return Ok(());
+                    }
+                } else {
+                    self.should_quit = true;
+                    return Ok(());
+                }
+            }
+        }
+
         // Handle ESC or Enter in table viewer edit mode to save
-        if (key.code == KeyCode::Esc || key.code == KeyCode::Enter) 
-            && self.state.focused_pane == FocusedPane::TabularOutput 
+        if (key.code == KeyCode::Esc || key.code == KeyCode::Enter)
+            && self.state.focused_pane == FocusedPane::TabularOutput
         {
             if let Some(tab) = self.state.table_viewer_state.current_tab_mut() {
                 if tab.in_edit_mode {
                     // Save the edit and update database
                     if let Some(update) = tab.save_edit() {
                         if let Err(e) = self.state.update_table_cell(update).await {
-                            self.state.toast_manager.error(format!("Failed to update cell: {e}"));
+                            self.state
+                                .toast_manager
+                                .error(format!("Failed to update cell: {e}"));
                         } else {
-                            self.state.toast_manager.success("Cell updated successfully");
+                            self.state
+                                .toast_manager
+                                .success("Cell updated successfully");
                         }
                     }
                     return Ok(());
@@ -112,9 +210,9 @@ impl App {
         }
 
         // Handle Ctrl+C in table viewer edit mode
-        if key.code == KeyCode::Char('c') 
+        if key.code == KeyCode::Char('c')
             && key.modifiers == KeyModifiers::CONTROL
-            && self.state.focused_pane == FocusedPane::TabularOutput 
+            && self.state.focused_pane == FocusedPane::TabularOutput
         {
             if let Some(tab) = self.state.table_viewer_state.current_tab_mut() {
                 if tab.in_edit_mode {
@@ -189,13 +287,13 @@ impl App {
             return self.handle_table_editor_key_event(key).await;
         }
 
-        match self.state.mode {
+        match self.mode {
             Mode::Normal => {
                 match (key.modifiers, key.code) {
                     // Enter command mode with ':'
                     (KeyModifiers::NONE, KeyCode::Char(':')) => {
-                        self.state.mode = Mode::Command;
-                        self.state.command_buffer.clear();
+                        self.mode = Mode::Command;
+                        self.command_buffer.clear();
                     }
                     // Pane navigation with Ctrl+h/j/k/l (directional movement)
                     (KeyModifiers::CONTROL, KeyCode::Char('h')) => {
@@ -240,18 +338,19 @@ impl App {
                         } else if self.state.focused_pane == FocusedPane::QueryWindow
                             || self.state.focused_pane == FocusedPane::SqlFiles
                         {
-                            self.state.mode = Mode::Query;
+                            self.mode = Mode::Query;
                         } else {
-                            self.state.mode = Mode::Insert;
+                            self.mode = Mode::Insert;
                         }
                     }
                     // Enter visual mode
                     (KeyModifiers::NONE, KeyCode::Char('v')) => {
-                        self.state.mode = Mode::Visual;
+                        self.mode = Mode::Visual;
                     }
-                    // Show help overlay
+                    // Show help overlay (already handled globally)
+                    // This branch is kept for backwards compatibility
                     (KeyModifiers::NONE, KeyCode::Char('?')) => {
-                        self.state.show_help = !self.state.show_help;
+                        // Already handled globally
                     }
                     // Add connection (only in connections pane)
                     (KeyModifiers::NONE, KeyCode::Char('a')) => {
@@ -305,7 +404,10 @@ impl App {
                         } else if self.state.focused_pane == FocusedPane::TabularOutput {
                             // Next search result (when not in search mode)
                             if let Some(tab) = self.state.table_viewer_state.current_tab_mut() {
-                                if !tab.in_edit_mode && !tab.in_search_mode && !tab.search_results.is_empty() {
+                                if !tab.in_edit_mode
+                                    && !tab.in_search_mode
+                                    && !tab.search_results.is_empty()
+                                {
                                     tab.next_search_result();
                                 }
                             }
@@ -316,7 +418,10 @@ impl App {
                         if self.state.focused_pane == FocusedPane::TabularOutput {
                             // Previous search result (when not in search mode)
                             if let Some(tab) = self.state.table_viewer_state.current_tab_mut() {
-                                if !tab.in_edit_mode && !tab.in_search_mode && !tab.search_results.is_empty() {
+                                if !tab.in_edit_mode
+                                    && !tab.in_search_mode
+                                    && !tab.search_results.is_empty()
+                                {
                                     tab.prev_search_result();
                                 }
                             }
@@ -350,16 +455,24 @@ impl App {
                         } else if self.state.focused_pane == FocusedPane::Details {
                             // Load metadata for current table if not already loaded
                             if self.state.current_table_metadata.is_none() {
-                                if let Some(table_name) = self.state.tables.get(self.state.selected_table).cloned() {
-                                    if let Err(e) = self.state.load_table_metadata(&table_name).await {
-                                        self.state.toast_manager.error(format!("Failed to load table metadata: {}", e));
+                                if let Some(table_name) =
+                                    self.state.tables.get(self.state.selected_table).cloned()
+                                {
+                                    if let Err(e) =
+                                        self.state.load_table_metadata(&table_name).await
+                                    {
+                                        self.state
+                                            .toast_manager
+                                            .error(format!("Failed to load table metadata: {e}"));
                                     }
                                 }
                             }
                         } else if self.state.focused_pane == FocusedPane::SqlFiles {
                             // Load selected SQL file
                             if let Err(e) = self.state.load_selected_sql_file() {
-                                self.state.toast_manager.error(format!("Failed to load SQL file: {e}"));
+                                self.state
+                                    .toast_manager
+                                    .error(format!("Failed to load SQL file: {e}"));
                             } else {
                                 self.state.toast_manager.success("SQL file loaded");
                             }
@@ -372,7 +485,9 @@ impl App {
                         {
                             // Save current query
                             if let Err(e) = self.state.save_query() {
-                                self.state.toast_manager.error(format!("Failed to save query: {e}"));
+                                self.state
+                                    .toast_manager
+                                    .error(format!("Failed to save query: {e}"));
                             } else {
                                 self.state.toast_manager.success("Query saved successfully");
                             }
@@ -400,7 +515,9 @@ impl App {
                                     .as_secs()
                             );
                             if let Err(e) = self.state.new_query_file(&filename) {
-                                self.state.toast_manager.error(format!("Failed to create new query: {e}"));
+                                self.state
+                                    .toast_manager
+                                    .error(format!("Failed to create new query: {e}"));
                             } else {
                                 self.state.toast_manager.success("New query file created");
                             }
@@ -432,13 +549,15 @@ impl App {
                             self.state.table_viewer_state.close_current_tab();
                         }
                     }
-                    (KeyModifiers::NONE, KeyCode::Char('S')) => {
+                    // Handle uppercase S for previous tab (both with and without SHIFT modifier)
+                    (KeyModifiers::SHIFT, KeyCode::Char('S')) | (KeyModifiers::SHIFT, KeyCode::Char('s')) | (KeyModifiers::NONE, KeyCode::Char('S')) => {
                         if self.state.focused_pane == FocusedPane::TabularOutput {
                             // Previous tab
                             self.state.table_viewer_state.prev_tab();
                         }
                     }
-                    (KeyModifiers::NONE, KeyCode::Char('D')) => {
+                    // Handle uppercase D for next tab (with SHIFT modifier)
+                    (KeyModifiers::SHIFT, KeyCode::Char('D')) | (KeyModifiers::SHIFT, KeyCode::Char('d')) | (KeyModifiers::NONE, KeyCode::Char('D')) => {
                         if self.state.focused_pane == FocusedPane::TabularOutput {
                             // Next tab
                             self.state.table_viewer_state.next_tab();
@@ -448,7 +567,9 @@ impl App {
                         if self.state.focused_pane == FocusedPane::TabularOutput {
                             // Reload current table
                             if let Err(e) = self.state.reload_current_table_tab().await {
-                                self.state.toast_manager.error(format!("Failed to reload table: {e}"));
+                                self.state
+                                    .toast_manager
+                                    .error(format!("Failed to reload table: {e}"));
                             } else {
                                 self.state.toast_manager.info("Table data refreshed");
                             }
@@ -462,7 +583,9 @@ impl App {
                                     // Need to reload data
                                     let tab_idx = self.state.table_viewer_state.active_tab;
                                     if let Err(e) = self.state.load_table_data(tab_idx).await {
-                                        self.state.toast_manager.error(format!("Failed to load next page: {e}"));
+                                        self.state
+                                            .toast_manager
+                                            .error(format!("Failed to load next page: {e}"));
                                     }
                                 }
                             }
@@ -475,7 +598,9 @@ impl App {
                                     // Need to reload data
                                     let tab_idx = self.state.table_viewer_state.active_tab;
                                     if let Err(e) = self.state.load_table_data(tab_idx).await {
-                                        self.state.toast_manager.error(format!("Failed to load previous page: {e}"));
+                                        self.state
+                                            .toast_manager
+                                            .error(format!("Failed to load previous page: {e}"));
                                     }
                                 }
                             }
@@ -484,14 +609,14 @@ impl App {
                     // Jump navigation in table viewer
                     (KeyModifiers::NONE, KeyCode::Char('g')) => {
                         if self.state.focused_pane == FocusedPane::TabularOutput {
-                            if self.state.leader_pressed {
+                            if self.leader_pressed {
                                 // gg - jump to first row
                                 if let Some(tab) = self.state.table_viewer_state.current_tab_mut() {
                                     tab.jump_to_first();
                                 }
-                                self.state.leader_pressed = false;
+                                self.leader_pressed = false;
                             } else {
-                                self.state.leader_pressed = true;
+                                self.leader_pressed = true;
                             }
                         }
                     }
@@ -519,15 +644,88 @@ impl App {
                             }
                         }
                     }
-                    // Leader key (Space) commands
+                    // Handle 'd' for delete row (dd vim command)
+                    (KeyModifiers::NONE, KeyCode::Char('d')) => {
+                        if self.state.focused_pane == FocusedPane::TabularOutput {
+                            // Check if there's a delete confirmation dialog
+                            if self.state.table_viewer_state.delete_confirmation.is_some() {
+                                // This is handled elsewhere (Enter/Esc for confirm/cancel)
+                            } else {
+                                // Check for double 'd' press (dd command)
+                                let now = std::time::Instant::now();
+                                if let Some(last_press) = self.state.table_viewer_state.last_d_press {
+                                    if now.duration_since(last_press).as_millis() < 500 {
+                                        // Double 'd' detected - prepare delete confirmation
+                                        if let Some(confirmation) = self.state.table_viewer_state.prepare_delete_confirmation() {
+                                            self.state.table_viewer_state.delete_confirmation = Some(confirmation);
+                                        } else {
+                                            self.state.toast_manager.error("Cannot delete row without primary key");
+                                        }
+                                        self.state.table_viewer_state.last_d_press = None;
+                                    } else {
+                                        self.state.table_viewer_state.last_d_press = Some(now);
+                                    }
+                                } else {
+                                    self.state.table_viewer_state.last_d_press = Some(now);
+                                }
+                            }
+                        }
+                    }
+                    // Handle 'y' for yank/copy row (yy vim command)
+                    (KeyModifiers::NONE, KeyCode::Char('y')) => {
+                        if self.state.focused_pane == FocusedPane::TabularOutput {
+                            // Check for double 'y' press (yy command)
+                            let now = std::time::Instant::now();
+                            if let Some(last_press) = self.state.table_viewer_state.last_y_press {
+                                if now.duration_since(last_press).as_millis() < 500 {
+                                    // Double 'y' detected - copy row to clipboard
+                                    match self.state.table_viewer_state.copy_row_csv() {
+                                        Ok(()) => {
+                                            self.state.toast_manager.success("Row copied to clipboard (CSV format)");
+                                        }
+                                        Err(e) => {
+                                            self.state.toast_manager.error(format!("Failed to copy row: {e}"));
+                                        }
+                                    }
+                                    self.state.table_viewer_state.last_y_press = None;
+                                } else {
+                                    self.state.table_viewer_state.last_y_press = Some(now);
+                                }
+                            } else {
+                                self.state.table_viewer_state.last_y_press = Some(now);
+                            }
+                        }
+                    }
+                    // Leader key (Space) commands OR Connect in Connections pane
                     (KeyModifiers::NONE, KeyCode::Char(' ')) => {
-                        // Track that space was pressed and wait for next key
-                        self.state.leader_pressed = true;
+                        if self.state.focused_pane == crate::app::state::FocusedPane::Connections {
+                            // Handle database connection (same as Enter)
+                            if let Some(connection) = self
+                                .state
+                                .connections
+                                .connections
+                                .get(self.state.selected_connection)
+                            {
+                                match &connection.status {
+                                    crate::database::ConnectionStatus::Connected => {
+                                        // Disconnect if already connected
+                                        self.state.disconnect_from_database();
+                                    }
+                                    _ => {
+                                        // Connect if not connected or failed
+                                        self.state.connect_to_selected_database().await;
+                                    }
+                                }
+                            }
+                        } else {
+                            // Track that space was pressed and wait for next key (leader key functionality)
+                            self.leader_pressed = true;
+                        }
                     }
                     _ => {
                         // Handle leader key combinations
-                        if self.state.leader_pressed {
-                            self.state.leader_pressed = false;
+                        if self.leader_pressed {
+                            self.leader_pressed = false;
                             // Leader key combinations can be added here for future features
                             // For now, just reset the leader state
                         }
@@ -537,7 +735,7 @@ impl App {
             Mode::Insert => {
                 match key.code {
                     KeyCode::Esc => {
-                        self.state.mode = Mode::Normal;
+                        self.mode = Mode::Normal;
                     }
                     _ => {
                         // Handle insert mode input
@@ -547,7 +745,7 @@ impl App {
             Mode::Visual => {
                 match key.code {
                     KeyCode::Esc => {
-                        self.state.mode = Mode::Normal;
+                        self.mode = Mode::Normal;
                     }
                     _ => {
                         // Handle visual mode selection
@@ -557,23 +755,23 @@ impl App {
             Mode::Command => {
                 match key.code {
                     KeyCode::Esc => {
-                        self.state.command_buffer.clear();
-                        self.state.mode = Mode::Normal;
+                        self.command_buffer.clear();
+                        self.mode = Mode::Normal;
                     }
                     KeyCode::Enter => {
                         // Execute command
-                        let command = self.state.command_buffer.trim();
+                        let command = self.command_buffer.trim();
                         if command == "q" || command == "quit" {
                             self.should_quit = true;
                         }
-                        self.state.command_buffer.clear();
-                        self.state.mode = Mode::Normal;
+                        self.command_buffer.clear();
+                        self.mode = Mode::Normal;
                     }
                     KeyCode::Char(c) => {
-                        self.state.command_buffer.push(c);
+                        self.command_buffer.push(c);
                     }
                     KeyCode::Backspace => {
-                        self.state.command_buffer.pop();
+                        self.command_buffer.pop();
                     }
                     _ => {}
                 }
@@ -581,12 +779,14 @@ impl App {
             Mode::Query => {
                 match key.code {
                     KeyCode::Esc => {
-                        self.state.mode = Mode::Normal;
+                        self.mode = Mode::Normal;
                     }
                     KeyCode::Char('s') if key.modifiers.contains(KeyModifiers::CONTROL) => {
                         // Save current query
                         if let Err(e) = self.state.save_query() {
-                            self.state.toast_manager.error(format!("Failed to save query: {e}"));
+                            self.state
+                                .toast_manager
+                                .error(format!("Failed to save query: {e}"));
                         } else {
                             self.state.toast_manager.success("Query saved successfully");
                         }
@@ -605,7 +805,9 @@ impl App {
                                 .as_secs()
                         );
                         if let Err(e) = self.state.new_query_file(&filename) {
-                            self.state.toast_manager.error(format!("Failed to create new query: {e}"));
+                            self.state
+                                .toast_manager
+                                .error(format!("Failed to create new query: {e}"));
                         } else {
                             self.state.toast_manager.success("New query file created");
                         }
@@ -774,10 +976,14 @@ impl App {
                     ConnectionField::Save => {
                         // Try to save the connection
                         if let Err(error) = self.state.save_connection_from_modal() {
-                            self.state.toast_manager.error(format!("Failed to save connection: {}", &error));
+                            self.state
+                                .toast_manager
+                                .error(format!("Failed to save connection: {}", &error));
                             self.state.connection_modal_state.error_message = Some(error);
                         } else {
-                            self.state.toast_manager.success("Connection saved successfully");
+                            self.state
+                                .toast_manager
+                                .success("Connection saved successfully");
                         }
                     }
                     ConnectionField::Cancel => {
@@ -807,10 +1013,14 @@ impl App {
             KeyCode::Char('s') => {
                 // Save shortcut - works from any field
                 if let Err(error) = self.state.save_connection_from_modal() {
-                    self.state.toast_manager.error(format!("Failed to save connection: {}", &error));
+                    self.state
+                        .toast_manager
+                        .error(format!("Failed to save connection: {}", &error));
                     self.state.connection_modal_state.error_message = Some(error);
                 } else {
-                    self.state.toast_manager.success("Connection saved successfully");
+                    self.state
+                        .toast_manager
+                        .success("Connection saved successfully");
                 }
             }
             KeyCode::Char('c') => {
@@ -956,10 +1166,14 @@ impl App {
                     TableCreatorField::Save => {
                         // Save the table
                         if let Err(error) = self.state.create_table_from_creator().await {
-                            self.state.toast_manager.error(format!("Failed to create table: {}", &error));
+                            self.state
+                                .toast_manager
+                                .error(format!("Failed to create table: {}", &error));
                             self.state.table_creator_state.error_message = Some(error);
                         } else {
-                            self.state.toast_manager.success("Table created successfully");
+                            self.state
+                                .toast_manager
+                                .success("Table created successfully");
                         }
                     }
                     TableCreatorField::Cancel => {
@@ -985,10 +1199,14 @@ impl App {
             KeyCode::Char('s') => {
                 // Quick save
                 if let Err(error) = self.state.create_table_from_creator().await {
-                    self.state.toast_manager.error(format!("Failed to create table: {}", &error));
+                    self.state
+                        .toast_manager
+                        .error(format!("Failed to create table: {}", &error));
                     self.state.table_creator_state.error_message = Some(error);
                 } else {
-                    self.state.toast_manager.success("Table created successfully");
+                    self.state
+                        .toast_manager
+                        .success("Table created successfully");
                 }
             }
             KeyCode::Char('c') => {
@@ -1123,10 +1341,14 @@ impl App {
                     TableCreatorField::Save => {
                         // Save the table changes
                         if let Err(error) = self.state.apply_table_edits_from_editor().await {
-                            self.state.toast_manager.error(format!("Failed to apply table changes: {}", &error));
+                            self.state
+                                .toast_manager
+                                .error(format!("Failed to apply table changes: {}", &error));
                             self.state.table_editor_state.error_message = Some(error);
                         } else {
-                            self.state.toast_manager.success("Table updated successfully");
+                            self.state
+                                .toast_manager
+                                .success("Table updated successfully");
                         }
                     }
                     TableCreatorField::Cancel => {
@@ -1151,10 +1373,14 @@ impl App {
             KeyCode::Char('s') => {
                 // Quick save
                 if let Err(error) = self.state.apply_table_edits_from_editor().await {
-                    self.state.toast_manager.error(format!("Failed to apply table changes: {}", &error));
+                    self.state
+                        .toast_manager
+                        .error(format!("Failed to apply table changes: {}", &error));
                     self.state.table_editor_state.error_message = Some(error);
                 } else {
-                    self.state.toast_manager.success("Table updated successfully");
+                    self.state
+                        .toast_manager
+                        .success("Table updated successfully");
                 }
             }
             KeyCode::Char('c') => {
