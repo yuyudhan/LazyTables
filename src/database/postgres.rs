@@ -198,7 +198,8 @@ impl Connection for PostgresConnection {
                     ON ccu.constraint_name = tc.constraint_name
                     AND ccu.table_schema = tc.table_schema
                 WHERE tc.constraint_type = 'FOREIGN KEY' 
-                    AND tc.table_name = $1";
+                    AND tc.table_name = $1
+                    AND tc.table_schema = 'public'";
             
             let fk_rows = sqlx::query(fk_query)
                 .bind(table_name)
@@ -259,10 +260,10 @@ impl Connection for PostgresConnection {
     async fn get_table_columns(&self, table_name: &str) -> Result<Vec<TableColumn>> {
         if let Some(pool) = &self.pool {
             let query = "SELECT 
-                column_name,
-                data_type,
-                is_nullable,
-                column_default,
+                c.column_name,
+                c.data_type,
+                c.is_nullable,
+                c.column_default,
                 CASE 
                     WHEN pk.column_name IS NOT NULL THEN true 
                     ELSE false 
@@ -276,6 +277,7 @@ impl Connection for PostgresConnection {
                         AND tc.table_schema = kcu.table_schema
                     WHERE tc.constraint_type = 'PRIMARY KEY'
                         AND tc.table_name = $1
+                        AND tc.table_schema = 'public'
                 ) pk ON c.column_name = pk.column_name
                 WHERE c.table_schema = 'public' 
                 AND c.table_name = $1
