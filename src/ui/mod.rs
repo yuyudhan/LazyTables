@@ -18,14 +18,16 @@ use ratatui::{
 pub mod components;
 pub mod help;
 pub mod layout;
+pub mod theme;
 pub mod widgets;
 
 use layout::LayoutManager;
+use theme::Theme;
 
 /// Main UI structure
 pub struct UI {
     layout_manager: LayoutManager,
-    theme: Theme,
+    pub theme: Theme,
 }
 
 impl UI {
@@ -91,7 +93,7 @@ impl UI {
         state.toast_manager.cleanup();
 
         // Draw toast notifications
-        components::toast::render_toasts(frame, &state.toast_manager, frame.area());
+        components::toast::render_toasts(frame, &state.toast_manager, frame.area(), &self.theme);
 
         // Command mode is handled internally, not shown in UI
 
@@ -126,11 +128,11 @@ impl UI {
     /// Draw the header bar
     fn draw_header(&self, frame: &mut Frame, area: Rect, _state: &AppState) {
         let header = Paragraph::new(constants::version_string())
-            .style(Style::default().fg(self.theme.header_fg))
+            .style(Style::default().fg(self.theme.get_color("header_fg")))
             .block(
                 Block::default()
                     .borders(Borders::BOTTOM)
-                    .border_style(Style::default().fg(self.theme.border)),
+                    .border_style(Style::default().fg(self.theme.get_color("border"))),
             )
             .centered();
 
@@ -141,9 +143,9 @@ impl UI {
     fn draw_connections_pane(&self, frame: &mut Frame, area: Rect, state: &mut AppState) {
         let is_focused = state.focused_pane == FocusedPane::Connections;
         let border_style = if is_focused {
-            Style::default().fg(self.theme.active_border)
+            Style::default().fg(self.theme.get_color("active_border"))
         } else {
-            Style::default().fg(self.theme.border)
+            Style::default().fg(self.theme.get_color("border"))
         };
 
         // Create list items from stored connections
@@ -298,7 +300,7 @@ impl UI {
             )
             .highlight_style(
                 Style::default()
-                    .bg(self.theme.selection_bg)
+                    .bg(self.theme.get_color("selection_bg"))
                     .add_modifier(Modifier::BOLD),
             );
 
@@ -314,9 +316,9 @@ impl UI {
     fn draw_tables_pane(&self, frame: &mut Frame, area: Rect, state: &mut AppState) {
         let is_focused = state.focused_pane == FocusedPane::Tables;
         let border_style = if is_focused {
-            Style::default().fg(self.theme.active_border)
+            Style::default().fg(self.theme.get_color("active_border"))
         } else {
-            Style::default().fg(self.theme.border)
+            Style::default().fg(self.theme.get_color("border"))
         };
 
         // Check if there's an active connection
@@ -427,7 +429,7 @@ impl UI {
             )
             .highlight_style(
                 Style::default()
-                    .bg(self.theme.selection_bg)
+                    .bg(self.theme.get_color("selection_bg"))
                     .add_modifier(Modifier::BOLD),
             );
 
@@ -446,9 +448,9 @@ impl UI {
     fn draw_details_pane(&self, frame: &mut Frame, area: Rect, state: &AppState) {
         let is_focused = state.focused_pane == FocusedPane::Details;
         let border_style = if is_focused {
-            Style::default().fg(self.theme.active_border)
+            Style::default().fg(self.theme.get_color("active_border"))
         } else {
-            Style::default().fg(self.theme.border)
+            Style::default().fg(self.theme.get_color("border"))
         };
 
         // Check if there's an active connection and table selected
@@ -611,7 +613,7 @@ impl UI {
                     .borders(Borders::ALL)
                     .border_style(border_style),
             )
-            .style(Style::default().fg(self.theme.text));
+            .style(Style::default().fg(self.theme.get_color("text")));
 
         frame.render_widget(details, area);
     }
@@ -620,7 +622,7 @@ impl UI {
     fn draw_tabular_output(&self, frame: &mut Frame, area: Rect, state: &mut AppState) {
         // Use table viewer if tables are open
         if !state.table_viewer_state.tabs.is_empty() {
-            crate::ui::components::render_table_viewer(frame, &mut state.table_viewer_state, area);
+            crate::ui::components::render_table_viewer(frame, &mut state.table_viewer_state, area, &self.theme);
             return;
         }
 
@@ -636,9 +638,9 @@ impl UI {
 
         let is_focused = state.focused_pane == FocusedPane::TabularOutput;
         let border_style = if is_focused {
-            Style::default().fg(self.theme.active_border)
+            Style::default().fg(self.theme.get_color("active_border"))
         } else {
-            Style::default().fg(self.theme.border)
+            Style::default().fg(self.theme.get_color("border"))
         };
 
         // Check if there's an active connection and table selected
@@ -680,7 +682,7 @@ impl UI {
                         .borders(Borders::ALL)
                         .border_style(border_style),
                 )
-                .style(Style::default().fg(self.theme.text))
+                .style(Style::default().fg(self.theme.get_color("text")))
                 .alignment(Alignment::Center);
 
             frame.render_widget(placeholder, area);
@@ -713,14 +715,14 @@ impl UI {
                         .borders(Borders::ALL)
                         .border_style(border_style),
                 )
-                .style(Style::default().fg(self.theme.text))
+                .style(Style::default().fg(self.theme.get_color("text")))
                 .alignment(Alignment::Center);
 
             frame.render_widget(placeholder, area);
         } else {
             // Show actual table data (sample data for now)
             let header = Row::new(vec!["id", "name", "email", "created"])
-                .style(Style::default().fg(self.theme.header_fg))
+                .style(Style::default().fg(self.theme.get_color("header_fg")))
                 .height(1);
 
             let rows = vec![
@@ -746,7 +748,7 @@ impl UI {
                         .borders(Borders::ALL)
                         .border_style(border_style),
                 )
-                .row_highlight_style(Style::default().bg(self.theme.selection_bg));
+                .row_highlight_style(Style::default().bg(self.theme.get_color("selection_bg")));
 
             frame.render_widget(table, area);
         }
@@ -756,9 +758,9 @@ impl UI {
     fn draw_sql_files_pane(&self, frame: &mut Frame, area: Rect, state: &AppState) {
         let is_focused = state.focused_pane == FocusedPane::SqlFiles;
         let border_style = if is_focused {
-            Style::default().fg(self.theme.active_border)
+            Style::default().fg(self.theme.get_color("active_border"))
         } else {
-            Style::default().fg(self.theme.border)
+            Style::default().fg(self.theme.get_color("border"))
         };
 
         // Create list items from SQL files
@@ -778,9 +780,9 @@ impl UI {
                         .fg(Color::Green)
                         .add_modifier(Modifier::BOLD)
                 } else if i == state.selected_sql_file && is_focused {
-                    Style::default().fg(self.theme.primary_highlight)
+                    Style::default().fg(self.theme.get_color("primary_highlight"))
                 } else {
-                    Style::default().fg(self.theme.text)
+                    Style::default().fg(self.theme.get_color("text"))
                 };
 
                 ListItem::new(Line::from(vec![Span::styled(
@@ -824,7 +826,7 @@ impl UI {
             )
             .highlight_style(
                 Style::default()
-                    .bg(self.theme.selection_bg)
+                    .bg(self.theme.get_color("selection_bg"))
                     .add_modifier(Modifier::BOLD),
             );
 
@@ -835,9 +837,9 @@ impl UI {
     fn draw_query_window(&self, frame: &mut Frame, area: Rect, state: &AppState) {
         let is_focused = state.focused_pane == FocusedPane::QueryWindow;
         let border_style = if is_focused {
-            Style::default().fg(self.theme.active_border)
+            Style::default().fg(self.theme.get_color("active_border"))
         } else {
-            Style::default().fg(self.theme.border)
+            Style::default().fg(self.theme.get_color("border"))
         };
 
         // Check if there's an active connection for better help messages
@@ -1016,7 +1018,7 @@ impl UI {
                     .borders(Borders::ALL)
                     .border_style(border_style),
             )
-            .style(Style::default().fg(self.theme.text))
+            .style(Style::default().fg(self.theme.get_color("text")))
             .wrap(Wrap { trim: false });
 
         frame.render_widget(query_editor, area);
@@ -1104,7 +1106,7 @@ impl UI {
             Span::styled(
                 brand.as_str(),
                 Style::default()
-                    .fg(self.theme.primary_highlight)
+                    .fg(self.theme.get_color("primary_highlight"))
                     .add_modifier(Modifier::BOLD),
             ),
             Span::raw(" | "),
@@ -1123,28 +1125,13 @@ impl UI {
 
         let status_bar = Paragraph::new(status_line).style(
             Style::default()
-                .fg(self.theme.status_fg)
-                .bg(self.theme.status_bg),
+                .fg(self.theme.get_color("status_fg"))
+                .bg(self.theme.get_color("status_bg")),
         );
 
         frame.render_widget(status_bar, area);
     }
 }
-
-#[derive(Debug, Clone)]
-pub struct Theme {
-    pub background: Color,
-    pub text: Color,
-    pub header_fg: Color,
-    pub border: Color,
-    pub active_border: Color,
-    pub selection_bg: Color,
-    pub status_bg: Color,
-    pub status_fg: Color,
-    pub primary_highlight: Color,
-}
-
-impl Theme {}
 
 /// Format bytes as human-readable size
 fn format_bytes(bytes: i64) -> String {
@@ -1162,21 +1149,5 @@ fn format_bytes(bytes: i64) -> String {
         format!("{:.0} {}", size, UNITS[i])
     } else {
         format!("{:.2} {}", size, UNITS[i])
-    }
-}
-
-impl Default for Theme {
-    fn default() -> Self {
-        Self {
-            background: Color::Rgb(13, 13, 13),           // #0d0d0d
-            text: Color::Rgb(255, 255, 255),              // #ffffff
-            header_fg: Color::Rgb(203, 166, 247),         // #cba6f7
-            border: Color::Rgb(49, 50, 68),               // #313244
-            active_border: Color::Rgb(116, 199, 236),     // #74c7ec
-            selection_bg: Color::Rgb(69, 71, 90),         // #45475a
-            status_bg: Color::Rgb(49, 50, 68),            // #313244
-            status_fg: Color::Rgb(205, 214, 244),         // #cdd6f4
-            primary_highlight: Color::Rgb(116, 199, 236), // #74c7ec
-        }
     }
 }

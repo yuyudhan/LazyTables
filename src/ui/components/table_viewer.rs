@@ -2,12 +2,13 @@
 
 use ratatui::{
     layout::{Alignment, Constraint, Direction, Layout, Rect},
-    style::{Color, Modifier, Style, Stylize},
+    style::{Modifier, Style, Stylize},
     text::{Line, Span},
     widgets::{Block, Borders, Cell as TableCell, Paragraph, Row, Table, Tabs, Wrap},
     Frame,
 };
 use std::collections::HashMap;
+use crate::ui::theme::Theme;
 
 /// Represents a single table tab
 #[derive(Debug, Clone)]
@@ -484,9 +485,9 @@ impl Default for TableViewerState {
 }
 
 /// Render the table viewer
-pub fn render_table_viewer(f: &mut Frame, state: &mut TableViewerState, area: Rect) {
+pub fn render_table_viewer(f: &mut Frame, state: &mut TableViewerState, area: Rect, theme: &Theme) {
     if state.tabs.is_empty() {
-        render_empty_state(f, area);
+        render_empty_state(f, area, theme);
         return;
     }
 
@@ -501,23 +502,23 @@ pub fn render_table_viewer(f: &mut Frame, state: &mut TableViewerState, area: Re
         .split(area);
 
     // Render tabs
-    render_tabs(f, state, chunks[0]);
+    render_tabs(f, state, chunks[0], theme);
 
     // Render current table
     if let Some(tab) = state.current_tab() {
-        render_table_content(f, tab, chunks[1]);
+        render_table_content(f, tab, chunks[1], theme);
     }
 
     // Render help or status
     if state.show_help {
-        render_help(f, chunks[2]);
+        render_help(f, chunks[2], theme);
     } else {
-        render_status_bar(f, state, chunks[2]);
+        render_status_bar(f, state, chunks[2], theme);
     }
 
     // Render delete confirmation dialog if active
     if let Some(confirmation) = &state.delete_confirmation {
-        render_delete_confirmation(f, confirmation, f.area());
+        render_delete_confirmation(f, confirmation, f.area(), theme);
     }
 }
 
@@ -525,10 +526,11 @@ fn render_delete_confirmation(
     f: &mut Frame,
     confirmation: &DeleteConfirmation,
     area: Rect,
+    theme: &Theme,
 ) {
     // First, render a full-screen dark overlay to hide the background
     let full_overlay = Block::default()
-        .style(Style::default().bg(Color::Black));
+        .style(Style::default().bg(theme.get_color("modal_overlay")));
     f.render_widget(full_overlay, area);
     
     // Create a compact centered modal
@@ -549,8 +551,8 @@ fn render_delete_confirmation(
         .borders(Borders::ALL)
         .title(" ⚠ Delete Confirmation ")
         .title_alignment(Alignment::Center)
-        .border_style(Style::default().fg(Color::Red).add_modifier(Modifier::BOLD))
-        .style(Style::default().bg(Color::Black));
+        .border_style(Style::default().fg(theme.get_color("danger")).add_modifier(Modifier::BOLD))
+        .style(Style::default().bg(theme.get_color("modal_background")));
 
     f.render_widget(inner_block, modal_area);
 
@@ -566,19 +568,19 @@ fn render_delete_confirmation(
     let lines = vec![
         Line::from(""),
         Line::from(vec![
-            Span::styled("Delete row ", Style::default().fg(Color::White)),
-            Span::styled(format!("#{}", confirmation.row_index + 1), Style::default().fg(Color::Cyan).add_modifier(Modifier::BOLD)),
-            Span::styled(" from table ", Style::default().fg(Color::White)),
-            Span::styled(format!("'{}'", confirmation.table_name), Style::default().fg(Color::Yellow).add_modifier(Modifier::BOLD)),
-            Span::styled("?", Style::default().fg(Color::White)),
+            Span::styled("Delete row ", Style::default().fg(theme.get_color("text_primary"))),
+            Span::styled(format!("#{}", confirmation.row_index + 1), Style::default().fg(theme.get_color("primary_highlight")).add_modifier(Modifier::BOLD)),
+            Span::styled(" from table ", Style::default().fg(theme.get_color("text_primary"))),
+            Span::styled(format!("'{}'", confirmation.table_name), Style::default().fg(theme.get_color("secondary_highlight")).add_modifier(Modifier::BOLD)),
+            Span::styled("?", Style::default().fg(theme.get_color("text_primary"))),
         ]),
         Line::from(""),
-        Line::from("─────────────────").fg(Color::DarkGray).centered(),
+        Line::from("─────────────────").fg(theme.get_color("border_muted")).centered(),
         Line::from(vec![
-            Span::styled("[Y/Enter] ", Style::default().fg(Color::Green).add_modifier(Modifier::BOLD)),
-            Span::styled("Confirm  ", Style::default().fg(Color::Gray)),
-            Span::styled("[N/Esc] ", Style::default().fg(Color::Red).add_modifier(Modifier::BOLD)),
-            Span::styled("Cancel", Style::default().fg(Color::Gray)),
+            Span::styled("[Y/Enter] ", Style::default().fg(theme.get_color("success")).add_modifier(Modifier::BOLD)),
+            Span::styled("Confirm  ", Style::default().fg(theme.get_color("text_secondary"))),
+            Span::styled("[N/Esc] ", Style::default().fg(theme.get_color("danger")).add_modifier(Modifier::BOLD)),
+            Span::styled("Cancel", Style::default().fg(theme.get_color("text_secondary"))),
         ]),
     ];
 
@@ -589,12 +591,12 @@ fn render_delete_confirmation(
     f.render_widget(paragraph, inner_area);
 }
 
-fn render_empty_state(f: &mut Frame, area: Rect) {
+fn render_empty_state(f: &mut Frame, area: Rect, theme: &Theme) {
     let text = vec![
         Line::from(""),
-        Line::from("No tables open").fg(Color::DarkGray),
+        Line::from("No tables open").fg(theme.get_color("text_muted")),
         Line::from(""),
-        Line::from("Press Enter on a table in the Tables pane to open it").fg(Color::DarkGray),
+        Line::from("Press Enter on a table in the Tables pane to open it").fg(theme.get_color("text_muted")),
     ];
 
     let paragraph = Paragraph::new(text)
@@ -602,14 +604,14 @@ fn render_empty_state(f: &mut Frame, area: Rect) {
             Block::default()
                 .borders(Borders::ALL)
                 .title(" Table Viewer ")
-                .border_style(Style::default().fg(Color::DarkGray)),
+                .border_style(Style::default().fg(theme.get_color("border_muted"))),
         )
         .alignment(Alignment::Center);
 
     f.render_widget(paragraph, area);
 }
 
-fn render_tabs(f: &mut Frame, state: &TableViewerState, area: Rect) {
+fn render_tabs(f: &mut Frame, state: &TableViewerState, area: Rect, theme: &Theme) {
     let tab_titles: Vec<String> = state
         .tabs
         .iter()
@@ -639,23 +641,23 @@ fn render_tabs(f: &mut Frame, state: &TableViewerState, area: Rect) {
             Block::default()
                 .borders(Borders::ALL)
                 .title(" Open Tables ")
-                .border_style(Style::default().fg(Color::Cyan)),
+                .border_style(Style::default().fg(theme.get_color("primary_highlight"))),
         )
         .select(state.active_tab)
-        .style(Style::default().fg(Color::White))
+        .style(Style::default().fg(theme.get_color("text_primary")))
         .highlight_style(
             Style::default()
-                .fg(Color::Yellow)
+                .fg(theme.get_color("secondary_highlight"))
                 .add_modifier(Modifier::BOLD),
         );
 
     f.render_widget(tabs, area);
 }
 
-fn render_table_content(f: &mut Frame, tab: &TableTab, area: Rect) {
+fn render_table_content(f: &mut Frame, tab: &TableTab, area: Rect, theme: &Theme) {
     if tab.loading {
         let loading = Paragraph::new("Loading table data...")
-            .style(Style::default().fg(Color::Yellow))
+            .style(Style::default().fg(theme.get_color("warning")))
             .block(
                 Block::default()
                     .borders(Borders::ALL)
@@ -668,12 +670,12 @@ fn render_table_content(f: &mut Frame, tab: &TableTab, area: Rect) {
 
     if let Some(ref error) = tab.error {
         let error_text = Paragraph::new(error.as_str())
-            .style(Style::default().fg(Color::Red))
+            .style(Style::default().fg(theme.get_color("danger")))
             .block(
                 Block::default()
                     .borders(Borders::ALL)
                     .title(format!(" {} - Error ", tab.table_name))
-                    .border_style(Style::default().fg(Color::Red)),
+                    .border_style(Style::default().fg(theme.get_color("danger"))),
             )
             .alignment(Alignment::Center);
         f.render_widget(error_text, area);
@@ -688,14 +690,14 @@ fn render_table_content(f: &mut Frame, tab: &TableTab, area: Rect) {
         .map(|(idx, col)| {
             let style = if idx == tab.selected_col && !tab.in_edit_mode {
                 Style::default()
-                    .fg(Color::Yellow)
+                    .fg(theme.get_color("secondary_highlight"))
                     .add_modifier(Modifier::BOLD)
             } else if col.is_primary_key {
                 Style::default()
-                    .fg(Color::Cyan)
+                    .fg(theme.get_color("primary_highlight"))
                     .add_modifier(Modifier::BOLD)
             } else {
-                Style::default().fg(Color::White)
+                Style::default().fg(theme.get_color("text_primary"))
             };
 
             let name = if col.is_primary_key {
@@ -743,33 +745,33 @@ fn render_table_content(f: &mut Frame, tab: &TableTab, area: Rect) {
 
                     // Base style with alternating row background
                     let base_style = if row_idx % 2 == 0 {
-                        Style::default().bg(Color::Rgb(15, 15, 20))
+                        Style::default().bg(theme.get_color("row_alternate_bg"))
                     } else {
                         Style::default()
                     };
 
                     let style = if is_selected && tab.in_edit_mode {
                         Style::default()
-                            .fg(Color::Black)
-                            .bg(Color::Yellow)
+                            .fg(theme.get_color("edit_mode_text"))
+                            .bg(theme.get_color("edit_mode_bg"))
                             .add_modifier(Modifier::BOLD)
                     } else if is_current_search {
                         Style::default()
-                            .fg(Color::Black)
-                            .bg(Color::Magenta)
+                            .fg(theme.get_color("search_current_text"))
+                            .bg(theme.get_color("search_current_bg"))
                             .add_modifier(Modifier::BOLD)
                     } else if is_selected {
-                        Style::default().fg(Color::Black).bg(Color::Cyan)
+                        Style::default().fg(theme.get_color("selected_text")).bg(theme.get_color("selected_bg"))
                     } else if is_search_match {
                         base_style
-                            .fg(Color::Magenta)
+                            .fg(theme.get_color("search_match"))
                             .add_modifier(Modifier::UNDERLINED)
                     } else if is_modified {
                         base_style
-                            .fg(Color::Green)
+                            .fg(theme.get_color("modified_cell"))
                             .add_modifier(Modifier::ITALIC)
                     } else if value == "NULL" || value.is_empty() {
-                        base_style.fg(Color::DarkGray)
+                        base_style.fg(theme.get_color("null_value"))
                     } else {
                         base_style
                     };
@@ -824,11 +826,11 @@ fn render_table_content(f: &mut Frame, tab: &TableTab, area: Rect) {
                     }
                 ))
                 .border_style(if tab.in_edit_mode {
-                    Style::default().fg(Color::Yellow)
+                    Style::default().fg(theme.get_color("edit_mode_border"))
                 } else if tab.in_search_mode {
-                    Style::default().fg(Color::Magenta)
+                    Style::default().fg(theme.get_color("search_mode_border"))
                 } else {
-                    Style::default().fg(Color::Cyan)
+                    Style::default().fg(theme.get_color("primary_highlight"))
                 }),
         )
         .column_spacing(1)
@@ -837,7 +839,7 @@ fn render_table_content(f: &mut Frame, tab: &TableTab, area: Rect) {
     f.render_widget(table, area);
 }
 
-fn render_status_bar(f: &mut Frame, state: &TableViewerState, area: Rect) {
+fn render_status_bar(f: &mut Frame, state: &TableViewerState, area: Rect, theme: &Theme) {
     let help_text = if let Some(tab) = state.current_tab() {
         if tab.in_edit_mode {
             " [ESC/Enter] Save & Exit | [Ctrl+C] Cancel Edit "
@@ -851,24 +853,24 @@ fn render_status_bar(f: &mut Frame, state: &TableViewerState, area: Rect) {
     };
 
     let help = Paragraph::new(help_text)
-        .style(Style::default().fg(Color::DarkGray))
+        .style(Style::default().fg(theme.get_color("text_muted")))
         .block(
             Block::default()
                 .borders(Borders::TOP)
-                .border_style(Style::default().fg(Color::DarkGray)),
+                .border_style(Style::default().fg(theme.get_color("border_muted"))),
         )
         .alignment(Alignment::Center);
 
     f.render_widget(help, area);
 }
 
-fn render_help(f: &mut Frame, area: Rect) {
+fn render_help(f: &mut Frame, area: Rect, theme: &Theme) {
     let help_text = vec![
         Line::from(vec![
             Span::styled(
                 "Navigation: ",
                 Style::default()
-                    .fg(Color::Cyan)
+                    .fg(theme.get_color("primary_highlight"))
                     .add_modifier(Modifier::BOLD),
             ),
             Span::raw(
@@ -879,7 +881,7 @@ fn render_help(f: &mut Frame, area: Rect) {
             Span::styled(
                 "Editing: ",
                 Style::default()
-                    .fg(Color::Cyan)
+                    .fg(theme.get_color("primary_highlight"))
                     .add_modifier(Modifier::BOLD),
             ),
             Span::raw("i - Edit cell | ESC - Save changes | Ctrl+C - Cancel edit"),
@@ -888,7 +890,7 @@ fn render_help(f: &mut Frame, area: Rect) {
             Span::styled(
                 "Pagination: ",
                 Style::default()
-                    .fg(Color::Cyan)
+                    .fg(theme.get_color("primary_highlight"))
                     .add_modifier(Modifier::BOLD),
             ),
             Span::raw("Ctrl+D - Page down | Ctrl+U - Page up | n/p - Next/Previous page"),
@@ -897,7 +899,7 @@ fn render_help(f: &mut Frame, area: Rect) {
             Span::styled(
                 "Tabs: ",
                 Style::default()
-                    .fg(Color::Cyan)
+                    .fg(theme.get_color("primary_highlight"))
                     .add_modifier(Modifier::BOLD),
             ),
             Span::raw("S - Previous tab | D - Next tab | x - Close current tab"),
@@ -906,7 +908,7 @@ fn render_help(f: &mut Frame, area: Rect) {
             Span::styled(
                 "Other: ",
                 Style::default()
-                    .fg(Color::Cyan)
+                    .fg(theme.get_color("primary_highlight"))
                     .add_modifier(Modifier::BOLD),
             ),
             Span::raw("r - Refresh data | / - Search | ? - Toggle this help"),
@@ -918,7 +920,7 @@ fn render_help(f: &mut Frame, area: Rect) {
             Block::default()
                 .borders(Borders::ALL)
                 .title(" Table Viewer Help ")
-                .border_style(Style::default().fg(Color::Yellow)),
+                .border_style(Style::default().fg(theme.get_color("secondary_highlight"))),
         )
         .alignment(Alignment::Left);
 
