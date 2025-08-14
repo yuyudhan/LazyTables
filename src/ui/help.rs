@@ -30,7 +30,7 @@ impl HelpSystem {
         };
 
         lines.push(Line::from(vec![Span::styled(
-            format!("─── {} Commands ", pane_name),
+            format!("─── {pane_name} Commands "),
             Style::default()
                 .fg(Color::Rgb(180, 180, 100))
                 .add_modifier(Modifier::BOLD),
@@ -188,7 +188,7 @@ impl HelpSystem {
     ) {
         lines.push(Line::from(vec![
             Span::raw("    "),
-            Span::styled(format!("{:8}", key), key_style),
+            Span::styled(format!("{key:8}"), key_style),
             Span::styled(desc.to_string(), desc_style),
         ]));
     }
@@ -197,7 +197,7 @@ impl HelpSystem {
     fn add_command(lines: &mut Vec<Line<'static>>, key: &str, desc: &str) {
         lines.push(Line::from(vec![
             Span::styled(
-                format!("{:10}", key),
+                format!("{key:10}"),
                 Style::default()
                     .fg(Color::Rgb(100, 200, 200))
                     .add_modifier(Modifier::BOLD),
@@ -300,7 +300,7 @@ impl HelpSystem {
         f.render_widget(overlay_block, area);
 
         let main_block = Block::default()
-            .title(format!(" Help • {} ", pane_name))
+            .title(format!(" Help • {pane_name} "))
             .title_alignment(Alignment::Center)
             .borders(Borders::ALL)
             .border_style(Style::default().fg(Color::Rgb(80, 80, 100)))

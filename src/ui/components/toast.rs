@@ -202,7 +202,7 @@ fn render_single_toast(f: &mut Frame, toast: &Toast, area: Rect) {
     let content = vec![
         Line::from(vec![
             Span::styled(
-                format!("{} ", prefix),
+                format!("{prefix} "),
                 Style::default()
                     .fg(border_color)
                     .add_modifier(Modifier::BOLD),
