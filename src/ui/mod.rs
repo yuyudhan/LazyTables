@@ -189,7 +189,7 @@ impl UI {
         // Use stateful widget to show selection
         let mut list_state = state.connections_list_state.clone();
         frame.render_stateful_widget(connections, area, &mut list_state);
-        
+
         // Update the state with any changes
         state.connections_list_state = list_state;
     }
@@ -244,28 +244,26 @@ impl UI {
             ]
         } else if state.tables.is_empty() {
             // Show loading or no tables message
-            vec![
-                ListItem::new(Line::from(vec![Span::styled(
-                    "Loading tables...",
-                    Style::default().fg(Color::Yellow),
-                )])),
-            ]
+            vec![ListItem::new(Line::from(vec![Span::styled(
+                "Loading tables...",
+                Style::default().fg(Color::Yellow),
+            )]))]
         } else {
             // Show actual tables from connected database
-            let mut table_items = vec![
-                ListItem::new(Line::from(vec![Span::styled(
-                    "▼ Tables",
-                    Style::default().fg(Color::Cyan).add_modifier(Modifier::BOLD),
-                )])),
-            ];
-            
+            let mut table_items = vec![ListItem::new(Line::from(vec![Span::styled(
+                "▼ Tables",
+                Style::default()
+                    .fg(Color::Cyan)
+                    .add_modifier(Modifier::BOLD),
+            )]))];
+
             for table in &state.tables {
                 table_items.push(ListItem::new(Line::from(vec![
                     Span::styled("  📋 ", Style::default().fg(Color::Blue)),
                     Span::styled(table, Style::default().fg(Color::White)),
                 ])));
             }
-            
+
             // Add navigation help if focused
             if is_focused && !state.tables.is_empty() {
                 table_items.push(ListItem::new(""));
@@ -289,8 +287,18 @@ impl UI {
                     ),
                     Span::styled(" to view table data", Style::default().fg(Color::Gray)),
                 ])));
+                table_items.push(ListItem::new(Line::from(vec![
+                    Span::styled("Press ", Style::default().fg(Color::Gray)),
+                    Span::styled(
+                        "n",
+                        Style::default()
+                            .fg(Color::Yellow)
+                            .add_modifier(Modifier::BOLD),
+                    ),
+                    Span::styled(" to create new table", Style::default().fg(Color::Gray)),
+                ])));
             }
-            
+
             table_items
         };
 
@@ -310,7 +318,7 @@ impl UI {
         // Use stateful widget to show selection
         let mut list_state = state.tables_list_state.clone();
         frame.render_stateful_widget(tables, area, &mut list_state);
-        
+
         // Update the state with any changes
         state.tables_list_state = list_state;
     }
@@ -394,7 +402,17 @@ impl UI {
     }
 
     /// Draw the tabular output area
-    fn draw_tabular_output(&self, frame: &mut Frame, area: Rect, state: &AppState) {
+    fn draw_tabular_output(&self, frame: &mut Frame, area: Rect, state: &mut AppState) {
+        // Check if table creator is active
+        if state.show_table_creator {
+            crate::ui::components::render_table_creator(
+                frame,
+                &mut state.table_creator_state,
+                area,
+            );
+            return;
+        }
+
         let is_focused = state.focused_pane == FocusedPane::TabularOutput;
         let border_style = if is_focused {
             Style::default().fg(self.theme.active_border)
