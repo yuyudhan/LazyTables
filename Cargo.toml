@@ -54,6 +54,9 @@ uuid = { version = "1.11", features = ["v4", "serde"] }
 # Directory management
 dirs = "5.0"
 
+# Clipboard support
+arboard = "3.4"
+
 # Command line argument parsing
 clap = { version = "4.5", features = ["derive", "env"] }
 

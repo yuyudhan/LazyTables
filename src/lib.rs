@@ -18,7 +18,7 @@ pub use config::Config;
 
 // Re-export commonly used types
 pub mod prelude {
-    pub use crate::app::{App, AppState, Mode};
+    pub use crate::app::{App, AppState};
     pub use crate::config::Config;
     pub use crate::core::error::{Error, Result};
     pub use crate::event::{Event, EventHandler};
