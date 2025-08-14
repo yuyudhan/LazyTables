@@ -176,12 +176,20 @@ impl UI {
                     ),
                 };
 
-                // Format: "✓ ConnectionName: Connected"
+                // Format: "✓ CONN: ConnectionName, DB: database_name: Connected"
+                let db_name = connection.database.as_deref().unwrap_or("default");
                 let line = Line::from(vec![
                     Span::styled(format!("{} ", connection.status_symbol()), symbol_style),
+                    Span::styled("CONN: ", Style::default().fg(Color::DarkGray)),
                     Span::styled(
-                        connection.display_string(),
+                        &connection.name,
                         Style::default().fg(Color::White),
+                    ),
+                    Span::styled(", ", Style::default().fg(Color::DarkGray)),
+                    Span::styled("DB: ", Style::default().fg(Color::DarkGray)),
+                    Span::styled(
+                        db_name,
+                        Style::default().fg(Color::Cyan),
                     ),
                     Span::styled(": ", Style::default().fg(Color::DarkGray)),
                     Span::styled(connection.status_text(), text_style),
@@ -1083,8 +1091,7 @@ impl UI {
 
         // Calculate the width of left side content
         let left_content = format!(
-            "{} | {} | {}{}",
-            brand, connection_text, position_text, help_hint
+            "{brand} | {connection_text} | {position_text}{help_hint}"
         );
 
         // Calculate padding needed to right-align the date/time

@@ -1,6 +1,6 @@
 # FilePath: TASKS.txt
 
-Task:
+TASK DONE:
 In the connections pane, can you also write the database which it connects to. Can use Format CONN: <connection name>, DB: <database name> along with the existing things already showing like status etc.
 
 TASK DONE:
