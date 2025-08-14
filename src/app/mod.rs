@@ -1,6 +1,7 @@
 // FilePath: src/app/mod.rs
 
 use crate::{
+    commands::{CommandRegistry, CommandContext, CommandResult, CommandAction, CommandId},
     config::Config,
     core::error::Result,
     event::{Event, EventHandler},
@@ -33,7 +34,9 @@ pub struct App {
     /// User interface
     ui: UI,
     /// Configuration
-    _config: Config,
+    config: Config,
+    /// Command registry
+    command_registry: CommandRegistry,
     /// Flag to quit the application
     should_quit: bool,
     /// Internal mode for key handling (not shown to user)
@@ -50,12 +53,14 @@ impl App {
         let state = AppState::new();
         let event_handler = EventHandler::new(Duration::from_millis(250));
         let ui = UI::new(&config)?;
+        let command_registry = CommandRegistry::new();
 
         Ok(Self {
             state,
             event_handler,
             ui,
-            _config: config,
+            config,
+            command_registry,
             should_quit: false,
             mode: Mode::Normal,
             command_buffer: String::new(),
@@ -103,6 +108,82 @@ impl App {
         Ok(())
     }
 
+    /// Execute a command by ID
+    fn execute_command(&mut self, command_id: CommandId) -> Result<()> {
+        let mut context = CommandContext {
+            state: &mut self.state,
+            config: &self.config,
+        };
+        
+        match self.command_registry.execute(command_id, &mut context)? {
+            CommandResult::Success => {},
+            CommandResult::SuccessWithMessage(msg) => {
+                self.state.toast_manager.success(&msg);
+            },
+            CommandResult::Error(msg) => {
+                self.state.toast_manager.error(&msg);
+            },
+            CommandResult::RequiresConfirmation(msg) => {
+                self.state.toast_manager.warning(&format!("Confirm: {}", msg));
+            },
+            CommandResult::Cancelled => {},
+            CommandResult::Action(action) => {
+                self.handle_command_action(action)?;
+            },
+        }
+        
+        Ok(())
+    }
+    
+    /// Handle command actions
+    fn handle_command_action(&mut self, action: CommandAction) -> Result<()> {
+        match action {
+            CommandAction::Quit => {
+                self.should_quit = true;
+            },
+            CommandAction::OpenModal(modal_type) => {
+                use crate::commands::ModalType;
+                match modal_type {
+                    ModalType::Help => {
+                        self.execute_command(CommandId::Help)?;
+                    },
+                    ModalType::Connection => {
+                        self.state.show_add_connection_modal = true;
+                    },
+                    _ => {}
+                }
+            },
+            CommandAction::CloseModal => {
+                self.state.show_add_connection_modal = false;
+                self.state.show_edit_connection_modal = false;
+                self.state.show_table_creator = false;
+                self.state.show_table_editor = false;
+            },
+            CommandAction::ExecuteQuery(query) => {
+                // TODO: Execute query through database connection
+                self.state.toast_manager.info(&format!("Executing: {}", query));
+            },
+            CommandAction::LoadFile(path) => {
+                // TODO: Load file
+                self.state.toast_manager.info(&format!("Loading: {}", path));
+            },
+            CommandAction::SaveFile(path) => {
+                // TODO: Save file
+                self.state.toast_manager.info(&format!("Saving: {}", path));
+            },
+            CommandAction::Navigate(target) => {
+                use crate::commands::NavigationTarget;
+                match target {
+                    NavigationTarget::Pane(pane) => {
+                        self.state.focused_pane = pane;
+                    },
+                    _ => {}
+                }
+            },
+        }
+        Ok(())
+    }
+
     /// Handle keyboard events
     async fn handle_key_event(&mut self, key: KeyEvent) -> Result<()> {
         // Handle ESC key globally to close help overlay
@@ -113,20 +194,7 @@ impl App {
 
         // Handle '?' key globally for context-aware help
         if key.code == KeyCode::Char('?') && key.modifiers == KeyModifiers::NONE {
-            use crate::app::state::HelpMode;
-            // Toggle help based on current pane
-            if self.state.help_mode != HelpMode::None {
-                self.state.help_mode = HelpMode::None;
-            } else {
-                self.state.help_mode = match self.state.focused_pane {
-                    FocusedPane::Connections => HelpMode::Connections,
-                    FocusedPane::Tables => HelpMode::Tables,
-                    FocusedPane::Details => HelpMode::Details,
-                    FocusedPane::TabularOutput => HelpMode::TabularOutput,
-                    FocusedPane::SqlFiles => HelpMode::SqlFiles,
-                    FocusedPane::QueryWindow => HelpMode::QueryWindow,
-                };
-            }
+            self.execute_command(CommandId::Help)?;
             return Ok(());
         }
 
@@ -172,7 +240,7 @@ impl App {
                 if self.state.focused_pane == FocusedPane::TabularOutput {
                     if let Some(tab) = self.state.table_viewer_state.current_tab() {
                         if !tab.in_edit_mode && !tab.in_search_mode {
-                            self.should_quit = true;
+                            self.execute_command(CommandId::Quit)?;
                             return Ok(());
                         }
                     } else {
@@ -762,7 +830,7 @@ impl App {
                         // Execute command
                         let command = self.command_buffer.trim();
                         if command == "q" || command == "quit" {
-                            self.should_quit = true;
+                            self.execute_command(CommandId::Quit)?;
                         }
                         self.command_buffer.clear();
                         self.mode = Mode::Normal;
