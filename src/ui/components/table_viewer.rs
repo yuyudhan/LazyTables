@@ -4,7 +4,7 @@ use ratatui::{
     layout::{Alignment, Constraint, Direction, Layout, Rect},
     style::{Color, Modifier, Style, Stylize},
     text::{Line, Span},
-    widgets::{Block, Borders, Cell as TableCell, Paragraph, Row, Table, Tabs},
+    widgets::{Block, Borders, Cell as TableCell, Paragraph, Row, Table, Tabs, Wrap},
     Frame,
 };
 use std::collections::HashMap;
@@ -526,52 +526,67 @@ fn render_delete_confirmation(
     confirmation: &DeleteConfirmation,
     area: Rect,
 ) {
-    // Create a centered modal
-    let modal_width = 60;
-    let modal_height = 8;
+    // First, render a full-screen dark overlay to hide the background
+    let full_overlay = Block::default()
+        .style(Style::default().bg(Color::Black));
+    f.render_widget(full_overlay, area);
+    
+    // Create a compact centered modal
+    let modal_width = 50u16.min(area.width - 4);
+    let modal_height = 7;
     let x = (area.width.saturating_sub(modal_width)) / 2;
     let y = (area.height.saturating_sub(modal_height)) / 2;
     
     let modal_area = Rect {
         x,
         y,
-        width: modal_width.min(area.width),
-        height: modal_height.min(area.height),
+        width: modal_width,
+        height: modal_height,
     };
 
-    // Clear the modal area
-    let clear = Block::default()
+    // Create the modal content with proper spacing
+    let inner_block = Block::default()
+        .borders(Borders::ALL)
+        .title(" ⚠ Delete Confirmation ")
+        .title_alignment(Alignment::Center)
+        .border_style(Style::default().fg(Color::Red).add_modifier(Modifier::BOLD))
         .style(Style::default().bg(Color::Black));
-    f.render_widget(clear, modal_area);
 
-    // Build confirmation message
-    let pk_info = confirmation.primary_key_values
-        .iter()
-        .map(|(k, v)| format!("{}: {}", k, v))
-        .collect::<Vec<_>>()
-        .join(", ");
+    f.render_widget(inner_block, modal_area);
 
-    let text = vec![
+    // Calculate inner area for content
+    let inner_area = Rect {
+        x: modal_area.x + 2,
+        y: modal_area.y + 1,
+        width: modal_area.width.saturating_sub(4),
+        height: modal_area.height.saturating_sub(2),
+    };
+
+    // Build the content lines with proper formatting
+    let lines = vec![
         Line::from(""),
-        Line::from("⚠️  Delete Confirmation").fg(Color::Yellow).centered(),
+        Line::from(vec![
+            Span::styled("Delete row ", Style::default().fg(Color::White)),
+            Span::styled(format!("#{}", confirmation.row_index + 1), Style::default().fg(Color::Cyan).add_modifier(Modifier::BOLD)),
+            Span::styled(" from table ", Style::default().fg(Color::White)),
+            Span::styled(format!("'{}'", confirmation.table_name), Style::default().fg(Color::Yellow).add_modifier(Modifier::BOLD)),
+            Span::styled("?", Style::default().fg(Color::White)),
+        ]),
         Line::from(""),
-        Line::from(format!("Delete row from table '{}'?", confirmation.table_name)).centered(),
-        Line::from(format!("Row: {}", pk_info)).fg(Color::Gray).centered(),
-        Line::from(""),
-        Line::from("Press Enter/Y to confirm, Esc/N to cancel").fg(Color::Cyan).centered(),
+        Line::from("─────────────────").fg(Color::DarkGray).centered(),
+        Line::from(vec![
+            Span::styled("[Y/Enter] ", Style::default().fg(Color::Green).add_modifier(Modifier::BOLD)),
+            Span::styled("Confirm  ", Style::default().fg(Color::Gray)),
+            Span::styled("[N/Esc] ", Style::default().fg(Color::Red).add_modifier(Modifier::BOLD)),
+            Span::styled("Cancel", Style::default().fg(Color::Gray)),
+        ]),
     ];
 
-    let paragraph = Paragraph::new(text)
-        .block(
-            Block::default()
-                .borders(Borders::ALL)
-                .title(" Confirm Delete ")
-                .border_style(Style::default().fg(Color::Red))
-                .style(Style::default().bg(Color::Black)),
-        )
-        .alignment(Alignment::Center);
+    let paragraph = Paragraph::new(lines)
+        .alignment(Alignment::Center)
+        .wrap(Wrap { trim: false });
 
-    f.render_widget(paragraph, modal_area);
+    f.render_widget(paragraph, inner_area);
 }
 
 fn render_empty_state(f: &mut Frame, area: Rect) {
@@ -805,6 +820,7 @@ fn render_table_content(f: &mut Frame, tab: &TableTab, area: Rect) {
                     Style::default().fg(Color::Cyan)
                 }),
         )
+        .column_spacing(1)
         .row_highlight_style(Style::default().add_modifier(Modifier::REVERSED));
 
     f.render_widget(table, area);
