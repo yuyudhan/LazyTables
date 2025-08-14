@@ -777,73 +777,159 @@ impl App {
                 }
             }
             Mode::Query => {
-                match key.code {
-                    KeyCode::Esc => {
-                        self.mode = Mode::Normal;
-                    }
-                    KeyCode::Char('s') if key.modifiers.contains(KeyModifiers::CONTROL) => {
-                        // Save current query
-                        if let Err(e) = self.state.save_query() {
-                            self.state
-                                .toast_manager
-                                .error(format!("Failed to save query: {e}"));
-                        } else {
-                            self.state.toast_manager.success("Query saved successfully");
+                use crate::app::state::QueryEditMode;
+                
+                // Handle vim command mode
+                if self.state.in_vim_command {
+                    match key.code {
+                        KeyCode::Esc => {
+                            self.state.in_vim_command = false;
+                            self.state.vim_command_buffer.clear();
                         }
+                        KeyCode::Enter => {
+                            let command = self.state.vim_command_buffer.trim();
+                            if command == "w" {
+                                // Save file
+                                if let Err(e) = self.state.save_sql_file_with_connection() {
+                                    self.state.toast_manager.error(format!("Failed to save: {e}"));
+                                } else {
+                                    self.state.toast_manager.success("File saved");
+                                }
+                            } else if command == "q" {
+                                // Quit query mode
+                                if self.state.query_modified {
+                                    self.state.toast_manager.warning("Unsaved changes! Use :w to save or :q! to force quit");
+                                } else {
+                                    self.mode = Mode::Normal;
+                                }
+                            } else if command == "q!" {
+                                // Force quit
+                                self.mode = Mode::Normal;
+                            } else if command == "wq" {
+                                // Save and quit
+                                if let Err(e) = self.state.save_sql_file_with_connection() {
+                                    self.state.toast_manager.error(format!("Failed to save: {e}"));
+                                } else {
+                                    self.state.toast_manager.success("File saved");
+                                    self.mode = Mode::Normal;
+                                }
+                            }
+                            self.state.in_vim_command = false;
+                            self.state.vim_command_buffer.clear();
+                        }
+                        KeyCode::Char(c) => {
+                            self.state.vim_command_buffer.push(c);
+                        }
+                        KeyCode::Backspace => {
+                            self.state.vim_command_buffer.pop();
+                        }
+                        _ => {}
                     }
-                    KeyCode::Char('o') if key.modifiers.contains(KeyModifiers::CONTROL) => {
-                        // TODO: Show file picker modal to load query
-                        self.state.refresh_sql_files();
+                } else if self.state.query_edit_mode == QueryEditMode::Insert {
+                    // Insert mode - handle text input
+                    match key.code {
+                        KeyCode::Esc => {
+                            self.state.query_edit_mode = QueryEditMode::Normal;
+                        }
+                        KeyCode::Enter => {
+                            self.state.insert_char_at_cursor('\n');
+                        }
+                        KeyCode::Char(c) => {
+                            self.state.insert_char_at_cursor(c);
+                        }
+                        KeyCode::Backspace => {
+                            self.state.delete_char_at_cursor();
+                        }
+                        KeyCode::Left => {
+                            self.state.move_left();
+                        }
+                        KeyCode::Right => {
+                            self.state.move_right();
+                        }
+                        KeyCode::Up => {
+                            self.state.move_up();
+                        }
+                        KeyCode::Down => {
+                            self.state.move_down();
+                        }
+                        _ => {}
                     }
-                    KeyCode::Char('n') if key.modifiers.contains(KeyModifiers::CONTROL) => {
-                        // Create new query file
-                        let filename = format!(
-                            "query_{}",
-                            std::time::SystemTime::now()
-                                .duration_since(std::time::UNIX_EPOCH)
-                                .unwrap()
-                                .as_secs()
-                        );
-                        if let Err(e) = self.state.new_query_file(&filename) {
-                            self.state
-                                .toast_manager
-                                .error(format!("Failed to create new query: {e}"));
-                        } else {
+                } else {
+                    // Normal mode - vim navigation
+                    match key.code {
+                        KeyCode::Esc => {
+                            self.mode = Mode::Normal;
+                        }
+                        KeyCode::Char('i') => {
+                            self.state.query_edit_mode = QueryEditMode::Insert;
+                        }
+                        KeyCode::Char(':') => {
+                            self.state.in_vim_command = true;
+                            self.state.vim_command_buffer.clear();
+                        }
+                        // Vim navigation
+                        KeyCode::Char('h') => {
+                            self.state.move_left();
+                        }
+                        KeyCode::Char('j') => {
+                            self.state.move_down();
+                        }
+                        KeyCode::Char('k') => {
+                            self.state.move_up();
+                        }
+                        KeyCode::Char('l') => {
+                            self.state.move_right();
+                        }
+                        // Word navigation
+                        KeyCode::Char('w') => {
+                            self.state.move_to_next_word();
+                        }
+                        KeyCode::Char('b') => {
+                            self.state.move_to_prev_word();
+                        }
+                        KeyCode::Char('e') => {
+                            self.state.move_to_end_of_word();
+                        }
+                        // Line navigation
+                        KeyCode::Char('0') => {
+                            self.state.move_to_line_start();
+                        }
+                        KeyCode::Char('$') => {
+                            self.state.move_to_line_end();
+                        }
+                        // Execute query
+                        KeyCode::Enter if key.modifiers.contains(KeyModifiers::CONTROL) => {
+                            if let Some(statement) = self.state.get_statement_under_cursor() {
+                                // TODO: Execute the SQL statement
+                                println!("Executing SQL: {statement}");
+                            }
+                        }
+                        // Legacy shortcuts still work in normal mode
+                        KeyCode::Char('s') if key.modifiers.contains(KeyModifiers::CONTROL) => {
+                            if let Err(e) = self.state.save_sql_file_with_connection() {
+                                self.state.toast_manager.error(format!("Failed to save: {e}"));
+                            } else {
+                                self.state.toast_manager.success("File saved");
+                            }
+                        }
+                        KeyCode::Char('n') if key.modifiers.contains(KeyModifiers::CONTROL) => {
+                            // Create new query file
+                            let filename = format!(
+                                "query_{}.sql",
+                                std::time::SystemTime::now()
+                                    .duration_since(std::time::UNIX_EPOCH)
+                                    .unwrap()
+                                    .as_secs()
+                            );
+                            self.state.current_sql_file = Some(filename);
+                            self.state.query_content = String::new();
+                            self.state.query_modified = false;
+                            self.state.query_cursor_line = 0;
+                            self.state.query_cursor_column = 0;
                             self.state.toast_manager.success("New query file created");
                         }
+                        _ => {}
                     }
-                    KeyCode::Enter if key.modifiers.contains(KeyModifiers::CONTROL) => {
-                        // Execute SQL query under cursor
-                        if let Some(statement) = self.state.get_statement_under_cursor() {
-                            // TODO: Execute the SQL statement
-                            println!("Executing SQL: {statement}");
-                        }
-                    }
-                    KeyCode::Enter => {
-                        // Insert newline
-                        self.state.insert_char_at_cursor('\n');
-                    }
-                    KeyCode::Char(c) => {
-                        // Insert character at cursor position
-                        self.state.insert_char_at_cursor(c);
-                    }
-                    KeyCode::Backspace => {
-                        // Delete character at cursor position
-                        self.state.delete_char_at_cursor();
-                    }
-                    KeyCode::Left => {
-                        self.state.move_left();
-                    }
-                    KeyCode::Right => {
-                        self.state.move_right();
-                    }
-                    KeyCode::Up => {
-                        self.state.move_up();
-                    }
-                    KeyCode::Down => {
-                        self.state.move_down();
-                    }
-                    _ => {}
                 }
             }
         }

@@ -1,4 +1,4 @@
-// FilePath: src/database/postgres.rs
+// FilePath: src/database/mysql.rs
 
 use crate::core::error::{LazyTablesError, Result};
 use crate::database::{
@@ -6,48 +6,48 @@ use crate::database::{
     Connection, DataType, TableColumn, TableMetadata,
 };
 use async_trait::async_trait;
-use sqlx::postgres::{PgPool, PgPoolOptions};
+use sqlx::mysql::{MySqlPool, MySqlPoolOptions};
 use sqlx::Row;
 
-/// PostgreSQL database connection implementation
-pub struct PostgresConnection {
+/// MySQL database connection implementation
+pub struct MySqlConnection {
     config: ConnectionConfig,
-    pool: Option<PgPool>,
+    pool: Option<MySqlPool>,
 }
 
-impl PostgresConnection {
-    /// Create a new PostgreSQL connection instance
+impl MySqlConnection {
+    /// Create a new MySQL connection instance
     pub fn new(config: ConnectionConfig) -> Self {
         Self { config, pool: None }
     }
 
-    /// Build PostgreSQL connection string
+    /// Build MySQL connection string
     fn build_connection_string(&self) -> String {
         let host = &self.config.host;
         let port = self.config.port;
-        let database = self.config.database.as_deref().unwrap_or("postgres");
+        let database = self.config.database.as_deref().unwrap_or("mysql");
         let username = &self.config.username;
         let password = self.config.password.as_deref().unwrap_or("");
 
         if !password.is_empty() {
-            format!("postgresql://{}:{}@{}:{}/{}", username, password, host, port, database)
+            format!("mysql://{}:{}@{}:{}/{}", username, password, host, port, database)
         } else {
-            format!("postgresql://{}@{}:{}/{}", username, host, port, database)
+            format!("mysql://{}@{}:{}/{}", username, host, port, database)
         }
     }
 }
 
 #[async_trait]
-impl Connection for PostgresConnection {
+impl Connection for MySqlConnection {
     async fn connect(&mut self) -> Result<()> {
         let connection_string = self.build_connection_string();
 
-        let pool = PgPoolOptions::new()
+        let pool = MySqlPoolOptions::new()
             .max_connections(5)
             .connect(&connection_string)
             .await
             .map_err(|e| {
-                LazyTablesError::Connection(format!("Failed to connect to PostgreSQL: {}", e))
+                LazyTablesError::Connection(format!("Failed to connect to MySQL: {}", e))
             })?;
 
         self.pool = Some(pool);
@@ -85,14 +85,14 @@ impl Connection for PostgresConnection {
 
     async fn list_databases(&self) -> Result<Vec<String>> {
         if let Some(pool) = &self.pool {
-            let rows = sqlx::query("SELECT datname FROM pg_database WHERE datistemplate = false")
+            let rows = sqlx::query("SHOW DATABASES")
                 .fetch_all(pool)
                 .await
                 .map_err(|e| LazyTablesError::Connection(format!("Failed to list databases: {}", e)))?;
 
             let databases = rows
                 .iter()
-                .map(|row| row.get::<String, _>("datname"))
+                .map(|row| row.get::<String, _>(0))
                 .collect();
 
             Ok(databases)
@@ -105,22 +105,14 @@ impl Connection for PostgresConnection {
 
     async fn list_tables(&self) -> Result<Vec<String>> {
         if let Some(pool) = &self.pool {
-            let query = "
-                SELECT table_name 
-                FROM information_schema.tables 
-                WHERE table_schema = 'public' 
-                AND table_type = 'BASE TABLE'
-                ORDER BY table_name
-            ";
-
-            let rows = sqlx::query(query)
+            let rows = sqlx::query("SHOW TABLES")
                 .fetch_all(pool)
                 .await
                 .map_err(|e| LazyTablesError::Connection(format!("Failed to list tables: {}", e)))?;
 
             let tables = rows
                 .iter()
-                .map(|row| row.get::<String, _>("table_name"))
+                .map(|row| row.get::<String, _>(0))
                 .collect();
 
             Ok(tables)
@@ -134,7 +126,7 @@ impl Connection for PostgresConnection {
     async fn get_table_metadata(&self, table_name: &str) -> Result<TableMetadata> {
         if let Some(pool) = &self.pool {
             // Get row count
-            let count_query = format!("SELECT COUNT(*) FROM \"{}\"", table_name);
+            let count_query = format!("SELECT COUNT(*) FROM `{}`", table_name);
             let count_row = sqlx::query(&count_query)
                 .fetch_one(pool)
                 .await
@@ -143,7 +135,7 @@ impl Connection for PostgresConnection {
 
             // Get column count
             let columns_query = "SELECT COUNT(*) FROM information_schema.columns 
-                                WHERE table_schema = 'public' AND table_name = $1";
+                                WHERE table_schema = DATABASE() AND table_name = ?";
             let col_row = sqlx::query(columns_query)
                 .bind(table_name)
                 .fetch_one(pool)
@@ -152,53 +144,46 @@ impl Connection for PostgresConnection {
 
             // Get table size
             let size_query = "SELECT 
-                pg_size_pretty(pg_total_relation_size($1)) as total_size,
-                pg_size_pretty(pg_table_size($1)) as table_size,
-                pg_size_pretty(pg_indexes_size($1)) as indexes_size,
-                pg_total_relation_size($1) as total_bytes,
-                pg_table_size($1) as table_bytes,
-                pg_indexes_size($1) as index_bytes";
+                data_length + index_length AS total_size,
+                data_length AS table_size,
+                index_length AS indexes_size
+                FROM information_schema.tables 
+                WHERE table_schema = DATABASE() AND table_name = ?";
             
             let size_row = sqlx::query(size_query)
-                .bind(format!("public.{}", table_name))
+                .bind(table_name)
                 .fetch_one(pool)
                 .await?;
             
-            let total_size: i64 = size_row.get("total_bytes");
-            let table_size: i64 = size_row.get("table_bytes");
-            let indexes_size: i64 = size_row.get("index_bytes");
+            let total_size: Option<i64> = size_row.get(0);
+            let table_size: Option<i64> = size_row.get(1);
+            let indexes_size: Option<i64> = size_row.get(2);
 
             // Get primary keys
-            let pk_query = "SELECT a.attname 
-                           FROM pg_index i
-                           JOIN pg_attribute a ON a.attrelid = i.indrelid
-                           AND a.attnum = ANY(i.indkey)
-                           WHERE i.indrelid = $1::regclass
-                           AND i.indisprimary";
+            let pk_query = "SELECT column_name 
+                           FROM information_schema.key_column_usage 
+                           WHERE table_schema = DATABASE() 
+                           AND table_name = ? 
+                           AND constraint_name = 'PRIMARY'
+                           ORDER BY ordinal_position";
             
             let pk_rows = sqlx::query(pk_query)
-                .bind(format!("public.{}", table_name))
+                .bind(table_name)
                 .fetch_all(pool)
                 .await?;
             
             let primary_keys: Vec<String> = pk_rows
                 .iter()
-                .map(|row| row.get::<String, _>("attname"))
+                .map(|row| row.get::<String, _>(0))
                 .collect();
 
             // Get foreign keys
-            let fk_query = "
-                SELECT 
-                    kcu.column_name || ' → ' || ccu.table_name || '.' || ccu.column_name as fk_info
-                FROM information_schema.table_constraints tc
-                JOIN information_schema.key_column_usage kcu
-                    ON tc.constraint_name = kcu.constraint_name
-                    AND tc.table_schema = kcu.table_schema
-                JOIN information_schema.constraint_column_usage ccu
-                    ON ccu.constraint_name = tc.constraint_name
-                    AND ccu.table_schema = tc.table_schema
-                WHERE tc.constraint_type = 'FOREIGN KEY' 
-                    AND tc.table_name = $1";
+            let fk_query = "SELECT 
+                CONCAT(column_name, ' → ', referenced_table_name, '.', referenced_column_name) as fk_info
+                FROM information_schema.key_column_usage 
+                WHERE table_schema = DATABASE() 
+                AND table_name = ? 
+                AND referenced_table_name IS NOT NULL";
             
             let fk_rows = sqlx::query(fk_query)
                 .bind(table_name)
@@ -207,15 +192,15 @@ impl Connection for PostgresConnection {
             
             let foreign_keys: Vec<String> = fk_rows
                 .iter()
-                .map(|row| row.get::<String, _>("fk_info"))
+                .map(|row| row.get::<String, _>(0))
                 .collect();
 
             // Get indexes
-            let index_query = "
-                SELECT indexname 
-                FROM pg_indexes 
-                WHERE tablename = $1 
-                AND schemaname = 'public'";
+            let index_query = "SELECT DISTINCT index_name 
+                              FROM information_schema.statistics 
+                              WHERE table_schema = DATABASE() 
+                              AND table_name = ? 
+                              AND index_name != 'PRIMARY'";
             
             let index_rows = sqlx::query(index_query)
                 .bind(table_name)
@@ -224,26 +209,30 @@ impl Connection for PostgresConnection {
             
             let indexes: Vec<String> = index_rows
                 .iter()
-                .map(|row| row.get::<String, _>("indexname"))
+                .map(|row| row.get::<String, _>(0))
                 .collect();
 
             // Get table comment
-            let comment_query = "SELECT obj_description($1::regclass, 'pg_class') as comment";
+            let comment_query = "SELECT table_comment 
+                                FROM information_schema.tables 
+                                WHERE table_schema = DATABASE() 
+                                AND table_name = ?";
             
             let comment_row = sqlx::query(comment_query)
-                .bind(format!("public.{}", table_name))
+                .bind(table_name)
                 .fetch_one(pool)
                 .await?;
             
-            let comment: Option<String> = comment_row.get("comment");
+            let comment: String = comment_row.get(0);
+            let comment = if comment.is_empty() { None } else { Some(comment) };
 
             Ok(TableMetadata {
                 table_name: table_name.to_string(),
                 row_count: row_count as usize,
                 column_count: column_count as usize,
-                total_size,
-                table_size,
-                indexes_size,
+                total_size: total_size.unwrap_or(0) as i64,
+                table_size: table_size.unwrap_or(0) as i64,
+                indexes_size: indexes_size.unwrap_or(0) as i64,
                 primary_keys,
                 foreign_keys,
                 indexes,
@@ -263,23 +252,11 @@ impl Connection for PostgresConnection {
                 data_type,
                 is_nullable,
                 column_default,
-                CASE 
-                    WHEN pk.column_name IS NOT NULL THEN true 
-                    ELSE false 
-                END as is_primary_key
-                FROM information_schema.columns c
-                LEFT JOIN (
-                    SELECT kcu.column_name
-                    FROM information_schema.table_constraints tc
-                    JOIN information_schema.key_column_usage kcu
-                        ON tc.constraint_name = kcu.constraint_name
-                        AND tc.table_schema = kcu.table_schema
-                    WHERE tc.constraint_type = 'PRIMARY KEY'
-                        AND tc.table_name = $1
-                ) pk ON c.column_name = pk.column_name
-                WHERE c.table_schema = 'public' 
-                AND c.table_name = $1
-                ORDER BY c.ordinal_position";
+                column_key
+                FROM information_schema.columns 
+                WHERE table_schema = DATABASE() 
+                AND table_name = ?
+                ORDER BY ordinal_position";
 
             let rows = sqlx::query(query)
                 .bind(table_name)
@@ -293,14 +270,14 @@ impl Connection for PostgresConnection {
                     let data_type_str: String = row.get("data_type");
                     let is_nullable: String = row.get("is_nullable");
                     let column_default: Option<String> = row.get("column_default");
-                    let is_primary_key: bool = row.get("is_primary_key");
+                    let column_key: String = row.get("column_key");
 
                     TableColumn {
                         name: column_name,
-                        data_type: parse_postgres_type(&data_type_str),
+                        data_type: parse_mysql_type(&data_type_str),
                         is_nullable: is_nullable == "YES",
                         default_value: column_default,
-                        is_primary_key,
+                        is_primary_key: column_key == "PRI",
                     }
                 })
                 .collect();
@@ -315,7 +292,7 @@ impl Connection for PostgresConnection {
 
     async fn get_table_row_count(&self, table_name: &str) -> Result<usize> {
         if let Some(pool) = &self.pool {
-            let query = format!("SELECT COUNT(*) FROM \"{}\"", table_name);
+            let query = format!("SELECT COUNT(*) FROM `{}`", table_name);
             let row = sqlx::query(&query)
                 .fetch_one(pool)
                 .await?;
@@ -336,12 +313,10 @@ impl Connection for PostgresConnection {
     ) -> Result<Vec<Vec<String>>> {
         if let Some(pool) = &self.pool {
             // Get column names first to maintain order
-            let columns_query = "
-                SELECT column_name 
+            let columns_query = "SELECT column_name 
                 FROM information_schema.columns 
-                WHERE table_name = $1 AND table_schema = 'public'
-                ORDER BY ordinal_position
-            ";
+                WHERE table_schema = DATABASE() AND table_name = ?
+                ORDER BY ordinal_position";
 
             let column_rows = sqlx::query(columns_query)
                 .bind(table_name)
@@ -360,12 +335,12 @@ impl Connection for PostgresConnection {
             // Build SELECT query with all columns
             let select_list = column_names
                 .iter()
-                .map(|col| format!("\"{}\"::text", col))
+                .map(|col| format!("`{}`", col))
                 .collect::<Vec<_>>()
                 .join(", ");
 
             let query = format!(
-                "SELECT {} FROM \"{}\" ORDER BY 1 LIMIT {} OFFSET {}",
+                "SELECT {} FROM `{}` LIMIT {} OFFSET {}",
                 select_list, table_name, limit, offset
             );
 
@@ -375,6 +350,7 @@ impl Connection for PostgresConnection {
             for row in rows {
                 let mut row_data = Vec::new();
                 for (idx, _col_name) in column_names.iter().enumerate() {
+                    // Try to get the value as string, handle NULL values
                     let value: Option<String> = row.try_get(idx).ok();
                     row_data.push(value.unwrap_or_else(|| "NULL".to_string()));
                 }
@@ -390,26 +366,26 @@ impl Connection for PostgresConnection {
     }
 }
 
-/// Parse PostgreSQL data type string to internal DataType enum
-fn parse_postgres_type(type_str: &str) -> DataType {
-    match type_str {
-        "integer" | "int4" => DataType::Integer,
-        "bigint" | "int8" => DataType::BigInt,
-        "smallint" | "int2" => DataType::SmallInt,
-        "numeric" | "decimal" => DataType::Decimal,
-        "real" | "float4" => DataType::Float,
-        "double precision" | "float8" => DataType::Double,
-        "boolean" | "bool" => DataType::Boolean,
-        "text" => DataType::Text,
-        "character varying" | "varchar" => DataType::Varchar(None),
-        "character" | "char" => DataType::Char(None),
+/// Parse MySQL data type string to internal DataType enum
+fn parse_mysql_type(type_str: &str) -> DataType {
+    let type_lower = type_str.to_lowercase();
+    
+    match type_lower.as_str() {
+        "tinyint" | "smallint" | "mediumint" | "int" | "integer" => DataType::Integer,
+        "bigint" => DataType::BigInt,
+        "decimal" | "numeric" | "dec" => DataType::Decimal,
+        "float" => DataType::Float,
+        "double" | "double precision" | "real" => DataType::Double,
+        "bit" => DataType::Boolean,
+        "char" | "varchar" => DataType::Text,
+        "tinytext" | "text" | "mediumtext" | "longtext" => DataType::Text,
         "date" => DataType::Date,
-        "time" | "time without time zone" => DataType::Time,
-        "timestamp" | "timestamp without time zone" | "timestamp with time zone" => DataType::Timestamp,
-        "json" | "jsonb" => DataType::Json,
-        "uuid" => DataType::Uuid,
-        "bytea" => DataType::Bytea,
-        s if s.starts_with("ARRAY") => DataType::Text, // Simplified for now
+        "time" => DataType::Time,
+        "datetime" | "timestamp" => DataType::Timestamp,
+        "year" => DataType::Integer,
+        "binary" | "varbinary" | "blob" | "tinyblob" | "mediumblob" | "longblob" => DataType::Bytea,
+        "json" => DataType::Json,
+        "enum" | "set" => DataType::Text,
         _ => DataType::Text,
     }
 }

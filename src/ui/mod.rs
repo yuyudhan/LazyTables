@@ -493,15 +493,15 @@ impl UI {
                 Line::from(""),
                 Line::from(vec![
                     Span::styled("Total Size: ", Style::default().fg(Color::Cyan)),
-                    Span::styled(&metadata.total_size, Style::default().fg(Color::White)),
+                    Span::styled(format_bytes(metadata.total_size), Style::default().fg(Color::White)),
                 ]),
                 Line::from(vec![
                     Span::styled("Table Size: ", Style::default().fg(Color::Cyan)),
-                    Span::styled(&metadata.table_size, Style::default().fg(Color::White)),
+                    Span::styled(format_bytes(metadata.table_size), Style::default().fg(Color::White)),
                 ]),
                 Line::from(vec![
                     Span::styled("Indexes Size: ", Style::default().fg(Color::Cyan)),
-                    Span::styled(&metadata.indexes_size, Style::default().fg(Color::White)),
+                    Span::styled(format_bytes(metadata.indexes_size), Style::default().fg(Color::White)),
                 ]),
             ];
 
@@ -936,7 +936,7 @@ impl UI {
             // Show current file info
             let file_info = if let Some(ref filename) = state.current_sql_file {
                 let modified_indicator = if state.query_modified { " [+]" } else { "" };
-                format!("File: {filename}.sql{modified_indicator}")
+                format!("File: {filename}{modified_indicator}")
             } else {
                 "New file (unsaved)".to_string()
             };
@@ -946,30 +946,51 @@ impl UI {
                 Style::default().fg(Color::Gray),
             )]));
 
+            // Show vim mode and command
+            let mode_info = if state.in_vim_command {
+                format!(":{}", state.vim_command_buffer)
+            } else {
+                match state.query_edit_mode {
+                    crate::app::state::QueryEditMode::Normal => "-- NORMAL --".to_string(),
+                    crate::app::state::QueryEditMode::Insert => "-- INSERT --".to_string(),
+                }
+            };
+            
+            query_lines.push(Line::from(vec![Span::styled(
+                mode_info,
+                Style::default()
+                    .fg(if state.query_edit_mode == crate::app::state::QueryEditMode::Insert {
+                        Color::Green
+                    } else {
+                        Color::Yellow
+                    })
+                    .add_modifier(Modifier::BOLD),
+            )]));
+
             // Add keybinding help
             query_lines.push(Line::from(""));
             query_lines.push(Line::from(vec![
                 Span::styled(
-                    "Ctrl+S",
+                    "i",
+                    Style::default()
+                        .fg(Color::Yellow)
+                        .add_modifier(Modifier::BOLD),
+                ),
+                Span::styled(" insert | ", Style::default().fg(Color::Gray)),
+                Span::styled(
+                    ":w",
                     Style::default()
                         .fg(Color::Yellow)
                         .add_modifier(Modifier::BOLD),
                 ),
                 Span::styled(" save | ", Style::default().fg(Color::Gray)),
                 Span::styled(
-                    "Ctrl+O",
+                    ":q",
                     Style::default()
                         .fg(Color::Yellow)
                         .add_modifier(Modifier::BOLD),
                 ),
-                Span::styled(" open | ", Style::default().fg(Color::Gray)),
-                Span::styled(
-                    "Ctrl+N",
-                    Style::default()
-                        .fg(Color::Yellow)
-                        .add_modifier(Modifier::BOLD),
-                ),
-                Span::styled(" new | ", Style::default().fg(Color::Gray)),
+                Span::styled(" quit | ", Style::default().fg(Color::Gray)),
                 Span::styled(
                     "Ctrl+Enter",
                     Style::default()
@@ -1117,6 +1138,25 @@ pub struct Theme {
 }
 
 impl Theme {}
+
+/// Format bytes as human-readable size
+fn format_bytes(bytes: i64) -> String {
+    const UNITS: &[&str] = &["B", "KB", "MB", "GB", "TB"];
+    if bytes == 0 {
+        return "0 B".to_string();
+    }
+    
+    let bytes = bytes.abs() as f64;
+    let i = (bytes.ln() / 1024_f64.ln()).floor() as usize;
+    let i = i.min(UNITS.len() - 1);
+    let size = bytes / 1024_f64.powi(i as i32);
+    
+    if i == 0 {
+        format!("{:.0} {}", size, UNITS[i])
+    } else {
+        format!("{:.2} {}", size, UNITS[i])
+    }
+}
 
 impl Default for Theme {
     fn default() -> Self {
