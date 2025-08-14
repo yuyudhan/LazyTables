@@ -4,7 +4,7 @@ use ratatui::{
     layout::{Alignment, Constraint, Direction, Layout, Rect},
     style::{Color, Modifier, Style},
     text::{Line, Span},
-    widgets::{Block, Borders, Clear, Paragraph, Wrap},
+    widgets::{Block, Borders, Paragraph, Wrap},
     Frame,
 };
 
@@ -30,9 +30,9 @@ impl HelpSystem {
         };
 
         lines.push(Line::from(vec![Span::styled(
-            format!("━━ {} Commands ", pane_name),
+            format!("─── {} Commands ", pane_name),
             Style::default()
-                .fg(Color::Yellow)
+                .fg(Color::Rgb(180, 180, 100))
                 .add_modifier(Modifier::BOLD),
         )]));
         lines.push(Line::from(""));
@@ -51,9 +51,9 @@ impl HelpSystem {
         // Add separator
         lines.push(Line::from(""));
         lines.push(Line::from(vec![Span::styled(
-            "━━ Global Commands ",
+            "─── Global Commands ",
             Style::default()
-                .fg(Color::Cyan)
+                .fg(Color::Rgb(100, 180, 180))
                 .add_modifier(Modifier::BOLD),
         )]));
         lines.push(Line::from(""));
@@ -77,9 +77,9 @@ impl HelpSystem {
         let mut lines = vec![];
 
         lines.push(Line::from(vec![Span::styled(
-            "━━ All Panes Overview ",
+            "─── All Panes Overview ",
             Style::default()
-                .fg(Color::Magenta)
+                .fg(Color::Rgb(180, 100, 180))
                 .add_modifier(Modifier::BOLD),
         )]));
         lines.push(Line::from(""));
@@ -110,7 +110,7 @@ impl HelpSystem {
         lines
     }
 
-    /// Add a pane overview section
+    /// Add a pane overview section with key descriptions
     fn add_pane_overview(
         lines: &mut Vec<Line<'static>>,
         name: &str,
@@ -118,65 +118,79 @@ impl HelpSystem {
         current_mode: HelpMode,
     ) {
         let is_current = mode == current_mode;
-        let style = if is_current {
+        let header_style = if is_current {
             Style::default()
                 .fg(Color::Yellow)
                 .add_modifier(Modifier::BOLD)
         } else {
-            Style::default().fg(Color::Gray)
+            Style::default().fg(Color::Rgb(150, 150, 150))
         };
 
         lines.push(Line::from(vec![
-            Span::styled(if is_current { "▶ " } else { "  " }, style),
-            Span::styled(name.to_string(), style.add_modifier(Modifier::UNDERLINED)),
+            Span::styled(if is_current { "▶ " } else { "  " }, header_style),
+            Span::styled(name.to_string(), header_style.add_modifier(Modifier::UNDERLINED)),
         ]));
 
         let key_style = if is_current {
-            Style::default().fg(Color::White)
+            Style::default().fg(Color::Rgb(100, 200, 200))
         } else {
-            Style::default().fg(Color::DarkGray)
+            Style::default().fg(Color::Rgb(100, 100, 100))
+        };
+        
+        let desc_style = if is_current {
+            Style::default().fg(Color::Rgb(200, 200, 200))
+        } else {
+            Style::default().fg(Color::Rgb(120, 120, 120))
         };
 
+        // Add key commands with descriptions for each pane
         match mode {
             HelpMode::Connections => {
-                lines.push(Line::from(vec![
-                    Span::raw("    "),
-                    Span::styled("Enter a e d", key_style),
-                ]));
+                Self::add_overview_command(lines, "Enter", "Connect", key_style, desc_style);
+                Self::add_overview_command(lines, "a", "Add", key_style, desc_style);
+                Self::add_overview_command(lines, "e", "Edit", key_style, desc_style);
             }
             HelpMode::Tables => {
-                lines.push(Line::from(vec![
-                    Span::raw("    "),
-                    Span::styled("Enter n e d r", key_style),
-                ]));
+                Self::add_overview_command(lines, "Enter", "Open", key_style, desc_style);
+                Self::add_overview_command(lines, "n", "Create", key_style, desc_style);
+                Self::add_overview_command(lines, "e", "Edit", key_style, desc_style);
             }
             HelpMode::Details => {
-                lines.push(Line::from(vec![
-                    Span::raw("    "),
-                    Span::styled("Enter r", key_style),
-                ]));
+                Self::add_overview_command(lines, "Enter", "Load metadata", key_style, desc_style);
             }
             HelpMode::TabularOutput => {
-                lines.push(Line::from(vec![
-                    Span::raw("    "),
-                    Span::styled("i / S D x r", key_style),
-                ]));
+                Self::add_overview_command(lines, "i", "Edit", key_style, desc_style);
+                Self::add_overview_command(lines, "dd/yy", "Delete/Copy", key_style, desc_style);
+                Self::add_overview_command(lines, "S/D", "Switch tabs", key_style, desc_style);
+                Self::add_overview_command(lines, "/", "Search", key_style, desc_style);
             }
             HelpMode::SqlFiles => {
-                lines.push(Line::from(vec![
-                    Span::raw("    "),
-                    Span::styled("Enter d r", key_style),
-                ]));
+                Self::add_overview_command(lines, "Enter", "Load file", key_style, desc_style);
+                Self::add_overview_command(lines, "C-s", "Save", key_style, desc_style);
             }
             HelpMode::QueryWindow => {
-                lines.push(Line::from(vec![
-                    Span::raw("    "),
-                    Span::styled("i C-Enter C-s", key_style),
-                ]));
+                Self::add_overview_command(lines, "i", "Edit mode", key_style, desc_style);
+                Self::add_overview_command(lines, "C-Enter", "Execute", key_style, desc_style);
+                Self::add_overview_command(lines, "C-s", "Save", key_style, desc_style);
             }
             _ => {}
         }
         lines.push(Line::from(""));
+    }
+    
+    /// Helper to add a command line in the overview section
+    fn add_overview_command(
+        lines: &mut Vec<Line<'static>>,
+        key: &str,
+        desc: &str,
+        key_style: Style,
+        desc_style: Style,
+    ) {
+        lines.push(Line::from(vec![
+            Span::raw("    "),
+            Span::styled(format!("{:8}", key), key_style),
+            Span::styled(desc.to_string(), desc_style),
+        ]));
     }
 
     /// Helper to add a command line with proper formatting
@@ -185,10 +199,13 @@ impl HelpSystem {
             Span::styled(
                 format!("{:10}", key),
                 Style::default()
-                    .fg(Color::Cyan)
+                    .fg(Color::Rgb(100, 200, 200))
                     .add_modifier(Modifier::BOLD),
             ),
-            Span::raw(desc.to_string()),
+            Span::styled(
+                desc.to_string(),
+                Style::default().fg(Color::Rgb(200, 200, 200)),
+            ),
         ]));
     }
 
@@ -263,11 +280,8 @@ impl HelpSystem {
             return;
         }
 
-        // Create a more elegant modal size
-        let area = centered_rect(70, 60, f.area());
-
-        // Clear the background
-        f.render_widget(Clear, area);
+        // Create a more elegant modal size - smaller and centered
+        let area = centered_rect(65, 50, f.area());
 
         // Create the main block with title
         let pane_name = match help_mode {
@@ -280,13 +294,18 @@ impl HelpSystem {
             HelpMode::None => "LazyTables",
         };
 
+        // Create an elegant dark overlay without completely clearing the background
+        let overlay_block = Block::default()
+            .style(Style::default().bg(Color::Rgb(20, 20, 20)));
+        f.render_widget(overlay_block, area);
+
         let main_block = Block::default()
-            .title(format!(" LazyTables Help • {} ", pane_name))
+            .title(format!(" Help • {} ", pane_name))
             .title_alignment(Alignment::Center)
             .borders(Borders::ALL)
-            .border_style(Style::default().fg(Color::Cyan))
+            .border_style(Style::default().fg(Color::Rgb(80, 80, 100)))
             .border_type(ratatui::widgets::BorderType::Rounded)
-            .style(Style::default().bg(Color::Black));
+            .style(Style::default().bg(Color::Rgb(20, 20, 20)));
 
         let inner_area = main_block.inner(area);
         f.render_widget(main_block, area);
