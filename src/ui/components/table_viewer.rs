@@ -764,7 +764,12 @@ fn render_table_content(f: &mut Frame, tab: &TableTab, area: Rect) {
                     } else if value == "NULL" || value.is_empty() {
                         Style::default().fg(Color::DarkGray)
                     } else {
-                        Style::default()
+                        // Add subtle alternating row background
+                        if row_idx % 2 == 0 {
+                            Style::default().bg(Color::Rgb(15, 15, 20))
+                        } else {
+                            Style::default()
+                        }
                     };
 
                     TableCell::from(display_value).style(style)
