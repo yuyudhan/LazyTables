@@ -1,13 +1,12 @@
 # FilePath: docker-compose.test.yml
 
 # Test database services for LazyTables development
-version: '3.8'
 
 services:
   # PostgreSQL Test Database
   postgres:
     image: postgres:16-alpine
-    container_name: lazytables-postgres
+    container_name: lazytables_test_postgres
     restart: unless-stopped
     environment:
       POSTGRES_USER: lazytables
@@ -28,30 +27,8 @@ services:
     networks:
       - lazytables_test
 
-  # PostgreSQL Admin Interface (pgAdmin)
-  pgadmin:
-    image: dpage/pgadmin4:latest
-    container_name: lazytables-pgadmin
-    restart: unless-stopped
-    environment:
-      PGADMIN_DEFAULT_EMAIL: admin@lazytables.dev
-      PGADMIN_DEFAULT_PASSWORD: lazytables_admin
-      PGADMIN_CONFIG_SERVER_MODE: 'False'
-    ports:
-      - "8080:80"
-    volumes:
-      - pgadmin_data:/var/lib/pgadmin
-      - ./docker/pgadmin/servers.json:/pgadmin4/servers.json:ro
-    depends_on:
-      postgres:
-        condition: service_healthy
-    networks:
-      - lazytables_test
-
 volumes:
   postgres_data:
-    driver: local
-  pgadmin_data:
     driver: local
 
 networks:
