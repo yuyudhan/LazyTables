@@ -93,7 +93,7 @@ impl App {
         }
 
         // Handle connection modal if active
-        if self.state.show_add_connection_modal {
+        if self.state.show_add_connection_modal || self.state.show_edit_connection_modal {
             return self.handle_connection_modal_key_event(key).await;
         }
 
@@ -162,13 +162,28 @@ impl App {
                             self.state.open_add_connection_modal();
                         }
                     }
+                    // Edit connection (only in connections pane)
+                    (KeyModifiers::NONE, KeyCode::Char('e')) => {
+                        if self.state.focused_pane == crate::app::state::FocusedPane::Connections 
+                            && !self.state.connections.connections.is_empty() {
+                            self.state.open_edit_connection_modal();
+                        }
+                    }
                     // Connect/select action
                     (KeyModifiers::NONE, KeyCode::Enter) => {
                         if self.state.focused_pane == crate::app::state::FocusedPane::Connections {
-                            // Handle connection selection/toggle
-                            if let Some(connection) = self.state.get_selected_connection_mut() {
-                                connection.is_connected = !connection.is_connected;
-                                // TODO: Actually connect/disconnect to database
+                            // Handle database connection
+                            if let Some(connection) = self.state.connections.connections.get(self.state.selected_connection) {
+                                match &connection.status {
+                                    crate::database::ConnectionStatus::Connected => {
+                                        // Disconnect if already connected
+                                        self.state.disconnect_from_database();
+                                    }
+                                    _ => {
+                                        // Connect if not connected or failed
+                                        self.state.connect_to_selected_database().await;
+                                    }
+                                }
                             }
                         } else if self.state.focused_pane == FocusedPane::SqlFiles {
                             // Load selected SQL file
@@ -366,7 +381,12 @@ impl App {
                 {
                     self.state.connection_modal_state.go_back();
                 } else {
-                    self.state.close_add_connection_modal();
+                    // Close the appropriate modal
+                    if self.state.show_add_connection_modal {
+                        self.state.close_add_connection_modal();
+                    } else {
+                        self.state.close_edit_connection_modal();
+                    }
                 }
             }
             KeyCode::Tab => {
@@ -456,7 +476,12 @@ impl App {
                         }
                     }
                     ConnectionField::Cancel => {
-                        self.state.close_add_connection_modal();
+                        // Close the appropriate modal
+                        if self.state.show_add_connection_modal {
+                            self.state.close_add_connection_modal();
+                        } else {
+                            self.state.close_edit_connection_modal();
+                        }
                     }
                     ConnectionField::DatabaseType => {
                         // In database type selection step, Enter advances to next step
@@ -474,7 +499,57 @@ impl App {
                     }
                 }
             }
+            KeyCode::Char('s') => {
+                // Only process shortcut if not in a text field
+                if matches!(
+                    self.state.connection_modal_state.focused_field,
+                    ConnectionField::Save | ConnectionField::Cancel | ConnectionField::DatabaseType
+                ) {
+                    // Save connection - same as clicking Save button
+                    if let Err(error) = self.state.save_connection_from_modal() {
+                        self.state.connection_modal_state.error_message = Some(error);
+                    }
+                } else {
+                    // Let it pass through as regular text input
+                    self.state.connection_modal_state.handle_char_input('s');
+                }
+            }
+            KeyCode::Char('c') => {
+                // Only process shortcut if not in a text field
+                if matches!(
+                    self.state.connection_modal_state.focused_field,
+                    ConnectionField::Save | ConnectionField::Cancel | ConnectionField::DatabaseType
+                ) {
+                    // Cancel - same as clicking Cancel button
+                    if self.state.show_add_connection_modal {
+                        self.state.close_add_connection_modal();
+                    } else {
+                        self.state.close_edit_connection_modal();
+                    }
+                } else {
+                    // Let it pass through as regular text input
+                    self.state.connection_modal_state.handle_char_input('c');
+                }
+            }
+            KeyCode::Char('b') => {
+                // Only process shortcut if not in a text field
+                if matches!(
+                    self.state.connection_modal_state.focused_field,
+                    ConnectionField::Save | ConnectionField::Cancel | ConnectionField::DatabaseType
+                ) {
+                    // Back - same as clicking Back button (only in connection details step)
+                    if self.state.connection_modal_state.current_step
+                        == crate::ui::components::ModalStep::ConnectionDetails
+                    {
+                        self.state.connection_modal_state.go_back();
+                    }
+                } else {
+                    // Let it pass through as regular text input
+                    self.state.connection_modal_state.handle_char_input('b');
+                }
+            }
             KeyCode::Char(c) => {
+                // For any other character, just handle as regular input
                 self.state.connection_modal_state.handle_char_input(c);
             }
             KeyCode::Backspace => {

@@ -4,7 +4,7 @@ use crate::{
     core::error::Result,
     database::{Connection, ConnectionConfig},
 };
-use sqlx::{postgres::PgPool, Pool, Postgres};
+use sqlx::{postgres::PgPool, Pool, Postgres, Row};
 
 /// PostgreSQL connection implementation
 pub struct PostgresConnection {
@@ -49,5 +49,33 @@ impl Connection for PostgresConnection {
 
     fn config(&self) -> &ConnectionConfig {
         &self.config
+    }
+}
+
+impl PostgresConnection {
+    /// Query all tables from the connected database
+    pub async fn get_tables(&self) -> Result<Vec<String>> {
+        if let Some(pool) = &self.pool {
+            let query = "
+                SELECT table_name 
+                FROM information_schema.tables 
+                WHERE table_schema = 'public' 
+                AND table_type = 'BASE TABLE'
+                ORDER BY table_name
+            ";
+            
+            let rows = sqlx::query(query).fetch_all(pool).await?;
+            
+            let tables: Vec<String> = rows
+                .iter()
+                .map(|row| row.get::<String, _>("table_name"))
+                .collect();
+                
+            Ok(tables)
+        } else {
+            Err(crate::core::error::LazyTablesError::Connection(
+                "Not connected to database".to_string()
+            ))
+        }
     }
 }

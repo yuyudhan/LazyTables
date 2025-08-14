@@ -43,9 +43,28 @@ pub enum SslMode {
     VerifyFull,
 }
 
+/// Connection status
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+pub enum ConnectionStatus {
+    /// Not connected
+    Disconnected,
+    /// Currently connecting
+    Connecting,
+    /// Successfully connected
+    Connected,
+    /// Connection failed
+    Failed(String), // Error message
+}
+
 impl Default for SslMode {
     fn default() -> Self {
         Self::Prefer
+    }
+}
+
+impl Default for ConnectionStatus {
+    fn default() -> Self {
+        Self::Disconnected
     }
 }
 
@@ -73,9 +92,9 @@ pub struct ConnectionConfig {
     pub ssl_mode: SslMode,
     /// Connection timeout in seconds
     pub timeout: Option<u64>,
-    /// Whether this connection is currently active
+    /// Connection status
     #[serde(default)]
-    pub is_connected: bool,
+    pub status: ConnectionStatus,
 }
 
 impl ConnectionConfig {
@@ -98,13 +117,37 @@ impl ConnectionConfig {
             password: None,
             ssl_mode: SslMode::default(),
             timeout: Some(30),
-            is_connected: false,
+            status: ConnectionStatus::default(),
         }
     }
 
     /// Get connection display string (e.g., "jatayu (postgres)")
     pub fn display_string(&self) -> String {
         format!("{} ({})", self.name, self.database_type.display_name())
+    }
+
+    /// Check if connection is currently connected
+    pub fn is_connected(&self) -> bool {
+        matches!(self.status, ConnectionStatus::Connected)
+    }
+
+    /// Check if connection is currently connecting
+    pub fn is_connecting(&self) -> bool {
+        matches!(self.status, ConnectionStatus::Connecting)
+    }
+
+    /// Check if connection failed
+    pub fn is_failed(&self) -> bool {
+        matches!(self.status, ConnectionStatus::Failed(_))
+    }
+
+    /// Get error message if connection failed
+    pub fn get_error(&self) -> Option<&String> {
+        if let ConnectionStatus::Failed(ref error) = self.status {
+            Some(error)
+        } else {
+            None
+        }
     }
 }
 

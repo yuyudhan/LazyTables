@@ -5,6 +5,7 @@ use crate::{
     config::Config,
     constants,
     core::error::Result,
+    database::ConnectionStatus,
 };
 use ratatui::{
     layout::{Alignment, Constraint, Rect},
@@ -76,8 +77,8 @@ impl UI {
             self.draw_command_modal(frame, frame.area(), state);
         }
 
-        // Draw connection creation modal if active
-        if state.show_add_connection_modal {
+        // Draw connection modal if active (either add or edit)
+        if state.show_add_connection_modal || state.show_edit_connection_modal {
             crate::ui::components::render_connection_modal(
                 frame,
                 &state.connection_modal_state,
@@ -101,7 +102,7 @@ impl UI {
     }
 
     /// Draw the connections pane
-    fn draw_connections_pane(&self, frame: &mut Frame, area: Rect, state: &AppState) {
+    fn draw_connections_pane(&self, frame: &mut Frame, area: Rect, state: &mut AppState) {
         let is_focused = state.focused_pane == FocusedPane::Connections;
         let border_style = if is_focused {
             Style::default().fg(self.theme.active_border)
@@ -115,17 +116,13 @@ impl UI {
             .connections
             .iter()
             .map(|connection| {
-                let status_indicator = if connection.is_connected {
-                    "●"
-                } else {
-                    "○"
+                let (status_indicator, style) = match &connection.status {
+                    ConnectionStatus::Connected => ("✓", Style::default().fg(Color::Green)),
+                    ConnectionStatus::Connecting => ("⟳", Style::default().fg(Color::Yellow)),
+                    ConnectionStatus::Failed(_) => ("✗", Style::default().fg(Color::Red)),
+                    ConnectionStatus::Disconnected => ("○", Style::default().fg(Color::Gray)),
                 };
                 let display_text = format!("{} {}", status_indicator, connection.display_string());
-                let style = if connection.is_connected {
-                    Style::default().fg(Color::Green)
-                } else {
-                    Style::default().fg(Color::Gray)
-                };
                 ListItem::new(Line::from(vec![Span::styled(display_text, style)]))
             })
             .collect();
@@ -160,8 +157,20 @@ impl UI {
                         .fg(Color::Yellow)
                         .add_modifier(Modifier::BOLD),
                 ),
-                Span::styled(" to connect", Style::default().fg(Color::Gray)),
+                Span::styled(" to connect/disconnect", Style::default().fg(Color::Gray)),
             ])));
+            if !state.connections.connections.is_empty() {
+                items.push(ListItem::new(Line::from(vec![
+                    Span::styled("Press ", Style::default().fg(Color::Gray)),
+                    Span::styled(
+                        "e",
+                        Style::default()
+                            .fg(Color::Yellow)
+                            .add_modifier(Modifier::BOLD),
+                    ),
+                    Span::styled(" to edit connection", Style::default().fg(Color::Gray)),
+                ])));
+            }
         }
 
         let connections = List::new(items)
@@ -177,11 +186,16 @@ impl UI {
                     .add_modifier(Modifier::BOLD),
             );
 
-        frame.render_widget(connections, area);
+        // Use stateful widget to show selection
+        let mut list_state = state.connections_list_state.clone();
+        frame.render_stateful_widget(connections, area, &mut list_state);
+        
+        // Update the state with any changes
+        state.connections_list_state = list_state;
     }
 
     /// Draw the tables/views pane
-    fn draw_tables_pane(&self, frame: &mut Frame, area: Rect, state: &AppState) {
+    fn draw_tables_pane(&self, frame: &mut Frame, area: Rect, state: &mut AppState) {
         let is_focused = state.focused_pane == FocusedPane::Tables;
         let border_style = if is_focused {
             Style::default().fg(self.theme.active_border)
@@ -194,7 +208,7 @@ impl UI {
             .connections
             .connections
             .iter()
-            .any(|conn| conn.is_connected);
+            .any(|conn| conn.is_connected());
 
         let items: Vec<ListItem> = if !has_active_connection {
             // Show "not connected" message
@@ -228,19 +242,56 @@ impl UI {
                     ListItem::new("")
                 },
             ]
-        } else {
-            // Show sample tables (this will be replaced with actual database tables later)
+        } else if state.tables.is_empty() {
+            // Show loading or no tables message
             vec![
-                ListItem::new("▼ public"),
-                ListItem::new("  ▶ users"),
-                ListItem::new("  ▶ products"),
-                ListItem::new("  ▶ orders"),
-                ListItem::new("  ▶ payments"),
-                ListItem::new("▼ analytics"),
-                ListItem::new("  events"),
-                ListItem::new("  sessions"),
-                ListItem::new("  metrics"),
+                ListItem::new(Line::from(vec![Span::styled(
+                    "Loading tables...",
+                    Style::default().fg(Color::Yellow),
+                )])),
             ]
+        } else {
+            // Show actual tables from connected database
+            let mut table_items = vec![
+                ListItem::new(Line::from(vec![Span::styled(
+                    "▼ Tables",
+                    Style::default().fg(Color::Cyan).add_modifier(Modifier::BOLD),
+                )])),
+            ];
+            
+            for table in &state.tables {
+                table_items.push(ListItem::new(Line::from(vec![
+                    Span::styled("  📋 ", Style::default().fg(Color::Blue)),
+                    Span::styled(table, Style::default().fg(Color::White)),
+                ])));
+            }
+            
+            // Add navigation help if focused
+            if is_focused && !state.tables.is_empty() {
+                table_items.push(ListItem::new(""));
+                table_items.push(ListItem::new(Line::from(vec![
+                    Span::styled("Press ", Style::default().fg(Color::Gray)),
+                    Span::styled(
+                        "j/k",
+                        Style::default()
+                            .fg(Color::Yellow)
+                            .add_modifier(Modifier::BOLD),
+                    ),
+                    Span::styled(" to navigate tables", Style::default().fg(Color::Gray)),
+                ])));
+                table_items.push(ListItem::new(Line::from(vec![
+                    Span::styled("Press ", Style::default().fg(Color::Gray)),
+                    Span::styled(
+                        "Enter",
+                        Style::default()
+                            .fg(Color::Yellow)
+                            .add_modifier(Modifier::BOLD),
+                    ),
+                    Span::styled(" to view table data", Style::default().fg(Color::Gray)),
+                ])));
+            }
+            
+            table_items
         };
 
         let tables = List::new(items)
@@ -256,7 +307,12 @@ impl UI {
                     .add_modifier(Modifier::BOLD),
             );
 
-        frame.render_widget(tables, area);
+        // Use stateful widget to show selection
+        let mut list_state = state.tables_list_state.clone();
+        frame.render_stateful_widget(tables, area, &mut list_state);
+        
+        // Update the state with any changes
+        state.tables_list_state = list_state;
     }
 
     /// Draw the table details pane
@@ -273,7 +329,7 @@ impl UI {
             .connections
             .connections
             .iter()
-            .any(|conn| conn.is_connected);
+            .any(|conn| conn.is_connected());
 
         // For now, we'll assume no table is selected until database integration is complete
         let has_selected_table = false;
@@ -351,7 +407,7 @@ impl UI {
             .connections
             .connections
             .iter()
-            .any(|conn| conn.is_connected);
+            .any(|conn| conn.is_connected());
 
         // For now, we'll assume no table is selected until database integration is complete
         let has_selected_table = false;
@@ -550,7 +606,7 @@ impl UI {
             .connections
             .connections
             .iter()
-            .any(|conn| conn.is_connected);
+            .any(|conn| conn.is_connected());
 
         // Get query content lines
         let mut query_lines: Vec<Line> = if state.query_content.is_empty() {

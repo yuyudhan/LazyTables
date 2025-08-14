@@ -159,8 +159,8 @@ impl ConnectionField {
             Self::Username => "Username",
             Self::Password => "Password",
             Self::SslMode => "SSL Mode",
-            Self::Save => "Save",
-            Self::Cancel => "Cancel",
+            Self::Save => "Save (s)",
+            Self::Cancel => "Cancel (c)",
         }
     }
 }
@@ -569,6 +569,48 @@ impl ConnectionModalState {
     /// Clear all fields
     pub fn clear(&mut self) {
         *self = Self::new();
+    }
+
+    /// Populate modal state from existing connection for editing
+    pub fn populate_from_connection(&mut self, connection: &ConnectionConfig) {
+        self.name = connection.name.clone();
+        self.database_type = connection.database_type.clone();
+        self.host = connection.host.clone();
+        self.port_input = connection.port.to_string();
+        self.database = connection.database.as_deref().unwrap_or("").to_string();
+        self.username = connection.username.clone();
+        self.password = connection.password.as_deref().unwrap_or("").to_string();
+        self.ssl_mode = connection.ssl_mode.clone();
+        
+        // Set up list state for database type
+        let db_types = get_database_types();
+        if let Some(index) = db_types.iter().position(|db| {
+            db.to_lowercase() == connection.database_type.display_name()
+        }) {
+            self.db_type_list_state.select(Some(index));
+        }
+        
+        // Set up SSL mode list state
+        let ssl_modes = [
+            SslMode::Disable,
+            SslMode::Allow,
+            SslMode::Prefer,
+            SslMode::Require,
+            SslMode::VerifyCA,
+            SslMode::VerifyFull,
+        ];
+        if let Some(index) = ssl_modes.iter().position(|mode| {
+            std::mem::discriminant(mode) == std::mem::discriminant(&connection.ssl_mode)
+        }) {
+            self.ssl_list_state.select(Some(index));
+        }
+        
+        // Start in connection details step for editing
+        self.current_step = ModalStep::ConnectionDetails;
+        self.focused_field = ConnectionField::Name;
+        self.error_message = None;
+        self.using_connection_string = false;
+        self.connection_string.clear();
     }
 }
 
@@ -1170,7 +1212,7 @@ fn render_database_selection_buttons(
         Style::default().fg(Color::Red).add_modifier(Modifier::BOLD)
     };
 
-    let next_button = Paragraph::new("▶️ Next Step")
+    let next_button = Paragraph::new("▶️ Next Step (s)")
         .style(next_style)
         .alignment(Alignment::Center)
         .block(Block::default().borders(Borders::ALL).border_style(
@@ -1181,7 +1223,7 @@ fn render_database_selection_buttons(
             },
         ));
 
-    let cancel_button = Paragraph::new("❌ Cancel")
+    let cancel_button = Paragraph::new("❌ Cancel (c)")
         .style(cancel_style)
         .alignment(Alignment::Center)
         .block(Block::default().borders(Borders::ALL).border_style(
@@ -1233,7 +1275,7 @@ fn render_connection_details_buttons(
         Style::default().fg(Color::Red).add_modifier(Modifier::BOLD)
     };
 
-    let save_button = Paragraph::new("💾 Save")
+    let save_button = Paragraph::new("💾 Save (s)")
         .style(save_style)
         .alignment(Alignment::Center)
         .block(Block::default().borders(Borders::ALL).border_style(
@@ -1244,7 +1286,7 @@ fn render_connection_details_buttons(
             },
         ));
 
-    let cancel_button = Paragraph::new("❌ Cancel")
+    let cancel_button = Paragraph::new("❌ Cancel (c)")
         .style(cancel_style)
         .alignment(Alignment::Center)
         .block(Block::default().borders(Borders::ALL).border_style(
@@ -1255,7 +1297,7 @@ fn render_connection_details_buttons(
             },
         ));
 
-    let back_button = Paragraph::new("◀️ Back")
+    let back_button = Paragraph::new("◀️ Back (b)")
         .style(
             Style::default()
                 .fg(Color::Gray)
