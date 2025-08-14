@@ -175,6 +175,29 @@ impl Theme {
             "help_header" => &self.colors.help_header,
             "help_key" => &self.colors.help_key,
             "help_description" => &self.colors.help_description,
+            
+            // Additional table viewer colors
+            "row_alternate_bg" => &self.colors.table_row_alt_bg,
+            "text_primary" => &self.colors.foreground,
+            "text_secondary" => &self.colors.status_fg,
+            "text_muted" => &self.colors.input_placeholder,
+            "border_muted" => &self.colors.border,
+            "secondary_highlight" => &self.colors.syntax_function,
+            "selected_text" => &self.colors.foreground,
+            "selected_bg" => &self.colors.selected_cell_bg,
+            "edit_mode_text" => &self.colors.warning,
+            "edit_mode_bg" => "#2a2a3a",
+            "edit_mode_border" => &self.colors.warning,
+            "search_current_text" => "#000000",
+            "search_current_bg" => &self.colors.warning,
+            "search_match" => &self.colors.info,
+            "search_mode_border" => &self.colors.info,
+            "modified_cell" => &self.colors.syntax_string,
+            "null_value" => &self.colors.input_placeholder,
+            "danger" => &self.colors.error,
+            "modal_overlay" => "#00000099",
+            "modal_background" => &self.colors.modal_bg,
+            
             _ => "#ffffff",
         };
         Self::parse_color(color_str)
@@ -212,12 +235,12 @@ impl Theme {
                 status_fg: "#cdd6f4".to_string(),
                 primary_highlight: "#74c7ec".to_string(),
                 
-                // Table colors
-                table_header_bg: "#313244".to_string(),
+                // Table colors - dark with subtle differences
+                table_header_bg: "#1a1a2a".to_string(),
                 table_header_fg: "#cba6f7".to_string(),
-                table_row_bg: "#181825".to_string(),
-                table_row_alt_bg: "#1e1e2e".to_string(),
-                selected_cell_bg: "#45475a".to_string(),
+                table_row_bg: "#0d0d0d".to_string(),
+                table_row_alt_bg: "#141424".to_string(),
+                selected_cell_bg: "#2a2a3a".to_string(),
                 
                 // Modal colors
                 modal_bg: "#0d0d0d".to_string(),
@@ -237,11 +260,11 @@ impl Theme {
                 button_active_bg: "#74c7ec".to_string(),
                 button_active_fg: "#000000".to_string(),
                 
-                // Status colors
-                success: "#00ff00".to_string(),
-                error: "#ff0000".to_string(),
-                warning: "#ffff00".to_string(),
-                info: "#00ffff".to_string(),
+                // Status colors - more subtle
+                success: "#a6e3a1".to_string(),
+                error: "#f38ba8".to_string(),
+                warning: "#f9e2af".to_string(),
+                info: "#89dceb".to_string(),
                 
                 // SQL editor colors
                 editor_bg: "#1e1e2e".to_string(),
