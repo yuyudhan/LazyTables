@@ -741,6 +741,13 @@ fn render_table_content(f: &mut Frame, tab: &TableTab, area: Rect) {
                         format!(" {} ", value)
                     };
 
+                    // Base style with alternating row background
+                    let base_style = if row_idx % 2 == 0 {
+                        Style::default().bg(Color::Rgb(15, 15, 20))
+                    } else {
+                        Style::default()
+                    };
+
                     let style = if is_selected && tab.in_edit_mode {
                         Style::default()
                             .fg(Color::Black)
@@ -754,22 +761,17 @@ fn render_table_content(f: &mut Frame, tab: &TableTab, area: Rect) {
                     } else if is_selected {
                         Style::default().fg(Color::Black).bg(Color::Cyan)
                     } else if is_search_match {
-                        Style::default()
+                        base_style
                             .fg(Color::Magenta)
                             .add_modifier(Modifier::UNDERLINED)
                     } else if is_modified {
-                        Style::default()
+                        base_style
                             .fg(Color::Green)
                             .add_modifier(Modifier::ITALIC)
                     } else if value == "NULL" || value.is_empty() {
-                        Style::default().fg(Color::DarkGray)
+                        base_style.fg(Color::DarkGray)
                     } else {
-                        // Add subtle alternating row background
-                        if row_idx % 2 == 0 {
-                            Style::default().bg(Color::Rgb(15, 15, 20))
-                        } else {
-                            Style::default()
-                        }
+                        base_style
                     };
 
                     TableCell::from(display_value).style(style)
