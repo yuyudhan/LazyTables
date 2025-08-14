@@ -4,4 +4,4 @@
 pub mod connection;
 pub mod postgres;
 
-pub use connection::{Connection, ConnectionConfig, ConnectionStorage, DatabaseType, SslMode};
+pub use connection::{Connection, ConnectionConfig, ConnectionStatus, ConnectionStorage, DatabaseType, SslMode};

@@ -1,6 +1,7 @@
 // FilePath: src/app/state.rs
 
-use crate::{database::connection::ConnectionStorage, ui::components::ConnectionModalState};
+use crate::{database::{connection::ConnectionStorage, ConnectionConfig, ConnectionStatus, DatabaseType}, ui::components::ConnectionModalState};
+use ratatui::widgets::ListState;
 use serde::{Deserialize, Serialize};
 
 /// Application modes (vim-style)
@@ -88,6 +89,10 @@ pub struct AppState {
     pub leader_pressed: bool,
     /// Connections storage
     pub connections: ConnectionStorage,
+    /// Connections list state for UI selection
+    pub connections_list_state: ListState,
+    /// Tables list state for UI selection
+    pub tables_list_state: ListState,
     /// Show connection creation modal
     pub show_add_connection_modal: bool,
     /// Show connection edit modal
@@ -109,6 +114,10 @@ pub struct AppState {
     pub query_modified: bool,
     /// Last focused left column pane (for smarter navigation)
     pub last_left_pane: FocusedPane,
+    /// Tables in the currently connected database
+    pub tables: Vec<String>,
+    /// Error message for table loading
+    pub table_load_error: Option<String>,
 }
 
 impl AppState {
@@ -119,6 +128,15 @@ impl AppState {
 
         let connections = ConnectionStorage::load().unwrap_or_default();
         let saved_sql_files = Self::load_sql_files();
+        
+        // Initialize connections list state
+        let mut connections_list_state = ListState::default();
+        if !connections.connections.is_empty() {
+            connections_list_state.select(Some(0));
+        }
+        
+        // Initialize tables list state
+        let tables_list_state = ListState::default();
 
         Self {
             mode: Mode::Normal,
@@ -133,6 +151,8 @@ impl AppState {
             show_help: false,
             leader_pressed: false,
             connections,
+            connections_list_state,
+            tables_list_state,
             show_add_connection_modal: false,
             show_edit_connection_modal: false,
             connection_modal_state: ConnectionModalState::new(),
@@ -144,6 +164,8 @@ impl AppState {
             current_sql_file: None,
             query_modified: false,
             last_left_pane: FocusedPane::Connections,
+            tables: Vec::new(),
+            table_load_error: None,
         }
     }
 
@@ -238,10 +260,10 @@ impl AppState {
     pub fn move_up(&mut self) {
         match self.focused_pane {
             FocusedPane::Connections => {
-                self.selected_connection = self.selected_connection.saturating_sub(1);
+                self.connection_up();
             }
             FocusedPane::Tables => {
-                self.selected_table = self.selected_table.saturating_sub(1);
+                self.table_up();
             }
             FocusedPane::TabularOutput => {
                 self.current_row = self.current_row.saturating_sub(1);
@@ -260,13 +282,10 @@ impl AppState {
     pub fn move_down(&mut self) {
         match self.focused_pane {
             FocusedPane::Connections => {
-                let max_connections = self.connections.connections.len().saturating_sub(1);
-                if self.selected_connection < max_connections {
-                    self.selected_connection += 1;
-                }
+                self.connection_down();
             }
             FocusedPane::Tables => {
-                self.selected_table += 1;
+                self.table_down();
             }
             FocusedPane::TabularOutput => {
                 self.current_row += 1;
@@ -345,17 +364,41 @@ impl AppState {
         self.connection_modal_state.clear(); // Clear any input
     }
 
+    /// Open the edit connection modal for the currently selected connection
+    pub fn open_edit_connection_modal(&mut self) {
+        if let Some(connection) = self.connections.connections.get(self.selected_connection) {
+            self.connection_modal_state.populate_from_connection(connection);
+            self.show_edit_connection_modal = true;
+        }
+    }
+
+    /// Close the edit connection modal
+    pub fn close_edit_connection_modal(&mut self) {
+        self.show_edit_connection_modal = false;
+        self.connection_modal_state.clear(); // Clear any input
+    }
+
     /// Save connection from modal
     pub fn save_connection_from_modal(&mut self) -> Result<(), String> {
-        let connection = self.connection_modal_state.try_create_connection()?;
-        let _ = self.connections.add_connection(connection);
-
-        // Save to file
-        if let Err(e) = self.connections.save() {
-            return Err(format!("Failed to save connection: {e}"));
+        let mut connection = self.connection_modal_state.try_create_connection()?;
+        
+        if self.show_edit_connection_modal {
+            // Update existing connection - preserve ID
+            if let Some(existing) = self.connections.connections.get(self.selected_connection) {
+                connection.id = existing.id.clone();
+                if let Err(e) = self.connections.update_connection(connection) {
+                    return Err(format!("Failed to update connection: {e}"));
+                }
+            }
+            self.close_edit_connection_modal();
+        } else {
+            // Add new connection
+            if let Err(e) = self.connections.add_connection(connection) {
+                return Err(format!("Failed to add connection: {e}"));
+            }
+            self.close_add_connection_modal();
         }
 
-        self.close_add_connection_modal();
         self.clamp_connection_selection();
         Ok(())
     }
@@ -367,8 +410,145 @@ impl AppState {
             if self.selected_connection > max_index {
                 self.selected_connection = max_index;
             }
+            self.connections_list_state.select(Some(self.selected_connection));
         } else {
             self.selected_connection = 0;
+            self.connections_list_state.select(None);
+        }
+    }
+
+    /// Move connection selection down
+    pub fn connection_down(&mut self) {
+        if !self.connections.connections.is_empty() {
+            let len = self.connections.connections.len();
+            self.selected_connection = (self.selected_connection + 1) % len;
+            self.connections_list_state.select(Some(self.selected_connection));
+        }
+    }
+
+    /// Move connection selection up
+    pub fn connection_up(&mut self) {
+        if !self.connections.connections.is_empty() {
+            let len = self.connections.connections.len();
+            self.selected_connection = if self.selected_connection > 0 {
+                self.selected_connection - 1
+            } else {
+                len - 1
+            };
+            self.connections_list_state.select(Some(self.selected_connection));
+        }
+    }
+
+    /// Move table selection down
+    pub fn table_down(&mut self) {
+        if !self.tables.is_empty() {
+            let len = self.tables.len();
+            self.selected_table = (self.selected_table + 1) % len;
+            self.tables_list_state.select(Some(self.selected_table));
+        }
+    }
+
+    /// Move table selection up
+    pub fn table_up(&mut self) {
+        if !self.tables.is_empty() {
+            let len = self.tables.len();
+            self.selected_table = if self.selected_table > 0 {
+                self.selected_table - 1
+            } else {
+                len - 1
+            };
+            self.tables_list_state.select(Some(self.selected_table));
+        }
+    }
+
+    /// Update table list state when tables change
+    pub fn update_table_selection(&mut self) {
+        if !self.tables.is_empty() {
+            self.selected_table = 0;
+            self.tables_list_state.select(Some(0));
+        } else {
+            self.selected_table = 0;
+            self.tables_list_state.select(None);
+        }
+    }
+
+    /// Attempt to connect to the selected database
+    pub async fn connect_to_selected_database(&mut self) {
+        if let Some(connection) = self.connections.connections.get(self.selected_connection).cloned() {
+            // Set connection status to connecting
+            if let Some(conn) = self.connections.connections.get_mut(self.selected_connection) {
+                conn.status = ConnectionStatus::Connecting;
+            }
+            
+            // Clear previous tables and errors
+            self.tables.clear();
+            self.table_load_error = None;
+            
+            // Attempt connection based on database type
+            let result = self.try_connect_to_database(&connection).await;
+            
+            // Update connection status based on result
+            if let Some(conn) = self.connections.connections.get_mut(self.selected_connection) {
+                match result {
+                    Ok(tables) => {
+                        conn.status = ConnectionStatus::Connected;
+                        self.tables = tables;
+                        self.update_table_selection();
+                    }
+                    Err(error) => {
+                        conn.status = ConnectionStatus::Failed(error);
+                    }
+                }
+            }
+            
+            // Save updated connection status
+            let _ = self.connections.save();
+        }
+    }
+
+    /// Try to connect to a specific database and return tables
+    async fn try_connect_to_database(&self, connection: &ConnectionConfig) -> Result<Vec<String>, String> {
+        match connection.database_type {
+            DatabaseType::PostgreSQL => {
+                self.connect_postgresql(connection).await
+            }
+            _ => {
+                Err(format!("Database type {} not yet supported", connection.database_type.display_name()))
+            }
+        }
+    }
+
+    /// Connect to PostgreSQL and retrieve table list
+    async fn connect_postgresql(&self, connection: &ConnectionConfig) -> Result<Vec<String>, String> {
+        use crate::database::postgres::PostgresConnection;
+        use crate::database::Connection;
+        
+        // Create connection config
+        let mut pg_connection = PostgresConnection::new(connection.clone());
+        
+        // Try to connect
+        pg_connection.connect().await.map_err(|e| format!("Connection failed: {e}"))?;
+        
+        // Query actual tables from the database
+        let tables = pg_connection.get_tables().await
+            .map_err(|e| format!("Failed to retrieve tables: {e}"))?;
+        
+        // Clean up connection
+        let _ = pg_connection.disconnect().await;
+        
+        Ok(tables)
+    }
+
+    /// Disconnect from current database
+    pub fn disconnect_from_database(&mut self) {
+        if let Some(connection) = self.connections.connections.get_mut(self.selected_connection) {
+            connection.status = ConnectionStatus::Disconnected;
+            self.tables.clear();
+            self.table_load_error = None;
+            self.update_table_selection();
+            
+            // Save updated connection status
+            let _ = self.connections.save();
         }
     }
 
