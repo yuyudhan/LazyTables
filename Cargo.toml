@@ -24,10 +24,12 @@ color-eyre = "0.6"
 thiserror = "2.0"
 anyhow = "1.0"
 
-# Database drivers (Phase 0 - PostgreSQL)
+# Database drivers
 sqlx = { version = "0.8", features = [
   "runtime-tokio-rustls",
   "postgres",
+  "mysql",
+  "sqlite",
   "chrono",
   "uuid",
 ] }

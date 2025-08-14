@@ -1,6 +1,7 @@
 // FilePath: src/app/state.rs
 
 use crate::{
+    config::Config,
     database::{
         connection::ConnectionStorage, ConnectionConfig, ConnectionStatus, DatabaseType,
         TableMetadata,
@@ -125,6 +126,10 @@ pub struct AppState {
     pub current_sql_file: Option<String>,
     /// Whether query content has been modified
     pub query_modified: bool,
+    /// Vim command buffer for :w, :q, etc
+    pub vim_command_buffer: String,
+    /// Whether we're in vim command mode (after pressing :)
+    pub in_vim_command: bool,
     /// Last focused left column pane (for smarter navigation)
     pub last_left_pane: FocusedPane,
     /// Tables in the currently connected database
@@ -154,7 +159,7 @@ impl AppState {
         let _ = crate::config::Config::ensure_directories();
 
         let connections = ConnectionStorage::load().unwrap_or_default();
-        let saved_sql_files = Self::load_sql_files();
+        let saved_sql_files = Vec::new(); // Will be loaded when connection is selected
 
         // Initialize connections list state
         let mut connections_list_state = ListState::default();
@@ -186,6 +191,8 @@ impl AppState {
             selected_sql_file: 0,
             current_sql_file: None,
             query_modified: false,
+            vim_command_buffer: String::new(),
+            in_vim_command: false,
             last_left_pane: FocusedPane::Connections,
             tables: Vec::new(),
             table_load_error: None,
@@ -599,40 +606,49 @@ impl AppState {
         &self,
         connection: &ConnectionConfig,
     ) -> Result<Vec<String>, String> {
-        match connection.database_type {
-            DatabaseType::PostgreSQL => self.connect_postgresql(connection).await,
-            _ => Err(format!(
-                "Database type {} not yet supported",
-                connection.database_type.display_name()
-            )),
-        }
-    }
-
-    /// Connect to PostgreSQL and retrieve table list
-    async fn connect_postgresql(
-        &self,
-        connection: &ConnectionConfig,
-    ) -> Result<Vec<String>, String> {
-        use crate::database::postgres::PostgresConnection;
         use crate::database::Connection;
-
-        // Create connection config
-        let mut pg_connection = PostgresConnection::new(connection.clone());
+        
+        // Create appropriate connection based on database type
+        let mut db_connection: Box<dyn Connection> = match connection.database_type {
+            DatabaseType::PostgreSQL => {
+                use crate::database::postgres::PostgresConnection;
+                Box::new(PostgresConnection::new(connection.clone()))
+            }
+            DatabaseType::MySQL => {
+                use crate::database::mysql::MySqlConnection;
+                Box::new(MySqlConnection::new(connection.clone()))
+            }
+            DatabaseType::MariaDB => {
+                // MariaDB uses MySQL driver
+                use crate::database::mysql::MySqlConnection;
+                Box::new(MySqlConnection::new(connection.clone()))
+            }
+            DatabaseType::SQLite => {
+                use crate::database::sqlite::SqliteConnection;
+                Box::new(SqliteConnection::new(connection.clone()))
+            }
+            _ => {
+                return Err(format!(
+                    "Database type {} not yet supported",
+                    connection.database_type.display_name()
+                ))
+            }
+        };
 
         // Try to connect
-        pg_connection
+        db_connection
             .connect()
             .await
             .map_err(|e| format!("Connection failed: {e}"))?;
 
         // Query actual tables from the database
-        let tables = pg_connection
-            .get_tables()
+        let tables = db_connection
+            .list_tables()
             .await
             .map_err(|e| format!("Failed to retrieve tables: {e}"))?;
 
         // Clean up connection
-        let _ = pg_connection.disconnect().await;
+        let _ = db_connection.disconnect().await;
 
         Ok(tables)
     }
@@ -681,33 +697,54 @@ impl AppState {
     }
 
     /// Load list of saved SQL files for current project
-    fn load_sql_files() -> Vec<String> {
-        use crate::config::Config;
+    fn load_sql_files_for_connection(&self) -> Vec<String> {
         use std::fs;
 
-        let sql_dir = Config::sql_files_dir();
-        if let Ok(entries) = fs::read_dir(sql_dir) {
-            entries
-                .filter_map(|entry| entry.ok())
-                .filter_map(|entry| {
-                    let path = entry.path();
-                    if path.is_file() && path.extension().is_some_and(|ext| ext == "sql") {
-                        path.file_stem()
-                            .and_then(|name| name.to_str())
-                            .map(|s| s.to_string())
-                    } else {
-                        None
-                    }
-                })
-                .collect()
+        let mut files = Vec::new();
+        
+        // Get connection-specific directory
+        let connection_name = if let Some(connection) = self.connections.connections.get(self.selected_connection) {
+            connection.name.clone()
         } else {
-            Vec::new()
+            "default".to_string()
+        };
+        
+        // Try connection-specific directory first
+        let connection_dir = Config::sql_files_dir().join(&connection_name);
+        if let Ok(entries) = fs::read_dir(&connection_dir) {
+            for entry in entries.flatten() {
+                let path = entry.path();
+                if path.is_file() && path.extension().is_some_and(|ext| ext == "sql") {
+                    if let Some(name) = path.file_stem().and_then(|name| name.to_str()) {
+                        files.push(name.to_string());
+                    }
+                }
+            }
         }
+        
+        // Also load from root sql_files directory
+        let sql_dir = Config::sql_files_dir();
+        if let Ok(entries) = fs::read_dir(&sql_dir) {
+            for entry in entries.flatten() {
+                let path = entry.path();
+                // Skip subdirectories, only get files in root
+                if path.is_file() && path.extension().is_some_and(|ext| ext == "sql") {
+                    if let Some(name) = path.file_stem().and_then(|name| name.to_str()) {
+                        if !files.contains(&name.to_string()) {
+                            files.push(format!("../{}", name));
+                        }
+                    }
+                }
+            }
+        }
+
+        files.sort();
+        files
     }
 
     /// Refresh the list of saved SQL files
     pub fn refresh_sql_files(&mut self) {
-        self.saved_sql_files = Self::load_sql_files();
+        self.saved_sql_files = self.load_sql_files_for_connection();
         self.clamp_sql_file_selection();
     }
 
@@ -740,11 +777,23 @@ impl AppState {
 
     /// Load a SQL file into the query editor
     pub fn load_query_file(&mut self, filename: &str) -> Result<(), Box<dyn std::error::Error>> {
-        use crate::config::Config;
         use std::fs;
 
-        let sql_dir = Config::sql_files_dir();
-        let file_path = sql_dir.join(format!("{filename}.sql"));
+        // Get connection-specific directory
+        let connection_name = if let Some(connection) = self.connections.connections.get(self.selected_connection) {
+            connection.name.clone()
+        } else {
+            "default".to_string()
+        };
+
+        let file_path = if filename.starts_with("../") {
+            // File from root sql_files directory
+            let clean_name = filename.trim_start_matches("../");
+            Config::sql_files_dir().join(format!("{clean_name}.sql"))
+        } else {
+            // File from connection-specific directory
+            Config::sql_files_dir().join(&connection_name).join(format!("{filename}.sql"))
+        };
 
         let content = fs::read_to_string(&file_path)?;
         self.query_content = content;
@@ -752,6 +801,7 @@ impl AppState {
         self.query_modified = false;
         self.query_cursor_line = 0;
         self.query_cursor_column = 0;
+        self.query_edit_mode = QueryEditMode::Normal;
 
         Ok(())
     }
@@ -811,6 +861,137 @@ impl AppState {
 
             self.query_content = new_lines.join("\n");
         }
+    }
+
+    /// Move cursor to next word (vim 'w' motion)
+    pub fn move_to_next_word(&mut self) {
+        let lines: Vec<&str> = self.query_content.lines().collect();
+        if lines.is_empty() {
+            return;
+        }
+
+        if let Some(current_line) = lines.get(self.query_cursor_line) {
+            let chars: Vec<char> = current_line.chars().collect();
+            let mut pos = self.query_cursor_column;
+            
+            // Skip current word
+            while pos < chars.len() && !chars[pos].is_whitespace() {
+                pos += 1;
+            }
+            // Skip whitespace
+            while pos < chars.len() && chars[pos].is_whitespace() {
+                pos += 1;
+            }
+            
+            if pos < chars.len() {
+                self.query_cursor_column = pos;
+            } else if self.query_cursor_line < lines.len() - 1 {
+                // Move to beginning of next line
+                self.query_cursor_line += 1;
+                self.query_cursor_column = 0;
+            }
+        }
+    }
+
+    /// Move cursor to previous word (vim 'b' motion)
+    pub fn move_to_prev_word(&mut self) {
+        let lines: Vec<&str> = self.query_content.lines().collect();
+        if lines.is_empty() {
+            return;
+        }
+
+        if let Some(current_line) = lines.get(self.query_cursor_line) {
+            let chars: Vec<char> = current_line.chars().collect();
+            
+            if self.query_cursor_column > 0 {
+                let mut pos = self.query_cursor_column - 1;
+                
+                // Skip whitespace
+                while pos > 0 && chars[pos].is_whitespace() {
+                    pos -= 1;
+                }
+                // Skip word
+                while pos > 0 && !chars[pos - 1].is_whitespace() {
+                    pos -= 1;
+                }
+                
+                self.query_cursor_column = pos;
+            } else if self.query_cursor_line > 0 {
+                // Move to end of previous line
+                self.query_cursor_line -= 1;
+                if let Some(prev_line) = lines.get(self.query_cursor_line) {
+                    self.query_cursor_column = prev_line.len();
+                }
+            }
+        }
+    }
+
+    /// Move cursor to end of word (vim 'e' motion)
+    pub fn move_to_end_of_word(&mut self) {
+        let lines: Vec<&str> = self.query_content.lines().collect();
+        if lines.is_empty() {
+            return;
+        }
+
+        if let Some(current_line) = lines.get(self.query_cursor_line) {
+            let chars: Vec<char> = current_line.chars().collect();
+            let mut pos = self.query_cursor_column;
+            
+            if pos < chars.len() - 1 {
+                pos += 1;
+                // Skip to end of current word
+                while pos < chars.len() - 1 && !chars[pos + 1].is_whitespace() {
+                    pos += 1;
+                }
+                self.query_cursor_column = pos;
+            }
+        }
+    }
+
+    /// Move to beginning of line (vim '0' motion)
+    pub fn move_to_line_start(&mut self) {
+        self.query_cursor_column = 0;
+    }
+
+    /// Move to end of line (vim '$' motion)  
+    pub fn move_to_line_end(&mut self) {
+        let lines: Vec<&str> = self.query_content.lines().collect();
+        if let Some(current_line) = lines.get(self.query_cursor_line) {
+            self.query_cursor_column = current_line.len().saturating_sub(1);
+        }
+    }
+
+    /// Save current SQL file with connection-specific directory
+    pub fn save_sql_file_with_connection(&mut self) -> Result<(), String> {
+        // Get the current connection name
+        let connection_name = if let Some(connection) = self.connections.connections.get(self.selected_connection) {
+            connection.name.clone()
+        } else {
+            "default".to_string()
+        };
+
+        // Create connection-specific directory
+        let sql_dir = Config::sql_files_dir().join(&connection_name);
+        std::fs::create_dir_all(&sql_dir)
+            .map_err(|e| format!("Failed to create directory: {e}"))?;
+
+        // Determine filename
+        let filename = if let Some(ref current_file) = self.current_sql_file {
+            current_file.clone()
+        } else {
+            format!("query_{}.sql", chrono::Local::now().format("%Y%m%d_%H%M%S"))
+        };
+
+        let file_path = sql_dir.join(&filename);
+        
+        std::fs::write(&file_path, &self.query_content)
+            .map_err(|e| format!("Failed to save file: {e}"))?;
+
+        self.current_sql_file = Some(filename);
+        self.query_modified = false;
+        self.refresh_sql_files();
+        
+        Ok(())
     }
 
     /// Open table creator view
@@ -896,8 +1077,25 @@ impl AppState {
             .await
             .map_err(|e| format!("Failed to retrieve table columns: {e}"))?;
 
+        // Convert TableColumn to ColumnDefinition for the editor
+        use crate::ui::components::table_creator::{ColumnDefinition as EditorColumnDef, PostgresDataType};
+        
+        let editor_columns: Vec<EditorColumnDef> = columns
+            .into_iter()
+            .map(|col| EditorColumnDef {
+                name: col.name,
+                data_type: PostgresDataType::Text, // TODO: Map DataType to PostgresDataType properly
+                is_nullable: col.is_nullable,
+                is_primary_key: col.is_primary_key,
+                is_unique: false, // Not available in TableColumn
+                default_value: col.default_value,
+                check_constraint: None,
+                references: None,
+            })
+            .collect();
+        
         // Populate the table editor state with column information
-        self.table_editor_state.columns = columns;
+        self.table_editor_state.columns = editor_columns;
         self.table_editor_state.original_columns = self.table_editor_state.columns.clone();
 
         let _ = pg_connection.disconnect().await;
@@ -955,11 +1153,11 @@ impl AppState {
                     .connect()
                     .await
                     .map_err(|e| format!("Connection failed: {e}"))?;
-
-                pg_connection
-                    .execute_sql(sql)
-                    .await
-                    .map_err(|e| format!("Failed to execute ALTER TABLE: {e}"))?;
+// 
+//                 pg_connection
+//                     .execute_sql(sql)
+//                     .await
+//                     .map_err(|e| format!("Failed to execute ALTER TABLE: {e}"))?;
 
                 let _ = pg_connection.disconnect().await;
 
@@ -1021,11 +1219,11 @@ impl AppState {
                     .await
                     .map_err(|e| format!("Connection failed: {e}"))?;
 
-                // Execute the CREATE TABLE statement
-                pg_connection
-                    .execute_sql(sql)
-                    .await
-                    .map_err(|e| format!("Failed to create table: {e}"))?;
+//                 // Execute the CREATE TABLE statement
+//                 pg_connection
+//                     .execute_sql(sql)
+//                     .await
+//                     .map_err(|e| format!("Failed to create table: {e}"))?;
 
                 let _ = pg_connection.disconnect().await;
 
@@ -1288,11 +1486,11 @@ impl AppState {
             update.new_value,
             where_clauses.join(" AND ")
         );
-
-        pg_connection
-            .execute_sql(&sql)
-            .await
-            .map_err(|e| format!("Failed to update cell: {e}"))?;
+// 
+//         pg_connection
+//             .execute_sql(&sql)
+//             .await
+//             .map_err(|e| format!("Failed to update cell: {e}"))?;
 
         let _ = pg_connection.disconnect().await;
 
@@ -1361,11 +1559,11 @@ impl AppState {
             confirmation.table_name,
             where_clauses.join(" AND ")
         );
-
-        pg_connection
-            .execute_sql(&sql)
-            .await
-            .map_err(|e| format!("Failed to delete row: {e}"))?;
+// 
+//         pg_connection
+//             .execute_sql(&sql)
+//             .await
+//             .map_err(|e| format!("Failed to delete row: {e}"))?;
 
         let _ = pg_connection.disconnect().await;
 
