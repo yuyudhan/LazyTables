@@ -280,7 +280,8 @@ impl TableTab {
     /// Navigate to next search result
     pub fn next_search_result(&mut self) {
         if !self.search_results.is_empty() {
-            self.current_search_result = (self.current_search_result + 1) % self.search_results.len();
+            self.current_search_result =
+                (self.current_search_result + 1) % self.search_results.len();
             if let Some(&(row, col)) = self.search_results.get(self.current_search_result) {
                 self.selected_row = row;
                 self.selected_col = col;
@@ -320,6 +321,17 @@ pub struct TableViewerState {
     pub tabs: Vec<TableTab>,
     pub active_tab: usize,
     pub show_help: bool,
+    pub delete_confirmation: Option<DeleteConfirmation>,
+    pub last_d_press: Option<std::time::Instant>,
+    pub last_y_press: Option<std::time::Instant>,
+}
+
+/// Delete confirmation dialog state
+#[derive(Debug, Clone)]
+pub struct DeleteConfirmation {
+    pub row_index: usize,
+    pub table_name: String,
+    pub primary_key_values: Vec<(String, String)>,
 }
 
 impl TableViewerState {
@@ -328,6 +340,9 @@ impl TableViewerState {
             tabs: Vec::new(),
             active_tab: 0,
             show_help: false,
+            delete_confirmation: None,
+            last_d_press: None,
+            last_y_press: None,
         }
     }
 
@@ -394,6 +409,72 @@ impl TableViewerState {
     pub fn toggle_help(&mut self) {
         self.show_help = !self.show_help;
     }
+
+    /// Copy current row to clipboard in CSV format
+    pub fn copy_row_csv(&self) -> Result<(), String> {
+        if let Some(tab) = self.current_tab() {
+            if let Some(row_data) = tab.rows.get(tab.selected_row) {
+                // Escape CSV values that contain commas, quotes, or newlines
+                let csv_row = row_data
+                    .iter()
+                    .map(|cell| {
+                        if cell.contains(',') || cell.contains('"') || cell.contains('\n') {
+                            format!("\"{}\"", cell.replace('"', "\"\""))
+                        } else {
+                            cell.clone()
+                        }
+                    })
+                    .collect::<Vec<_>>()
+                    .join(",");
+                
+                // Copy to clipboard
+                let mut clipboard = arboard::Clipboard::new()
+                    .map_err(|e| format!("Failed to access clipboard: {e}"))?;
+                clipboard.set_text(csv_row)
+                    .map_err(|e| format!("Failed to copy to clipboard: {e}"))?;
+                
+                Ok(())
+            } else {
+                Err("No row selected".to_string())
+            }
+        } else {
+            Err("No table open".to_string())
+        }
+    }
+
+    /// Prepare delete confirmation for current row
+    pub fn prepare_delete_confirmation(&mut self) -> Option<DeleteConfirmation> {
+        if let Some(tab) = self.current_tab() {
+            if tab.selected_row < tab.rows.len() {
+                // Get primary key values for the row
+                let mut primary_key_values = Vec::new();
+                for &pk_idx in &tab.primary_key_columns {
+                    if let Some(pk_col) = tab.columns.get(pk_idx) {
+                        if let Some(row) = tab.rows.get(tab.selected_row) {
+                            if let Some(value) = row.get(pk_idx) {
+                                primary_key_values.push((pk_col.name.clone(), value.clone()));
+                            }
+                        }
+                    }
+                }
+                
+                if primary_key_values.is_empty() {
+                    // Can't delete without primary key
+                    return None;
+                }
+                
+                Some(DeleteConfirmation {
+                    row_index: tab.selected_row,
+                    table_name: tab.table_name.clone(),
+                    primary_key_values,
+                })
+            } else {
+                None
+            }
+        } else {
+            None
+        }
+    }
 }
 
 impl Default for TableViewerState {
@@ -433,6 +514,64 @@ pub fn render_table_viewer(f: &mut Frame, state: &mut TableViewerState, area: Re
     } else {
         render_status_bar(f, state, chunks[2]);
     }
+
+    // Render delete confirmation dialog if active
+    if let Some(confirmation) = &state.delete_confirmation {
+        render_delete_confirmation(f, confirmation, f.area());
+    }
+}
+
+fn render_delete_confirmation(
+    f: &mut Frame,
+    confirmation: &DeleteConfirmation,
+    area: Rect,
+) {
+    // Create a centered modal
+    let modal_width = 60;
+    let modal_height = 8;
+    let x = (area.width.saturating_sub(modal_width)) / 2;
+    let y = (area.height.saturating_sub(modal_height)) / 2;
+    
+    let modal_area = Rect {
+        x,
+        y,
+        width: modal_width.min(area.width),
+        height: modal_height.min(area.height),
+    };
+
+    // Clear the modal area
+    let clear = Block::default()
+        .style(Style::default().bg(Color::Black));
+    f.render_widget(clear, modal_area);
+
+    // Build confirmation message
+    let pk_info = confirmation.primary_key_values
+        .iter()
+        .map(|(k, v)| format!("{}: {}", k, v))
+        .collect::<Vec<_>>()
+        .join(", ");
+
+    let text = vec![
+        Line::from(""),
+        Line::from("⚠️  Delete Confirmation").fg(Color::Yellow).centered(),
+        Line::from(""),
+        Line::from(format!("Delete row from table '{}'?", confirmation.table_name)).centered(),
+        Line::from(format!("Row: {}", pk_info)).fg(Color::Gray).centered(),
+        Line::from(""),
+        Line::from("Press Enter/Y to confirm, Esc/N to cancel").fg(Color::Cyan).centered(),
+    ];
+
+    let paragraph = Paragraph::new(text)
+        .block(
+            Block::default()
+                .borders(Borders::ALL)
+                .title(" Confirm Delete ")
+                .border_style(Style::default().fg(Color::Red))
+                .style(Style::default().bg(Color::Black)),
+        )
+        .alignment(Alignment::Center);
+
+    f.render_widget(paragraph, modal_area);
 }
 
 fn render_empty_state(f: &mut Frame, area: Rect) {
@@ -571,7 +710,8 @@ fn render_table_content(f: &mut Frame, tab: &TableTab, area: Rect) {
                     let is_selected = row_idx == tab.selected_row && col_idx == tab.selected_col;
                     let is_modified = tab.modified_cells.contains_key(&(row_idx, col_idx));
                     let is_search_match = tab.search_results.contains(&(row_idx, col_idx));
-                    let is_current_search = tab.search_results.get(tab.current_search_result) == Some(&(row_idx, col_idx));
+                    let is_current_search = tab.search_results.get(tab.current_search_result)
+                        == Some(&(row_idx, col_idx));
 
                     let display_value = if is_selected && tab.in_edit_mode {
                         format!("{}▌", tab.edit_buffer)
@@ -637,13 +777,22 @@ fn render_table_content(f: &mut Frame, tab: &TableTab, area: Rect) {
                     (tab.total_rows.saturating_sub(1)) / tab.rows_per_page + 1,
                     tab.total_rows,
                     if tab.in_search_mode {
-                        format!(" | Search: '{}' ({}/{})", 
+                        format!(
+                            " | Search: '{}' ({}/{})",
                             tab.search_query,
-                            if tab.search_results.is_empty() { 0 } else { tab.current_search_result + 1 },
+                            if tab.search_results.is_empty() {
+                                0
+                            } else {
+                                tab.current_search_result + 1
+                            },
                             tab.search_results.len()
                         )
                     } else if !tab.search_results.is_empty() {
-                        format!(" | Found: {}/{}", tab.current_search_result + 1, tab.search_results.len())
+                        format!(
+                            " | Found: {}/{}",
+                            tab.current_search_result + 1,
+                            tab.search_results.len()
+                        )
                     } else {
                         String::new()
                     }
