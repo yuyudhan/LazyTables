@@ -347,6 +347,7 @@ pub struct TableCreatorState {
     pub show_data_type_dropdown: bool,
     pub error_message: Option<String>,
     pub current_column_index: usize,
+    pub in_insert_mode: bool,
 }
 
 impl TableCreatorState {
@@ -363,7 +364,31 @@ impl TableCreatorState {
             show_data_type_dropdown: false,
             error_message: None,
             current_column_index: 0,
+            in_insert_mode: false,
         }
+    }
+
+    /// Check if current field is a text input field
+    pub fn is_text_field(&self) -> bool {
+        matches!(
+            self.focused_field,
+            TableCreatorField::TableName
+                | TableCreatorField::Column(_, ColumnField::Name)
+                | TableCreatorField::Column(_, ColumnField::Default)
+                | TableCreatorField::Column(_, ColumnField::Length)
+        )
+    }
+
+    /// Enter insert mode (for text fields)
+    pub fn enter_insert_mode(&mut self) {
+        if self.is_text_field() {
+            self.in_insert_mode = true;
+        }
+    }
+
+    /// Exit insert mode
+    pub fn exit_insert_mode(&mut self) {
+        self.in_insert_mode = false;
     }
 
     /// Add a new column
@@ -452,6 +477,11 @@ impl TableCreatorState {
 
     /// Handle character input
     pub fn handle_char_input(&mut self, c: char) {
+        // Only allow text input in insert mode
+        if !self.in_insert_mode {
+            return;
+        }
+
         self.error_message = None;
 
         match self.focused_field {
@@ -499,6 +529,10 @@ impl TableCreatorState {
 
     /// Handle backspace
     pub fn handle_backspace(&mut self) {
+        // Only allow backspace in insert mode
+        if !self.in_insert_mode {
+            return;
+        }
         match self.focused_field {
             TableCreatorField::TableName => {
                 self.table_name.pop();
@@ -621,6 +655,7 @@ impl TableCreatorState {
         self.focused_field = TableCreatorField::TableName;
         self.error_message = None;
         self.current_column_index = 0;
+        self.in_insert_mode = false;
     }
 }
 
@@ -697,15 +732,28 @@ fn render_table_name_input(f: &mut Frame, state: &TableCreatorState, area: Rect)
         Style::default()
     };
 
+    let title = if is_focused && state.in_insert_mode {
+        "Table Name [INSERT]"
+    } else if is_focused {
+        "Table Name [Press 'i' to edit]"
+    } else {
+        "Table Name"
+    };
+
     let input_block = Block::default()
         .borders(Borders::ALL)
         .border_style(style)
-        .title("Table Name");
+        .title(title);
 
     let input_text = if state.table_name.is_empty() && !is_focused {
         Paragraph::new("Enter table name...").style(Style::default().fg(Color::DarkGray))
     } else {
-        Paragraph::new(state.table_name.as_str()).style(Style::default().fg(Color::White))
+        let text = if is_focused && state.in_insert_mode {
+            format!("{}▌", state.table_name) // Show cursor in insert mode
+        } else {
+            state.table_name.clone()
+        };
+        Paragraph::new(text).style(Style::default().fg(Color::White))
     };
 
     f.render_widget(input_block, area);
@@ -760,7 +808,11 @@ fn render_columns_table(f: &mut Frame, state: &mut TableCreatorState, area: Rect
                         TableCreatorField::Column(_, ColumnField::Name)
                     )
                 {
-                    format!("▶ {}", column.name)
+                    if state.in_insert_mode {
+                        format!("▶ {}▌", column.name)
+                    } else {
+                        format!("▶ {}", column.name)
+                    }
                 } else {
                     column.name.clone()
                 },

@@ -403,7 +403,29 @@ impl App {
     async fn handle_connection_modal_key_event(&mut self, key: KeyEvent) -> Result<()> {
         use crate::ui::components::ConnectionField;
 
+        // Handle insert mode for text fields
+        if self.state.connection_modal_state.in_insert_mode {
+            match key.code {
+                KeyCode::Esc => {
+                    // Exit insert mode
+                    self.state.connection_modal_state.exit_insert_mode();
+                }
+                KeyCode::Char(c) => {
+                    self.state.connection_modal_state.handle_char_input(c);
+                }
+                KeyCode::Backspace => {
+                    self.state.connection_modal_state.handle_backspace();
+                }
+                _ => {}
+            }
+            return Ok(());
+        }
+
         match key.code {
+            KeyCode::Char('i') => {
+                // Enter insert mode for text fields
+                self.state.connection_modal_state.enter_insert_mode();
+            }
             KeyCode::Esc => {
                 // In connection details step, Esc goes back to database type selection
                 if self.state.connection_modal_state.current_step
@@ -530,60 +552,26 @@ impl App {
                 }
             }
             KeyCode::Char('s') => {
-                // Only process shortcut if not in a text field
-                if matches!(
-                    self.state.connection_modal_state.focused_field,
-                    ConnectionField::Save | ConnectionField::Cancel | ConnectionField::DatabaseType
-                ) {
-                    // Save connection - same as clicking Save button
-                    if let Err(error) = self.state.save_connection_from_modal() {
-                        self.state.connection_modal_state.error_message = Some(error);
-                    }
-                } else {
-                    // Let it pass through as regular text input
-                    self.state.connection_modal_state.handle_char_input('s');
+                // Save shortcut - works from any field
+                if let Err(error) = self.state.save_connection_from_modal() {
+                    self.state.connection_modal_state.error_message = Some(error);
                 }
             }
             KeyCode::Char('c') => {
-                // Only process shortcut if not in a text field
-                if matches!(
-                    self.state.connection_modal_state.focused_field,
-                    ConnectionField::Save | ConnectionField::Cancel | ConnectionField::DatabaseType
-                ) {
-                    // Cancel - same as clicking Cancel button
-                    if self.state.show_add_connection_modal {
-                        self.state.close_add_connection_modal();
-                    } else {
-                        self.state.close_edit_connection_modal();
-                    }
+                // Cancel shortcut - works from any field
+                if self.state.show_add_connection_modal {
+                    self.state.close_add_connection_modal();
                 } else {
-                    // Let it pass through as regular text input
-                    self.state.connection_modal_state.handle_char_input('c');
+                    self.state.close_edit_connection_modal();
                 }
             }
             KeyCode::Char('b') => {
-                // Only process shortcut if not in a text field
-                if matches!(
-                    self.state.connection_modal_state.focused_field,
-                    ConnectionField::Save | ConnectionField::Cancel | ConnectionField::DatabaseType
-                ) {
-                    // Back - same as clicking Back button (only in connection details step)
-                    if self.state.connection_modal_state.current_step
-                        == crate::ui::components::ModalStep::ConnectionDetails
-                    {
-                        self.state.connection_modal_state.go_back();
-                    }
-                } else {
-                    // Let it pass through as regular text input
-                    self.state.connection_modal_state.handle_char_input('b');
+                // Back shortcut (only in connection details step)
+                if self.state.connection_modal_state.current_step
+                    == crate::ui::components::ModalStep::ConnectionDetails
+                {
+                    self.state.connection_modal_state.go_back();
                 }
-            }
-            KeyCode::Char(c) => {
-                // For any other character, just handle as regular input
-                self.state.connection_modal_state.handle_char_input(c);
-            }
-            KeyCode::Backspace => {
-                self.state.connection_modal_state.handle_backspace();
             }
             _ => {}
         }
@@ -594,7 +582,29 @@ impl App {
     async fn handle_table_creator_key_event(&mut self, key: KeyEvent) -> Result<()> {
         use crate::ui::components::{ColumnField, TableCreatorField};
 
+        // Handle insert mode for text fields
+        if self.state.table_creator_state.in_insert_mode {
+            match key.code {
+                KeyCode::Esc => {
+                    // Exit insert mode
+                    self.state.table_creator_state.exit_insert_mode();
+                }
+                KeyCode::Char(c) => {
+                    self.state.table_creator_state.handle_char_input(c);
+                }
+                KeyCode::Backspace => {
+                    self.state.table_creator_state.handle_backspace();
+                }
+                _ => {}
+            }
+            return Ok(());
+        }
+
         match key.code {
+            KeyCode::Char('i') => {
+                // Enter insert mode for text fields
+                self.state.table_creator_state.enter_insert_mode();
+            }
             KeyCode::Esc => {
                 // Close table creator
                 self.state.close_table_creator();
@@ -720,26 +730,8 @@ impl App {
                 }
             }
             KeyCode::Char('c') => {
-                // Quick cancel - but only if not typing in a text field
-                match self.state.table_creator_state.focused_field {
-                    TableCreatorField::TableName
-                    | TableCreatorField::Column(_, ColumnField::Name)
-                    | TableCreatorField::Column(_, ColumnField::Default) => {
-                        // Let 'c' pass through as text input
-                        self.state.table_creator_state.handle_char_input('c');
-                    }
-                    _ => {
-                        // Cancel the table creator
-                        self.state.close_table_creator();
-                    }
-                }
-            }
-            KeyCode::Char(ch) => {
-                // Handle text input for appropriate fields
-                self.state.table_creator_state.handle_char_input(ch);
-            }
-            KeyCode::Backspace => {
-                self.state.table_creator_state.handle_backspace();
+                // Quick cancel
+                self.state.close_table_creator();
             }
             _ => {}
         }

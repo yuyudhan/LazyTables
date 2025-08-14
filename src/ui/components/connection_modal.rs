@@ -45,6 +45,8 @@ pub struct ConnectionModalState {
     pub error_message: Option<String>,
     /// Whether using connection string instead of individual fields
     pub using_connection_string: bool,
+    /// Whether in insert mode for text input
+    pub in_insert_mode: bool,
 }
 
 /// Fields in the connection modal
@@ -189,6 +191,7 @@ impl Default for ConnectionModalState {
             ssl_list_state,
             error_message: None,
             using_connection_string: false,
+            in_insert_mode: false,
         }
     }
 }
@@ -236,8 +239,38 @@ impl ConnectionModalState {
         }
     }
 
-    /// Handle character input for the current field
+    /// Check if current field is a text input field
+    pub fn is_text_field(&self) -> bool {
+        matches!(
+            self.focused_field,
+            ConnectionField::Name
+                | ConnectionField::ConnectionString
+                | ConnectionField::Host
+                | ConnectionField::Port
+                | ConnectionField::Database
+                | ConnectionField::Username
+                | ConnectionField::Password
+        )
+    }
+
+    /// Enter insert mode for text editing
+    pub fn enter_insert_mode(&mut self) {
+        if self.is_text_field() {
+            self.in_insert_mode = true;
+        }
+    }
+
+    /// Exit insert mode
+    pub fn exit_insert_mode(&mut self) {
+        self.in_insert_mode = false;
+    }
+
+    /// Handle character input for the current field (only in insert mode)
     pub fn handle_char_input(&mut self, c: char) {
+        if !self.in_insert_mode {
+            return;
+        }
+
         match self.focused_field {
             ConnectionField::Name => {
                 self.name.push(c);
@@ -280,8 +313,12 @@ impl ConnectionModalState {
         self.error_message = None; // Clear error on input
     }
 
-    /// Handle backspace for the current field
+    /// Handle backspace for the current field (only in insert mode)
     pub fn handle_backspace(&mut self) {
+        if !self.in_insert_mode {
+            return;
+        }
+
         match self.focused_field {
             ConnectionField::Name => {
                 self.name.pop();
