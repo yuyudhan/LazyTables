@@ -736,9 +736,9 @@ fn render_table_content(f: &mut Frame, tab: &TableTab, area: Rect) {
                             .get(&(row_idx, col_idx))
                             .cloned()
                             .unwrap_or_else(|| value.clone());
-                        format!(" {} ", val)
+                        format!(" {val} ")
                     } else {
-                        format!(" {} ", value)
+                        format!(" {value} ")
                     };
 
                     // Base style with alternating row background
