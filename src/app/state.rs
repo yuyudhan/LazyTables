@@ -1,25 +1,43 @@
 // FilePath: src/app/state.rs
 
 use crate::{
-    database::{connection::ConnectionStorage, ConnectionConfig, ConnectionStatus, DatabaseType, TableMetadata},
-    ui::components::{ConnectionModalState, TableCreatorState, TableEditorState, TableViewerState, ToastManager},
+    database::{
+        connection::ConnectionStorage, ConnectionConfig, ConnectionStatus, DatabaseType,
+        TableMetadata,
+    },
+    ui::components::{
+        ConnectionModalState, TableCreatorState, TableEditorState, TableViewerState, ToastManager,
+    },
 };
 use ratatui::widgets::ListState;
 use serde::{Deserialize, Serialize};
 
-/// Application modes (vim-style)
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
-pub enum Mode {
-    /// Normal mode - navigation and commands
+/// Help display mode for context-aware help
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum HelpMode {
+    /// No help displayed
+    None,
+    /// Connections pane help
+    Connections,
+    /// Tables pane help
+    Tables,
+    /// Details pane help
+    Details,
+    /// Tabular output help
+    TabularOutput,
+    /// SQL Files help
+    SqlFiles,
+    /// Query window help
+    QueryWindow,
+}
+
+/// Internal editing state for query window
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum QueryEditMode {
+    /// Normal navigation mode
     Normal,
-    /// Insert mode - editing data
+    /// Insert/edit mode for typing
     Insert,
-    /// Visual mode - selection
-    Visual,
-    /// Command mode - executing commands
-    Command,
-    /// Query mode - SQL editor
-    Query,
 }
 
 /// Which pane currently has focus
@@ -68,10 +86,10 @@ impl FocusedPane {
 /// Main application state
 #[derive(Debug, Clone)]
 pub struct AppState {
-    /// Current mode
-    pub mode: Mode,
     /// Currently focused pane
     pub focused_pane: FocusedPane,
+    /// Current help display mode
+    pub help_mode: HelpMode,
     /// Selected connection index
     pub selected_connection: usize,
     /// Selected table index
@@ -80,16 +98,6 @@ pub struct AppState {
     pub current_row: usize,
     /// Current column in main content
     pub current_column: usize,
-    /// Command buffer for command mode
-    pub command_buffer: String,
-    /// Search query
-    pub search_query: String,
-    /// Is search active
-    pub search_active: bool,
-    /// Show help overlay
-    pub show_help: bool,
-    /// Leader key (Space) was pressed
-    pub leader_pressed: bool,
     /// Connections storage
     pub connections: ConnectionStorage,
     /// Connections list state for UI selection
@@ -107,6 +115,8 @@ pub struct AppState {
     /// Current cursor position in query editor
     pub query_cursor_line: usize,
     pub query_cursor_column: usize,
+    /// Query editor mode
+    pub query_edit_mode: QueryEditMode,
     /// List of saved SQL files for current project
     pub saved_sql_files: Vec<String>,
     /// Selected SQL file index in the browser
@@ -156,17 +166,12 @@ impl AppState {
         let tables_list_state = ListState::default();
 
         Self {
-            mode: Mode::Normal,
             focused_pane: FocusedPane::Connections,
+            help_mode: HelpMode::None,
             selected_connection: 0,
             selected_table: 0,
             current_row: 0,
             current_column: 0,
-            command_buffer: String::new(),
-            search_query: String::new(),
-            search_active: false,
-            show_help: false,
-            leader_pressed: false,
             connections,
             connections_list_state,
             tables_list_state,
@@ -176,6 +181,7 @@ impl AppState {
             query_content: String::new(),
             query_cursor_line: 0,
             query_cursor_column: 0,
+            query_edit_mode: QueryEditMode::Normal,
             saved_sql_files,
             selected_sql_file: 0,
             current_sql_file: None,
@@ -490,7 +496,7 @@ impl AppState {
             self.selected_table = (self.selected_table + 1) % len;
             // Add 1 to account for the "▼ Tables" header in the UI
             self.tables_list_state.select(Some(self.selected_table + 1));
-            
+
             // Clear metadata when selection changes (will load when Enter is pressed)
             self.current_table_metadata = None;
         }
@@ -507,7 +513,7 @@ impl AppState {
             };
             // Add 1 to account for the "▼ Tables" header in the UI
             self.tables_list_state.select(Some(self.selected_table + 1));
-            
+
             // Clear metadata when selection changes (will load when Enter is pressed)
             self.current_table_metadata = None;
         }
@@ -555,8 +561,8 @@ impl AppState {
             let result = self.try_connect_to_database(&connection).await;
 
             // Update connection status based on result
-            let connection_succeeded = matches!(result, Ok(_));
-            
+            let connection_succeeded = result.is_ok();
+
             if let Some(conn) = self
                 .connections
                 .connections
@@ -570,15 +576,17 @@ impl AppState {
                     Err(error) => {
                         let error_msg = error.clone();
                         conn.status = ConnectionStatus::Failed(error.clone());
-                        self.toast_manager.error(format!("Connection failed: {}", error_msg));
+                        self.toast_manager
+                            .error(format!("Connection failed: {error_msg}"));
                     }
                 }
             }
-            
+
             // Handle post-connection tasks after mutable borrow ends
             if connection_succeeded {
                 self.update_table_selection();
-                self.toast_manager.success(format!("Connected to {}", connection_name));
+                self.toast_manager
+                    .success(format!("Connected to {connection_name}"));
             }
 
             // Save updated connection status
@@ -1043,10 +1051,11 @@ impl AppState {
                     tab.loading = false;
                 }
             }
-            
+
             // Load table metadata for the details pane
             if let Err(e) = self.load_table_metadata(&table_name).await {
-                self.toast_manager.error(format!("Failed to load table metadata: {}", e));
+                self.toast_manager
+                    .error(format!("Failed to load table metadata: {e}"));
             }
 
             // Switch focus to tabular output
@@ -1167,7 +1176,7 @@ impl AppState {
 
         Ok(())
     }
-    
+
     /// Load table metadata for the details pane
     pub async fn load_table_metadata(&mut self, table_name: &str) -> Result<(), String> {
         // Get the current connection
@@ -1184,21 +1193,21 @@ impl AppState {
                         DatabaseType::PostgreSQL => {
                             use crate::database::postgres::PostgresConnection;
                             use crate::database::Connection;
-                            
+
                             let mut pg_connection = PostgresConnection::new(connection.clone());
                             pg_connection
                                 .connect()
                                 .await
                                 .map_err(|e| format!("Connection failed: {e}"))?;
-                            
+
                             // Get table metadata
                             let metadata = pg_connection
                                 .get_table_metadata(table_name)
                                 .await
                                 .map_err(|e| format!("Failed to retrieve metadata: {e}"))?;
-                            
+
                             self.current_table_metadata = Some(metadata);
-                            
+
                             let _ = pg_connection.disconnect().await;
                             Ok(())
                         }
@@ -1284,6 +1293,79 @@ impl AppState {
             .execute_sql(&sql)
             .await
             .map_err(|e| format!("Failed to update cell: {e}"))?;
+
+        let _ = pg_connection.disconnect().await;
+
+        Ok(())
+    }
+
+    /// Delete a row from the database
+    pub async fn delete_table_row(
+        &mut self,
+        confirmation: crate::ui::components::table_viewer::DeleteConfirmation,
+    ) -> Result<(), String> {
+        // Get the current connection
+        if let Some(connection) = self
+            .connections
+            .connections
+            .get(self.selected_connection)
+            .cloned()
+        {
+            match &connection.status {
+                ConnectionStatus::Connected => {
+                    // Delete row based on database type
+                    match connection.database_type {
+                        DatabaseType::PostgreSQL => {
+                            self.delete_postgres_row(&connection, confirmation).await
+                        }
+                        _ => Err(format!(
+                            "Database type {} not yet supported for row deletion",
+                            connection.database_type.display_name()
+                        )),
+                    }
+                }
+                _ => Err("No active database connection".to_string()),
+            }
+        } else {
+            Err("No connection selected".to_string())
+        }
+    }
+
+    /// Delete a row in PostgreSQL
+    async fn delete_postgres_row(
+        &self,
+        connection: &ConnectionConfig,
+        confirmation: crate::ui::components::table_viewer::DeleteConfirmation,
+    ) -> Result<(), String> {
+        use crate::database::postgres::PostgresConnection;
+        use crate::database::Connection;
+
+        let mut pg_connection = PostgresConnection::new(connection.clone());
+        pg_connection
+            .connect()
+            .await
+            .map_err(|e| format!("Connection failed: {e}"))?;
+
+        // Build DELETE SQL
+        let mut where_clauses = Vec::new();
+        for (pk_col, pk_val) in &confirmation.primary_key_values {
+            where_clauses.push(format!("{pk_col} = '{pk_val}'"));
+        }
+
+        if where_clauses.is_empty() {
+            return Err("Cannot delete row without primary key".to_string());
+        }
+
+        let sql = format!(
+            "DELETE FROM {} WHERE {}",
+            confirmation.table_name,
+            where_clauses.join(" AND ")
+        );
+
+        pg_connection
+            .execute_sql(&sql)
+            .await
+            .map_err(|e| format!("Failed to delete row: {e}"))?;
 
         let _ = pg_connection.disconnect().await;
 

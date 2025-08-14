@@ -217,7 +217,6 @@ impl PostgresConnection {
 
     /// Get detailed table metadata
     pub async fn get_table_metadata(&self, table_name: &str) -> Result<TableMetadata> {
-        
         if let Some(pool) = &self.pool {
             // Get basic table info including size
             let size_query = "
@@ -226,33 +225,33 @@ impl PostgresConnection {
                     pg_size_pretty(pg_relation_size($1::regclass)) as table_size,
                     pg_size_pretty(pg_indexes_size($1::regclass)) as indexes_size
             ";
-            
+
             let size_row = sqlx::query(size_query)
                 .bind(format!("public.{}", table_name))
                 .fetch_one(pool)
                 .await?;
-            
+
             let total_size: String = size_row.get("total_size");
             let table_size: String = size_row.get("table_size");
             let indexes_size: String = size_row.get("indexes_size");
-            
+
             // Get row count
             let row_count = self.get_table_row_count(table_name).await?;
-            
+
             // Get column count
             let col_count_query = "
                 SELECT COUNT(*) as count 
                 FROM information_schema.columns 
                 WHERE table_name = $1 AND table_schema = 'public'
             ";
-            
+
             let col_row = sqlx::query(col_count_query)
                 .bind(table_name)
                 .fetch_one(pool)
                 .await?;
-            
+
             let column_count: i64 = col_row.get("count");
-            
+
             // Get primary key columns
             let pk_query = "
                 SELECT kcu.column_name
@@ -265,17 +264,17 @@ impl PostgresConnection {
                     AND tc.table_schema = 'public'
                 ORDER BY kcu.ordinal_position
             ";
-            
+
             let pk_rows = sqlx::query(pk_query)
                 .bind(table_name)
                 .fetch_all(pool)
                 .await?;
-            
+
             let primary_keys: Vec<String> = pk_rows
                 .iter()
                 .map(|row| row.get::<String, _>("column_name"))
                 .collect();
-            
+
             // Get foreign keys
             let fk_query = "
                 SELECT 
@@ -293,12 +292,12 @@ impl PostgresConnection {
                     AND tc.constraint_type = 'FOREIGN KEY'
                     AND tc.table_schema = 'public'
             ";
-            
+
             let fk_rows = sqlx::query(fk_query)
                 .bind(table_name)
                 .fetch_all(pool)
                 .await?;
-            
+
             let foreign_keys: Vec<String> = fk_rows
                 .iter()
                 .map(|row| {
@@ -308,7 +307,7 @@ impl PostgresConnection {
                     format!("{} → {}.{}", column, foreign_table, foreign_column)
                 })
                 .collect();
-            
+
             // Get indexes
             let index_query = "
                 SELECT 
@@ -318,29 +317,29 @@ impl PostgresConnection {
                 WHERE tablename = $1
                     AND schemaname = 'public'
             ";
-            
+
             let index_rows = sqlx::query(index_query)
                 .bind(table_name)
                 .fetch_all(pool)
                 .await?;
-            
+
             let indexes: Vec<String> = index_rows
                 .iter()
                 .map(|row| row.get::<String, _>("indexname"))
                 .collect();
-            
+
             // Get table comment if any
             let comment_query = "
                 SELECT obj_description($1::regclass, 'pg_class') as comment
             ";
-            
+
             let comment_row = sqlx::query(comment_query)
                 .bind(format!("public.{}", table_name))
                 .fetch_one(pool)
                 .await?;
-            
+
             let comment: Option<String> = comment_row.get("comment");
-            
+
             Ok(TableMetadata {
                 table_name: table_name.to_string(),
                 row_count,

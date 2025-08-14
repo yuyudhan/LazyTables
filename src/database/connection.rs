@@ -56,15 +56,15 @@ pub enum ConnectionStatus {
     Failed(String), // Error message
 }
 
-impl Default for SslMode {
-    fn default() -> Self {
-        Self::Prefer
-    }
-}
-
 impl Default for ConnectionStatus {
     fn default() -> Self {
         Self::Disconnected
+    }
+}
+
+impl Default for SslMode {
+    fn default() -> Self {
+        Self::Prefer
     }
 }
 
@@ -92,8 +92,8 @@ pub struct ConnectionConfig {
     pub ssl_mode: SslMode,
     /// Connection timeout in seconds
     pub timeout: Option<u64>,
-    /// Connection status
-    #[serde(default)]
+    /// Connection status (not persisted, always starts as Disconnected)
+    #[serde(skip)]
     pub status: ConnectionStatus,
 }
 
