@@ -18,10 +18,10 @@ Till now we have supported postgres. Can you also get the Mysql, sqlite, mariadb
 Task:
 In the sql writing option i should be able to create new sql file for this database connection, these should get saved at the relevant place in the ~/.lazytables directory. Also in the sql writing option put the feature of vim, to navigate around the words and also hjkl keys. Also pressing i should take me to writing mode. To save sql file, I press :w to close, I press :q.
 
-TASK:
+TASK DONE:
 I hope that you are not loading the entire table when showing, it should load only the values that need to be shown, so we don't hang up the system for large tables.
 
-TASK:
+TASK DONE:
 In the view of the table can you show a light border to the rows and columns so that the cells appear properly?
 
 TASK DONE:
