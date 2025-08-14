@@ -1,0 +1,83 @@
+# LazyTables Light Theme
+
+name = "LazyLight"
+author = "LazyTables Team"
+
+[colors]
+# Core UI colors
+background = "#ffffff"
+foreground = "#4c4f69"
+text = "#000000"
+selection_bg = "#dce0e8"
+cursor = "#dc8a78"
+
+# Pane colors
+pane_background = "#eff1f5"
+border = "#ccd0da"
+active_border = "#1e66f5"
+inactive_pane = "#bcc0cc"
+
+# Component colors
+header_fg = "#8839ef"
+status_bg = "#e6e9ef"
+status_fg = "#4c4f69"
+primary_highlight = "#1e66f5"
+
+# Table colors
+table_header_bg = "#e6e9ef"
+table_header_fg = "#8839ef"
+table_row_bg = "#ffffff"
+table_row_alt_bg = "#f5f5f5"
+selected_cell_bg = "#dce0e8"
+
+# Modal colors
+modal_bg = "#ffffff"
+modal_border = "#1e66f5"
+modal_title = "#1e66f5"
+
+# Input field colors
+input_bg = "#f5f5f5"
+input_fg = "#000000"
+input_border = "#ccd0da"
+input_active_border = "#1e66f5"
+input_placeholder = "#9ca0b0"
+
+# Button colors
+button_bg = "#1e66f5"
+button_fg = "#ffffff"
+button_active_bg = "#0d52bf"
+button_active_fg = "#ffffff"
+
+# Status colors
+success = "#40a02b"
+error = "#d20f39"
+warning = "#df8e1d"
+info = "#209fb5"
+
+# SQL editor colors
+editor_bg = "#f5f5f5"
+editor_fg = "#4c4f69"
+editor_line_number = "#9ca0b0"
+editor_cursor_line = "#e6e9ef"
+editor_selection = "#dce0e8"
+
+# Syntax highlighting
+syntax_keyword = "#8839ef"
+syntax_string = "#40a02b"
+syntax_number = "#fe640b"
+syntax_comment = "#9ca0b0"
+syntax_function = "#1e66f5"
+syntax_operator = "#ea76cb"
+
+# Toast colors
+toast_success_bg = "#d4f4dd"
+toast_error_bg = "#f4d4d4"
+toast_warning_bg = "#f4e6d4"
+toast_info_bg = "#d4e6f4"
+
+# Help colors
+help_bg = "#f5f5f5"
+help_fg = "#4c4f69"
+help_header = "#8839ef"
+help_key = "#1e66f5"
+help_description = "#5c5f77"

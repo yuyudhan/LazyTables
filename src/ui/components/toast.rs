@@ -1,5 +1,6 @@
 // FilePath: src/ui/components/toast.rs
 
+use crate::ui::theme::Theme;
 use ratatui::{
     layout::{Alignment, Rect},
     style::{Color, Modifier, Style},
@@ -68,12 +69,12 @@ impl Toast {
     }
 
     /// Get the style for this toast type
-    fn get_style(&self) -> (Color, &str, Color) {
+    fn get_style(&self, theme: &Theme) -> (Color, &str, Color) {
         match self.toast_type {
-            ToastType::Success => (Color::Green, "✓", Color::Rgb(40, 80, 40)),
-            ToastType::Error => (Color::Red, "✗", Color::Rgb(80, 40, 40)),
-            ToastType::Warning => (Color::Yellow, "⚠", Color::Rgb(80, 80, 40)),
-            ToastType::Info => (Color::Cyan, "ℹ", Color::Rgb(40, 60, 80)),
+            ToastType::Success => (theme.get_color("success"), "✓", theme.get_color("toast_success_bg")),
+            ToastType::Error => (theme.get_color("error"), "✗", theme.get_color("toast_error_bg")),
+            ToastType::Warning => (theme.get_color("warning"), "⚠", theme.get_color("toast_warning_bg")),
+            ToastType::Info => (theme.get_color("info"), "ℹ", theme.get_color("toast_info_bg")),
         }
     }
 }
@@ -147,7 +148,7 @@ impl Default for ToastManager {
 }
 
 /// Render toasts in the top-right corner
-pub fn render_toasts(f: &mut Frame, manager: &ToastManager, area: Rect) {
+pub fn render_toasts(f: &mut Frame, manager: &ToastManager, area: Rect, theme: &Theme) {
     if !manager.has_toasts() {
         return;
     }
@@ -175,13 +176,13 @@ pub fn render_toasts(f: &mut Frame, manager: &ToastManager, area: Rect) {
             height: toast_height,
         };
 
-        render_single_toast(f, toast, toast_area);
+        render_single_toast(f, toast, toast_area, theme);
     }
 }
 
 /// Render a single toast notification
-fn render_single_toast(f: &mut Frame, toast: &Toast, area: Rect) {
-    let (border_color, prefix, bg_color) = toast.get_style();
+fn render_single_toast(f: &mut Frame, toast: &Toast, area: Rect, theme: &Theme) {
+    let (border_color, prefix, bg_color) = toast.get_style(theme);
 
     // Calculate fade based on time remaining
     let elapsed = toast.created_at.elapsed();
@@ -209,7 +210,7 @@ fn render_single_toast(f: &mut Frame, toast: &Toast, area: Rect) {
             ),
             Span::styled(
                 &toast.message,
-                Style::default().fg(Color::Rgb(220, 220, 220)),
+                Style::default().fg(theme.get_color("text")),
             ),
         ]),
     ];
@@ -217,7 +218,7 @@ fn render_single_toast(f: &mut Frame, toast: &Toast, area: Rect) {
     let block = Block::default()
         .borders(Borders::ALL)
         .border_style(border_style)
-        .style(Style::default().bg(bg_color).fg(Color::White));
+        .style(Style::default().bg(bg_color).fg(theme.get_color("text")));
 
     let paragraph = Paragraph::new(content)
         .block(block)
