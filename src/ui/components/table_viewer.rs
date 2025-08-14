@@ -699,9 +699,9 @@ fn render_table_content(f: &mut Frame, tab: &TableTab, area: Rect) {
             };
 
             let name = if col.is_primary_key {
-                format!("🔑 {}", col.name)
+                format!(" 🔑 {} ", col.name)
             } else {
-                col.name.clone()
+                format!(" {} ", col.name)
             };
 
             TableCell::from(name).style(style)
@@ -710,7 +710,8 @@ fn render_table_content(f: &mut Frame, tab: &TableTab, area: Rect) {
 
     let header = Row::new(headers)
         .style(Style::default().add_modifier(Modifier::BOLD))
-        .height(1);
+        .height(1)
+        .bottom_margin(1);
 
     // Prepare table rows
     let rows: Vec<Row> = tab
@@ -729,14 +730,15 @@ fn render_table_content(f: &mut Frame, tab: &TableTab, area: Rect) {
                         == Some(&(row_idx, col_idx));
 
                     let display_value = if is_selected && tab.in_edit_mode {
-                        format!("{}▌", tab.edit_buffer)
+                        format!(" {}▌ ", tab.edit_buffer)
                     } else if is_modified {
-                        tab.modified_cells
+                        let val = tab.modified_cells
                             .get(&(row_idx, col_idx))
                             .cloned()
-                            .unwrap_or_else(|| value.clone())
+                            .unwrap_or_else(|| value.clone());
+                        format!(" {} ", val)
                     } else {
-                        value.clone()
+                        format!(" {} ", value)
                     };
 
                     let style = if is_selected && tab.in_edit_mode {
@@ -769,7 +771,9 @@ fn render_table_content(f: &mut Frame, tab: &TableTab, area: Rect) {
                 })
                 .collect();
 
-            Row::new(cells).height(1)
+            Row::new(cells)
+                .height(1)
+                .bottom_margin(0)
         })
         .collect();
 
