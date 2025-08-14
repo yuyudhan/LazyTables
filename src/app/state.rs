@@ -731,7 +731,7 @@ impl AppState {
                 if path.is_file() && path.extension().is_some_and(|ext| ext == "sql") {
                     if let Some(name) = path.file_stem().and_then(|name| name.to_str()) {
                         if !files.contains(&name.to_string()) {
-                            files.push(format!("../{}", name));
+                            files.push(format!("../{name}"));
                         }
                     }
                 }
@@ -1141,7 +1141,7 @@ impl AppState {
     async fn execute_alter_table_sql(
         &self,
         connection: &ConnectionConfig,
-        sql: &str,
+        _sql: &str,
     ) -> Result<(), String> {
         match connection.database_type {
             DatabaseType::PostgreSQL => {
@@ -1206,7 +1206,7 @@ impl AppState {
     async fn execute_create_table_sql(
         &self,
         connection: &ConnectionConfig,
-        sql: &str,
+        _sql: &str,
     ) -> Result<(), String> {
         match connection.database_type {
             DatabaseType::PostgreSQL => {
@@ -1479,7 +1479,7 @@ impl AppState {
             return Err("Cannot update row without primary key".to_string());
         }
 
-        let sql = format!(
+        let _sql = format!(
             "UPDATE {} SET {} = '{}' WHERE {}",
             update.table_name,
             update.column_name,
@@ -1554,7 +1554,7 @@ impl AppState {
             return Err("Cannot delete row without primary key".to_string());
         }
 
-        let sql = format!(
+        let _sql = format!(
             "DELETE FROM {} WHERE {}",
             confirmation.table_name,
             where_clauses.join(" AND ")
