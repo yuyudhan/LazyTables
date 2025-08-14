@@ -97,7 +97,7 @@ impl ToastManager {
     /// Add a new toast
     pub fn add(&mut self, toast: Toast) {
         self.toasts.push(toast);
-        
+
         // Keep only the most recent toasts
         if self.toasts.len() > self.max_toasts {
             self.toasts.drain(0..self.toasts.len() - self.max_toasts);
@@ -156,25 +156,25 @@ pub fn render_toasts(f: &mut Frame, manager: &ToastManager, area: Rect) {
     let toast_width = 40;
     let toast_height = 3;
     let padding = 1;
-    
+
     // Position toasts in the top-right corner
     let x = area.width.saturating_sub(toast_width + padding);
-    
+
     for (idx, toast) in manager.toasts.iter().enumerate() {
         let y = padding + (idx as u16 * (toast_height + 1));
-        
+
         // Don't render if we're out of vertical space
         if y + toast_height > area.height {
             break;
         }
-        
+
         let toast_area = Rect {
             x,
             y,
             width: toast_width,
             height: toast_height,
         };
-        
+
         render_single_toast(f, toast, toast_area);
     }
 }
@@ -182,40 +182,42 @@ pub fn render_toasts(f: &mut Frame, manager: &ToastManager, area: Rect) {
 /// Render a single toast notification
 fn render_single_toast(f: &mut Frame, toast: &Toast, area: Rect) {
     let (border_color, prefix, bg_color) = toast.get_style();
-    
+
     // Calculate fade based on time remaining
     let elapsed = toast.created_at.elapsed();
     let fade_start = toast.duration.saturating_sub(Duration::from_secs(1));
     let is_fading = elapsed > fade_start;
-    
+
     let border_style = if is_fading {
-        Style::default().fg(border_color).add_modifier(Modifier::DIM)
+        Style::default()
+            .fg(border_color)
+            .add_modifier(Modifier::DIM)
     } else {
-        Style::default().fg(border_color).add_modifier(Modifier::BOLD)
+        Style::default()
+            .fg(border_color)
+            .add_modifier(Modifier::BOLD)
     };
-    
+
     // Format the message with prefix
     let content = vec![
-        Line::from(vec![
-            Span::styled(
-                prefix,
-                Style::default()
-                    .fg(border_color)
-                    .add_modifier(Modifier::BOLD),
-            ),
-        ]),
+        Line::from(vec![Span::styled(
+            prefix,
+            Style::default()
+                .fg(border_color)
+                .add_modifier(Modifier::BOLD),
+        )]),
         Line::from(toast.message.clone()),
     ];
-    
+
     let block = Block::default()
         .borders(Borders::ALL)
         .border_style(border_style)
         .style(Style::default().bg(bg_color));
-    
+
     let paragraph = Paragraph::new(content)
         .block(block)
         .alignment(Alignment::Left)
         .wrap(Wrap { trim: true });
-    
+
     f.render_widget(paragraph, area);
 }
