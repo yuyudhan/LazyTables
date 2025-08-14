@@ -39,6 +39,21 @@ impl UI {
         })
     }
 
+    /// Calculate centered modal area
+    fn center_modal(&self, area: Rect, width_percent: u16, height_percent: u16) -> Rect {
+        let width = (area.width * width_percent / 100).min(area.width);
+        let height = (area.height * height_percent / 100).min(area.height);
+        let x = (area.width.saturating_sub(width)) / 2;
+        let y = (area.height.saturating_sub(height)) / 2;
+
+        Rect {
+            x: area.x + x,
+            y: area.y + y,
+            width,
+            height,
+        }
+    }
+
     /// Draw the entire UI
     pub fn draw(&mut self, frame: &mut Frame, state: &mut AppState) {
         let areas = self.layout_manager.calculate_layout(frame.area());
@@ -72,6 +87,12 @@ impl UI {
             self.draw_help_overlay(frame, frame.area());
         }
 
+        // Cleanup expired toasts
+        state.toast_manager.cleanup();
+        
+        // Draw toast notifications
+        components::toast::render_toasts(frame, &state.toast_manager, frame.area());
+
         // Draw command mode modal if in command mode
         if state.mode == Mode::Command {
             self.draw_command_modal(frame, frame.area(), state);
@@ -83,6 +104,24 @@ impl UI {
                 frame,
                 &state.connection_modal_state,
                 frame.area(),
+            );
+        }
+
+        // Draw table creator if active
+        if state.show_table_creator {
+            crate::ui::components::render_table_creator(
+                frame,
+                &mut state.table_creator_state,
+                self.center_modal(frame.area(), 90, 80),
+            );
+        }
+
+        // Draw table editor if active
+        if state.show_table_editor {
+            crate::ui::components::render_table_editor(
+                frame,
+                &mut state.table_editor_state,
+                self.center_modal(frame.area(), 90, 80),
             );
         }
     }
@@ -388,11 +427,12 @@ impl UI {
             );
 
         // Use stateful widget to show selection
-        let mut list_state = state.tables_list_state.clone();
-        frame.render_stateful_widget(tables, area, &mut list_state);
-
-        // Update the state with any changes
-        state.tables_list_state = list_state;
+        // Adjust selection index if we have tables (account for header)
+        if !state.tables.is_empty() && has_active_connection {
+            // Add 1 to account for the "▼ Tables" header
+            state.tables_list_state.select(Some(state.selected_table + 1));
+        }
+        frame.render_stateful_widget(tables, area, &mut state.tables_list_state);
     }
 
     /// Draw the table details pane
@@ -411,9 +451,6 @@ impl UI {
             .iter()
             .any(|conn| conn.is_connected());
 
-        // For now, we'll assume no table is selected until database integration is complete
-        let has_selected_table = false;
-
         let details_text = if !has_active_connection {
             vec![
                 Line::from(""),
@@ -427,7 +464,93 @@ impl UI {
                     Style::default().fg(Color::Gray),
                 )]),
             ]
-        } else if !has_selected_table {
+        } else if let Some(metadata) = &state.current_table_metadata {
+            // Show actual table metadata
+            let mut lines = vec![
+                Line::from(vec![
+                    Span::styled("Table: ", Style::default().fg(Color::Cyan)),
+                    Span::styled(&metadata.table_name, Style::default().fg(Color::White).add_modifier(Modifier::BOLD)),
+                ]),
+                Line::from(""),
+                Line::from(vec![
+                    Span::styled("Rows: ", Style::default().fg(Color::Cyan)),
+                    Span::styled(format!("{}", metadata.row_count), Style::default().fg(Color::White)),
+                ]),
+                Line::from(vec![
+                    Span::styled("Columns: ", Style::default().fg(Color::Cyan)),
+                    Span::styled(metadata.column_count.to_string(), Style::default().fg(Color::White)),
+                ]),
+                Line::from(""),
+                Line::from(vec![
+                    Span::styled("Total Size: ", Style::default().fg(Color::Cyan)),
+                    Span::styled(&metadata.total_size, Style::default().fg(Color::White)),
+                ]),
+                Line::from(vec![
+                    Span::styled("Table Size: ", Style::default().fg(Color::Cyan)),
+                    Span::styled(&metadata.table_size, Style::default().fg(Color::White)),
+                ]),
+                Line::from(vec![
+                    Span::styled("Indexes Size: ", Style::default().fg(Color::Cyan)),
+                    Span::styled(&metadata.indexes_size, Style::default().fg(Color::White)),
+                ]),
+            ];
+            
+            // Add primary keys if any
+            if !metadata.primary_keys.is_empty() {
+                lines.push(Line::from(""));
+                lines.push(Line::from(vec![
+                    Span::styled("Primary Keys:", Style::default().fg(Color::Yellow).add_modifier(Modifier::BOLD)),
+                ]));
+                for pk in &metadata.primary_keys {
+                    lines.push(Line::from(vec![
+                        Span::raw("  • "),
+                        Span::styled(pk, Style::default().fg(Color::White)),
+                    ]));
+                }
+            }
+            
+            // Add foreign keys if any
+            if !metadata.foreign_keys.is_empty() {
+                lines.push(Line::from(""));
+                lines.push(Line::from(vec![
+                    Span::styled("Foreign Keys:", Style::default().fg(Color::Yellow).add_modifier(Modifier::BOLD)),
+                ]));
+                for fk in &metadata.foreign_keys {
+                    lines.push(Line::from(vec![
+                        Span::raw("  • "),
+                        Span::styled(fk, Style::default().fg(Color::White)),
+                    ]));
+                }
+            }
+            
+            // Add indexes if any
+            if !metadata.indexes.is_empty() {
+                lines.push(Line::from(""));
+                lines.push(Line::from(vec![
+                    Span::styled("Indexes:", Style::default().fg(Color::Yellow).add_modifier(Modifier::BOLD)),
+                ]));
+                for idx in &metadata.indexes {
+                    lines.push(Line::from(vec![
+                        Span::raw("  • "),
+                        Span::styled(idx, Style::default().fg(Color::White)),
+                    ]));
+                }
+            }
+            
+            // Add comment if any
+            if let Some(comment) = &metadata.comment {
+                lines.push(Line::from(""));
+                lines.push(Line::from(vec![
+                    Span::styled("Comment:", Style::default().fg(Color::Yellow).add_modifier(Modifier::BOLD)),
+                ]));
+                lines.push(Line::from(vec![
+                    Span::raw("  "),
+                    Span::styled(comment, Style::default().fg(Color::Gray).add_modifier(Modifier::ITALIC)),
+                ]));
+            }
+            
+            lines
+        } else {
             vec![
                 Line::from(""),
                 Line::from(vec![Span::styled(
@@ -443,21 +566,6 @@ impl UI {
                     "its structure and metadata",
                     Style::default().fg(Color::Gray),
                 )]),
-            ]
-        } else {
-            // Show actual table details (sample data for now)
-            vec![
-                Line::from("Schema: public"),
-                Line::from("Table: users"),
-                Line::from(""),
-                Line::from("Rows: 15,234"),
-                Line::from("Size: 2.4 MB"),
-                Line::from("Created: Jan'24"),
-                Line::from("Modified: Today"),
-                Line::from(""),
-                Line::from("Indexes: 3"),
-                Line::from("Constraints: 2"),
-                Line::from("Relations: 5"),
             ]
         };
 
@@ -475,6 +583,12 @@ impl UI {
 
     /// Draw the tabular output area
     fn draw_tabular_output(&self, frame: &mut Frame, area: Rect, state: &mut AppState) {
+        // Use table viewer if tables are open
+        if !state.table_viewer_state.tabs.is_empty() {
+            crate::ui::components::render_table_viewer(frame, &mut state.table_viewer_state, area);
+            return;
+        }
+
         // Check if table creator is active
         if state.show_table_creator {
             crate::ui::components::render_table_creator(
@@ -867,8 +981,54 @@ impl UI {
             }
         );
 
-        let connection_text = "Connected: production@localhost";
-        let position_text = "Cell: B2 | Mode: Read-Only";
+        // Get real connection info
+        let connection_text = if let Some(connection) = state.connections.connections.get(state.selected_connection) {
+            match &connection.status {
+                ConnectionStatus::Connected => format!("Connected: {}@{}:{}", 
+                    connection.username, 
+                    connection.host,
+                    connection.port
+                ),
+                ConnectionStatus::Connecting => format!("Connecting to {}...", connection.name),
+                ConnectionStatus::Failed(_) => format!("Failed: {}", connection.name),
+                ConnectionStatus::Disconnected => "Not connected".to_string(),
+            }
+        } else {
+            "No connection selected".to_string()
+        };
+
+        // Get real position/context info
+        let position_text = match state.focused_pane {
+            FocusedPane::Connections => format!("Connection {}/{}", 
+                state.selected_connection + 1, 
+                state.connections.connections.len()
+            ),
+            FocusedPane::Tables => {
+                if state.tables.is_empty() {
+                    "No tables".to_string()
+                } else {
+                    format!("Table {}/{}", state.selected_table + 1, state.tables.len())
+                }
+            },
+            FocusedPane::TabularOutput => {
+                if let Some(tab) = state.table_viewer_state.current_tab() {
+                    format!("Row {} Col {} | {}", 
+                        tab.selected_row + 1, 
+                        tab.selected_col + 1,
+                        if tab.in_edit_mode { "EDITING" } else { "READ-ONLY" }
+                    )
+                } else {
+                    "No table open".to_string()
+                }
+            },
+            FocusedPane::QueryWindow => "Query Editor".to_string(),
+            FocusedPane::SqlFiles => format!("SQL Files: {}", state.saved_sql_files.len()),
+            FocusedPane::Details => "Table Details".to_string(),
+        };
+
+        // Get current date and time
+        let now = chrono::Local::now();
+        let datetime_text = now.format("%b %d, %Y  %H:%M:%S").to_string();
 
         // Add help hint when not showing help
         let help_hint = if !state.show_help {
@@ -877,6 +1037,17 @@ impl UI {
             ""
         };
 
+        // Calculate the width of left side content
+        let left_content = format!("{} {} | {} | {}{}",
+            brand, mode_text, connection_text, position_text, help_hint
+        );
+        
+        // Calculate padding needed to right-align the date/time
+        let available_width = area.width as usize;
+        let left_width = left_content.len();
+        let datetime_width = datetime_text.len();
+        let padding_width = available_width.saturating_sub(left_width + datetime_width + 2); // 2 for margins
+        
         let status_line = Line::from(vec![
             Span::styled(
                 brand.as_str(),
@@ -892,10 +1063,17 @@ impl UI {
                     .add_modifier(Modifier::BOLD),
             ),
             Span::raw(" | "),
-            Span::raw(connection_text),
+            Span::raw(&connection_text),
             Span::raw(" | "),
-            Span::raw(position_text),
+            Span::raw(&position_text),
             Span::raw(help_hint),
+            Span::raw(" ".repeat(padding_width)),
+            Span::styled(
+                datetime_text,
+                Style::default()
+                    .fg(Color::Cyan)
+                    .add_modifier(Modifier::ITALIC),
+            ),
         ]);
 
         let status_bar = Paragraph::new(status_line).style(
