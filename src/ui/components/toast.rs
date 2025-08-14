@@ -70,10 +70,10 @@ impl Toast {
     /// Get the style for this toast type
     fn get_style(&self) -> (Color, &str, Color) {
         match self.toast_type {
-            ToastType::Success => (Color::Green, "✓ SUCCESS", Color::Rgb(0, 50, 0)),
-            ToastType::Error => (Color::Red, "✗ ERROR", Color::Rgb(50, 0, 0)),
-            ToastType::Warning => (Color::Yellow, "⚠ WARNING", Color::Rgb(50, 50, 0)),
-            ToastType::Info => (Color::Cyan, "ℹ INFO", Color::Rgb(0, 30, 50)),
+            ToastType::Success => (Color::Green, "✓", Color::Rgb(40, 80, 40)),
+            ToastType::Error => (Color::Red, "✗", Color::Rgb(80, 40, 40)),
+            ToastType::Warning => (Color::Yellow, "⚠", Color::Rgb(80, 80, 40)),
+            ToastType::Info => (Color::Cyan, "ℹ", Color::Rgb(40, 60, 80)),
         }
     }
 }
@@ -152,19 +152,19 @@ pub fn render_toasts(f: &mut Frame, manager: &ToastManager, area: Rect) {
         return;
     }
 
-    // Calculate toast area (top-right corner)
-    let toast_width = 40;
-    let toast_height = 3;
+    // Calculate toast area - make it more visible
+    let toast_width = 50u16.min(area.width.saturating_sub(4));
+    let toast_height = 3; // Give more space for content
     let padding = 1;
 
-    // Position toasts in the top-right corner
-    let x = area.width.saturating_sub(toast_width + padding);
+    // Position toasts in the top-right corner with better positioning
+    let x = area.x + area.width.saturating_sub(toast_width + padding);
 
     for (idx, toast) in manager.toasts.iter().enumerate() {
-        let y = padding + (idx as u16 * (toast_height + 1));
+        let y = area.y + padding + (idx as u16 * (toast_height + 1));
 
         // Don't render if we're out of vertical space
-        if y + toast_height > area.height {
+        if y + toast_height > area.y + area.height {
             break;
         }
 
@@ -198,21 +198,26 @@ fn render_single_toast(f: &mut Frame, toast: &Toast, area: Rect) {
             .add_modifier(Modifier::BOLD)
     };
 
-    // Format the message with prefix
+    // Format the message with prefix on the same line
     let content = vec![
-        Line::from(vec![Span::styled(
-            prefix,
-            Style::default()
-                .fg(border_color)
-                .add_modifier(Modifier::BOLD),
-        )]),
-        Line::from(toast.message.clone()),
+        Line::from(vec![
+            Span::styled(
+                format!("{} ", prefix),
+                Style::default()
+                    .fg(border_color)
+                    .add_modifier(Modifier::BOLD),
+            ),
+            Span::styled(
+                &toast.message,
+                Style::default().fg(Color::Rgb(220, 220, 220)),
+            ),
+        ]),
     ];
 
     let block = Block::default()
         .borders(Borders::ALL)
         .border_style(border_style)
-        .style(Style::default().bg(bg_color));
+        .style(Style::default().bg(bg_color).fg(Color::White));
 
     let paragraph = Paragraph::new(content)
         .block(block)
