@@ -8,6 +8,11 @@
 help:
 	@echo "LazyTables Development Commands:"
 	@echo ""
+	@echo "Installation:"
+	@echo "  make install          - Install LazyTables to /usr/local/bin"
+	@echo "  make install-homebrew - Install via Homebrew formula"
+	@echo "  make uninstall        - Remove LazyTables from system"
+	@echo ""
 	@echo "Development:"
 	@echo "  make dev              - Run application in development mode"
 	@echo "  make build            - Build release binary"
@@ -42,6 +47,21 @@ run:
 
 build:
 	cargo build --release
+
+# Installation
+install: build
+	@echo "Installing LazyTables..."
+	@./scripts/install.sh
+
+install-homebrew:
+	@echo "Installing LazyTables via Homebrew..."
+	@./scripts/install-homebrew.sh
+
+uninstall:
+	@echo "Uninstalling LazyTables..."
+	@sudo rm -f /usr/local/bin/lazytables
+	@brew uninstall lazytables 2>/dev/null || true
+	@echo "LazyTables has been uninstalled"
 
 # Testing & Quality
 test:
