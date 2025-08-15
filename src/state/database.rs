@@ -2,11 +2,11 @@
 
 use crate::{
     database::{
-        connection::ConnectionStorage, ConnectionConfig, ConnectionStatus, 
-        DatabaseType, TableMetadata,
+        connection::ConnectionStorage, ConnectionConfig, ConnectionStatus, DatabaseType,
+        TableMetadata,
     },
     ui::components::{
-        table_viewer::{CellUpdate, DeleteConfirmation, ColumnInfo},
+        table_viewer::{CellUpdate, ColumnInfo, DeleteConfirmation},
         TableViewerState,
     },
 };
@@ -28,7 +28,7 @@ impl DatabaseState {
     /// Create a new database state
     pub fn new() -> Self {
         let connections = ConnectionStorage::load().unwrap_or_default();
-        
+
         Self {
             connections,
             tables: Vec::new(),
@@ -179,8 +179,7 @@ impl DatabaseState {
                             use crate::database::postgres::PostgresConnection;
                             use crate::database::Connection;
 
-                            let mut pg_connection = 
-                                PostgresConnection::new(connection.clone());
+                            let mut pg_connection = PostgresConnection::new(connection.clone());
                             pg_connection
                                 .connect()
                                 .await
@@ -190,9 +189,7 @@ impl DatabaseState {
                             let metadata = pg_connection
                                 .get_table_metadata(table_name)
                                 .await
-                                .map_err(|e| {
-                                    format!("Failed to retrieve metadata: {e}")
-                                })?;
+                                .map_err(|e| format!("Failed to retrieve metadata: {e}"))?;
 
                             self.current_table_metadata = Some(metadata);
 
@@ -277,11 +274,11 @@ impl DatabaseState {
             update.new_value,
             where_clauses.join(" AND ")
         );
-// 
-//         pg_connection
-//             .execute_sql(&sql)
-//             .await
-//             .map_err(|e| format!("Failed to update cell: {e}"))?;
+        //
+        //         pg_connection
+        //             .execute_sql(&sql)
+        //             .await
+        //             .map_err(|e| format!("Failed to update cell: {e}"))?;
 
         let _ = pg_connection.disconnect().await;
 
@@ -432,7 +429,7 @@ impl DatabaseState {
         connection: &ConnectionConfig,
     ) -> Result<Vec<String>, String> {
         use crate::database::Connection;
-        
+
         // Create appropriate connection based on database type
         let mut db_connection: Box<dyn Connection> = match connection.database_type {
             DatabaseType::PostgreSQL => {
@@ -501,8 +498,10 @@ impl DatabaseState {
             .map_err(|e| format!("Failed to retrieve table columns: {e}"))?;
 
         // Convert TableColumn to ColumnDefinition for the editor
-        use crate::ui::components::table_creator::{ColumnDefinition as EditorColumnDef, PostgresDataType};
-        
+        use crate::ui::components::table_creator::{
+            ColumnDefinition as EditorColumnDef, PostgresDataType,
+        };
+
         let editor_columns: Vec<EditorColumnDef> = columns
             .into_iter()
             .map(|col| EditorColumnDef {
@@ -516,7 +515,7 @@ impl DatabaseState {
                 references: None,
             })
             .collect();
-        
+
         // Populate the table editor state with column information
         table_editor_state.columns = editor_columns;
         table_editor_state.original_columns = table_editor_state.columns.clone();

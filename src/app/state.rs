@@ -3,7 +3,7 @@
 use crate::{
     config::Config,
     database::{ConnectionConfig, ConnectionStatus, DatabaseType},
-    state::{DatabaseState, ui::UIState},
+    state::{ui::UIState, DatabaseState},
     ui::components::{
         ConnectionModalState, TableCreatorState, TableEditorState, TableViewerState, ToastManager,
     },
@@ -43,10 +43,10 @@ impl AppState {
 
         let db = DatabaseState::new();
         let saved_sql_files = Vec::new(); // Will be loaded when connection is selected
-        
+
         // Load or create UI state
         let mut ui = UIState::load().unwrap_or_default();
-        
+
         // Update list states based on loaded connections
         ui.update_connection_selection(db.connections.connections.len());
 
@@ -179,7 +179,9 @@ impl AppState {
                 }
             }
             FocusedPane::QueryWindow => {
-                if let Some(current_line) = self.query_content.lines().nth(self.ui.query_cursor_line) {
+                if let Some(current_line) =
+                    self.query_content.lines().nth(self.ui.query_cursor_line)
+                {
                     if self.ui.query_cursor_column < current_line.len() {
                         self.ui.query_cursor_column += 1;
                     }
@@ -193,14 +195,18 @@ impl AppState {
     pub fn get_selected_connection(
         &self,
     ) -> Option<&crate::database::connection::ConnectionConfig> {
-        self.db.connections.connections.get(self.ui.selected_connection)
+        self.db
+            .connections
+            .connections
+            .get(self.ui.selected_connection)
     }
 
     /// Get currently selected connection (mutable)
     pub fn get_selected_connection_mut(
         &mut self,
     ) -> Option<&mut crate::database::connection::ConnectionConfig> {
-        self.db.connections
+        self.db
+            .connections
             .connections
             .get_mut(self.ui.selected_connection)
     }
@@ -219,7 +225,12 @@ impl AppState {
 
     /// Open the edit connection modal for the currently selected connection
     pub fn open_edit_connection_modal(&mut self) {
-        if let Some(connection) = self.db.connections.connections.get(self.ui.selected_connection) {
+        if let Some(connection) = self
+            .db
+            .connections
+            .connections
+            .get(self.ui.selected_connection)
+        {
             self.connection_modal_state
                 .populate_from_connection(connection);
             self.ui.show_edit_connection_modal = true;
@@ -238,7 +249,12 @@ impl AppState {
 
         if self.ui.show_edit_connection_modal {
             // Update existing connection - preserve ID
-            if let Some(existing) = self.db.connections.connections.get(self.ui.selected_connection) {
+            if let Some(existing) = self
+                .db
+                .connections
+                .connections
+                .get(self.ui.selected_connection)
+            {
                 connection.id = existing.id.clone();
                 if let Err(e) = self.db.connections.update_connection(connection) {
                     return Err(format!("Failed to update connection: {e}"));
@@ -264,7 +280,8 @@ impl AppState {
             if self.ui.selected_connection > max_index {
                 self.ui.selected_connection = max_index;
             }
-            self.ui.connections_list_state
+            self.ui
+                .connections_list_state
                 .select(Some(self.ui.selected_connection));
         } else {
             self.ui.selected_connection = 0;
@@ -277,7 +294,8 @@ impl AppState {
         if !self.db.connections.connections.is_empty() {
             let len = self.db.connections.connections.len();
             self.ui.selected_connection = (self.ui.selected_connection + 1) % len;
-            self.ui.connections_list_state
+            self.ui
+                .connections_list_state
                 .select(Some(self.ui.selected_connection));
         }
     }
@@ -291,7 +309,8 @@ impl AppState {
             } else {
                 len - 1
             };
-            self.ui.connections_list_state
+            self.ui
+                .connections_list_state
                 .select(Some(self.ui.selected_connection));
         }
     }
@@ -302,7 +321,9 @@ impl AppState {
             let len = self.db.tables.len();
             self.ui.selected_table = (self.ui.selected_table + 1) % len;
             // Add 1 to account for the "▼ Tables" header in the UI
-            self.ui.tables_list_state.select(Some(self.ui.selected_table + 1));
+            self.ui
+                .tables_list_state
+                .select(Some(self.ui.selected_table + 1));
 
             // Clear metadata when selection changes (will load when Enter is pressed)
             self.db.current_table_metadata = None;
@@ -319,7 +340,9 @@ impl AppState {
                 len - 1
             };
             // Add 1 to account for the "▼ Tables" header in the UI
-            self.ui.tables_list_state.select(Some(self.ui.selected_table + 1));
+            self.ui
+                .tables_list_state
+                .select(Some(self.ui.selected_table + 1));
 
             // Clear metadata when selection changes (will load when Enter is pressed)
             self.db.current_table_metadata = None;
@@ -335,7 +358,9 @@ impl AppState {
                 self.ui.selected_table = max_index;
             }
             // Add 1 to account for the "▼ Tables" header in the UI
-            self.ui.tables_list_state.select(Some(self.ui.selected_table + 1));
+            self.ui
+                .tables_list_state
+                .select(Some(self.ui.selected_table + 1));
         } else {
             self.ui.selected_table = 0;
             self.ui.tables_list_state.select(None);
@@ -410,7 +435,7 @@ impl AppState {
         connection: &ConnectionConfig,
     ) -> Result<Vec<String>, String> {
         use crate::database::Connection;
-        
+
         // Create appropriate connection based on database type
         let mut db_connection: Box<dyn Connection> = match connection.database_type {
             DatabaseType::PostgreSQL => {
@@ -505,14 +530,19 @@ impl AppState {
         use std::fs;
 
         let mut files = Vec::new();
-        
+
         // Get connection-specific directory
-        let connection_name = if let Some(connection) = self.db.connections.connections.get(self.ui.selected_connection) {
+        let connection_name = if let Some(connection) = self
+            .db
+            .connections
+            .connections
+            .get(self.ui.selected_connection)
+        {
             connection.name.clone()
         } else {
             "default".to_string()
         };
-        
+
         // Try connection-specific directory first
         let connection_dir = Config::sql_files_dir().join(&connection_name);
         if let Ok(entries) = fs::read_dir(&connection_dir) {
@@ -525,7 +555,7 @@ impl AppState {
                 }
             }
         }
-        
+
         // Also load from root sql_files directory
         let sql_dir = Config::sql_files_dir();
         if let Ok(entries) = fs::read_dir(&sql_dir) {
@@ -584,7 +614,12 @@ impl AppState {
         use std::fs;
 
         // Get connection-specific directory
-        let connection_name = if let Some(connection) = self.db.connections.connections.get(self.ui.selected_connection) {
+        let connection_name = if let Some(connection) = self
+            .db
+            .connections
+            .connections
+            .get(self.ui.selected_connection)
+        {
             connection.name.clone()
         } else {
             "default".to_string()
@@ -596,7 +631,9 @@ impl AppState {
             Config::sql_files_dir().join(format!("{clean_name}.sql"))
         } else {
             // File from connection-specific directory
-            Config::sql_files_dir().join(&connection_name).join(format!("{filename}.sql"))
+            Config::sql_files_dir()
+                .join(&connection_name)
+                .join(format!("{filename}.sql"))
         };
 
         let content = fs::read_to_string(&file_path)?;
@@ -677,7 +714,7 @@ impl AppState {
         if let Some(current_line) = lines.get(self.ui.query_cursor_line) {
             let chars: Vec<char> = current_line.chars().collect();
             let mut pos = self.ui.query_cursor_column;
-            
+
             // Skip current word
             while pos < chars.len() && !chars[pos].is_whitespace() {
                 pos += 1;
@@ -686,7 +723,7 @@ impl AppState {
             while pos < chars.len() && chars[pos].is_whitespace() {
                 pos += 1;
             }
-            
+
             if pos < chars.len() {
                 self.ui.query_cursor_column = pos;
             } else if self.ui.query_cursor_line < lines.len() - 1 {
@@ -706,10 +743,10 @@ impl AppState {
 
         if let Some(current_line) = lines.get(self.ui.query_cursor_line) {
             let chars: Vec<char> = current_line.chars().collect();
-            
+
             if self.ui.query_cursor_column > 0 {
                 let mut pos = self.ui.query_cursor_column - 1;
-                
+
                 // Skip whitespace
                 while pos > 0 && chars[pos].is_whitespace() {
                     pos -= 1;
@@ -718,7 +755,7 @@ impl AppState {
                 while pos > 0 && !chars[pos - 1].is_whitespace() {
                     pos -= 1;
                 }
-                
+
                 self.ui.query_cursor_column = pos;
             } else if self.ui.query_cursor_line > 0 {
                 // Move to end of previous line
@@ -740,7 +777,7 @@ impl AppState {
         if let Some(current_line) = lines.get(self.ui.query_cursor_line) {
             let chars: Vec<char> = current_line.chars().collect();
             let mut pos = self.ui.query_cursor_column;
-            
+
             if pos < chars.len() - 1 {
                 pos += 1;
                 // Skip to end of current word
@@ -768,7 +805,12 @@ impl AppState {
     /// Save current SQL file with connection-specific directory
     pub fn save_sql_file_with_connection(&mut self) -> Result<(), String> {
         // Get the current connection name
-        let connection_name = if let Some(connection) = self.db.connections.connections.get(self.ui.selected_connection) {
+        let connection_name = if let Some(connection) = self
+            .db
+            .connections
+            .connections
+            .get(self.ui.selected_connection)
+        {
             connection.name.clone()
         } else {
             "default".to_string()
@@ -787,14 +829,14 @@ impl AppState {
         };
 
         let file_path = sql_dir.join(&filename);
-        
+
         std::fs::write(&file_path, &self.query_content)
             .map_err(|e| format!("Failed to save file: {e}"))?;
 
         self.ui.current_sql_file = Some(filename);
         self.ui.query_modified = false;
         self.refresh_sql_files();
-        
+
         Ok(())
     }
 
@@ -845,7 +887,12 @@ impl AppState {
                     // Load table schema based on database type
                     match connection.database_type {
                         DatabaseType::PostgreSQL => {
-                            self.db.load_table_editor_from_database(&connection, table_name, &mut self.table_editor_state)
+                            self.db
+                                .load_table_editor_from_database(
+                                    &connection,
+                                    table_name,
+                                    &mut self.table_editor_state,
+                                )
                                 .await
                         }
                         _ => Err(format!(
@@ -860,7 +907,6 @@ impl AppState {
             Err("No connection selected".to_string())
         }
     }
-
 
     /// Apply table edits from table editor state
     pub async fn apply_table_edits_from_editor(&mut self) -> Result<(), String> {
@@ -913,11 +959,11 @@ impl AppState {
                     .connect()
                     .await
                     .map_err(|e| format!("Connection failed: {e}"))?;
-// 
-//                 pg_connection
-//                     .execute_sql(sql)
-//                     .await
-//                     .map_err(|e| format!("Failed to execute ALTER TABLE: {e}"))?;
+                //
+                //                 pg_connection
+                //                     .execute_sql(sql)
+                //                     .await
+                //                     .map_err(|e| format!("Failed to execute ALTER TABLE: {e}"))?;
 
                 let _ = pg_connection.disconnect().await;
 
@@ -980,11 +1026,11 @@ impl AppState {
                     .await
                     .map_err(|e| format!("Connection failed: {e}"))?;
 
-//                 // Execute the CREATE TABLE statement
-//                 pg_connection
-//                     .execute_sql(sql)
-//                     .await
-//                     .map_err(|e| format!("Failed to create table: {e}"))?;
+                //                 // Execute the CREATE TABLE statement
+                //                 pg_connection
+                //                     .execute_sql(sql)
+                //                     .await
+                //                     .map_err(|e| format!("Failed to create table: {e}"))?;
 
                 let _ = pg_connection.disconnect().await;
 
@@ -1024,13 +1070,20 @@ impl AppState {
 
     /// Load table data for a specific tab
     pub async fn load_table_data(&mut self, tab_idx: usize) -> Result<(), String> {
-        self.db.load_table_data(&mut self.table_viewer_state, self.ui.selected_connection, tab_idx).await
+        self.db
+            .load_table_data(
+                &mut self.table_viewer_state,
+                self.ui.selected_connection,
+                tab_idx,
+            )
+            .await
     }
-
 
     /// Load table metadata for the details pane
     pub async fn load_table_metadata(&mut self, table_name: &str) -> Result<(), String> {
-        self.db.load_table_metadata(table_name, self.ui.selected_connection).await
+        self.db
+            .load_table_metadata(table_name, self.ui.selected_connection)
+            .await
     }
 
     /// Update a cell in the database
@@ -1038,18 +1091,20 @@ impl AppState {
         &mut self,
         update: crate::ui::components::table_viewer::CellUpdate,
     ) -> Result<(), String> {
-        self.db.update_table_cell(update, self.ui.selected_connection).await
+        self.db
+            .update_table_cell(update, self.ui.selected_connection)
+            .await
     }
-
 
     /// Delete a row from the database
     pub async fn delete_table_row(
         &mut self,
         confirmation: crate::ui::components::table_viewer::DeleteConfirmation,
     ) -> Result<(), String> {
-        self.db.delete_table_row(confirmation, self.ui.selected_connection).await
+        self.db
+            .delete_table_row(confirmation, self.ui.selected_connection)
+            .await
     }
-
 
     /// Reload current table tab data
     pub async fn reload_current_table_tab(&mut self) -> Result<(), String> {
