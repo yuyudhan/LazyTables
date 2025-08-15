@@ -2,7 +2,7 @@ class Lazytables < Formula
   desc "Terminal-based SQL database viewer and editor with vim-style navigation"
   homepage "https://github.com/yuyudhan/LazyTables"
   url "https://github.com/yuyudhan/LazyTables/archive/refs/tags/v0.1.3.tar.gz"
-  sha256 "PLACEHOLDER_SHA256"  # Will be updated after release
+  sha256 "b03f7b67909177ff4af0c71f133e07843fef4f7fd6910122597b70ee5e66f2ff"  # Will be updated after release
   license "WTFPL"
   version "0.1.3"
 
