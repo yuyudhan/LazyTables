@@ -1,136 +1,206 @@
-# LazyTables Developer Documentation
+# LazyTables Developer Guide
 
-Welcome to the LazyTables developer documentation! This directory contains comprehensive guides for contributing to and working with LazyTables.
+Technical documentation for LazyTables contributors and developers.
 
-## Documentation Index
+## 📚 Documentation Index
 
-### 📚 Core Documentation
+### Getting Started
+1. **[Getting Started](001-getting-started.md)** - Development environment setup
+2. **[Architecture](002-architecture.md)** - System design and architecture
+3. **[Development Commands](003-development-commands.md)** - Useful make commands
+4. **[Project Structure](004-project-structure.md)** - Codebase organization
 
-1. **[001 - Getting Started](001-getting-started.md)**
-   - Development environment setup
-   - Prerequisites and dependencies
-   - First development session
-   - Troubleshooting common issues
+### Implementation
+5. **[Database Support](005-database-support.md)** - Database adapter implementation
+6. **[Testing](006-testing.md)** - Testing guidelines and strategies
+7. **[Contributing](007-contributing.md)** - How to contribute
+8. **[UI Design](008-ui-design-specs.md)** - Terminal UI specifications
 
-2. **[002 - Architecture](002-architecture.md)**
-   - Design philosophy and principles
-   - Four-pane layout system
-   - Component architecture
-   - Performance considerations
-
-3. **[003 - Development Commands](003-development-commands.md)**
-   - Complete Makefile reference
-   - Cargo command alternatives
-   - Environment variables
-   - Performance testing commands
-
-4. **[004 - Project Structure](004-project-structure.md)**
-   - Repository organization
-   - Source code structure
-   - Module dependencies
-   - File naming conventions
-
-### 🗄️ Database & Testing
-
-5. **[005 - Database Support](005-database-support.md)**
-   - Current and planned database support
-   - Database adapter architecture
-   - Implementation guidelines
-   - Connection management
-
-6. **[006 - Testing](006-testing.md)**
-   - Testing philosophy and strategy
-   - Unit, integration, and TUI tests
-   - Test database setup
-   - Performance testing
-
-### 🤝 Contributing
-
-7. **[007 - Contributing](007-contributing.md)**
-   - Contribution workflow
-   - Coding standards
-   - Pull request guidelines
-   - Community guidelines
-
-## Quick Start
-
-New to LazyTables development? Start here:
-
-1. **Set up your environment**: [001 - Getting Started](001-getting-started.md)
-2. **Understand the architecture**: [002 - Architecture](002-architecture.md)
-3. **Learn the project structure**: [004 - Project Structure](004-project-structure.md)
-4. **Read the contribution guide**: [007 - Contributing](007-contributing.md)
-
-## Development Workflow
+## 🚀 Quick Start
 
 ```bash
-# 1. Initial setup
-git clone git@github.com:yuyudhan/LazyTables.git
+# 1. Clone the repository
+git clone https://github.com/yuyudhan/LazyTables.git
 cd LazyTables
+
+# 2. Install Rust (if not already installed)
+curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
+
+# 3. Install development dependencies
 make install-deps
 
-# 2. Start development
-make dev              # Auto-reload development mode
+# 4. Run in development mode
+make dev
 
-# 3. Run tests
-make test            # Run all tests
-make lint            # Check code quality
-
-# 4. Test with database
-make db-up           # Start PostgreSQL
-make db-down         # Stop PostgreSQL
+# 5. Run tests
+make test
 ```
 
-## Key Resources
+## 🏗️ Architecture Overview
 
-- **[Project README](../../README.md)**: User-facing documentation
-- **[PRD.md](../../PRD.md)**: Product Requirements Document
-- **[CLAUDE.md](../../CLAUDE.md)**: AI assistant instructions
-- **[GitHub Issues](https://github.com/yuyudhan/LazyTables/issues)**: Bug reports and features
-- **[GitHub Discussions](https://github.com/yuyudhan/LazyTables/discussions)**: Community discussions
-
-## Architecture Overview
-
-LazyTables uses a **four-pane terminal UI** built with Rust and Ratatui:
+LazyTables uses a **six-pane terminal UI** built with Rust and Ratatui:
 
 ```
-┌─────────────┬─────────────────────────────┐
-│ Connections │                             │
-├─────────────┤                             │
-│ Tables/     │        Main Content         │
-│ Views       │          Area               │
-├─────────────┤                             │
-│ Table       │                             │
-│ Details     │                             │
-└─────────────┴─────────────────────────────┘
+┌─────────────┬──────────────────┬──────┐
+│ Connections │  Query Results   │ SQL  │
+├─────────────┼──────────────────┤ Files│
+│ Tables/     ├──────────────────┤      │
+│ Views       │  SQL Editor      │      │
+├─────────────┤                  │      │
+│ Table       │                  │      │
+│ Details     │                  │      │
+└─────────────┴──────────────────┴──────┘
 ```
 
-**Navigation**: Vim-style with `h/j/k/l` and `Ctrl+h/j/k/l` for pane switching
+### Key Components
 
-**Performance Goals**:
-- Startup: < 100ms
-- Query display: < 50ms for first results
-- Scrolling: 60 FPS
-- Memory: < 50MB base usage
+- **TUI Framework**: Ratatui with crossterm backend
+- **Database Layer**: SQLx with async support
+- **State Management**: Application state with event-driven updates
+- **Security**: AES-GCM encryption for credentials
+- **Configuration**: TOML-based configuration
 
-## Current Status
+## 🛠️ Development Workflow
 
-🚧 **Active Development**: LazyTables is in early development with PostgreSQL support being implemented first.
+### 1. Feature Development
 
-**Next Priorities**:
-1. Complete PostgreSQL adapter
-2. Implement basic TUI navigation
-3. Add MySQL and SQLite support
-4. Develop query editor functionality
+```bash
+# Create feature branch
+git checkout -b feature/your-feature
 
-## Getting Help
+# Run in watch mode
+make dev
 
-- **New to the project?** Start with [Getting Started](001-getting-started.md)
-- **Architecture questions?** See [Architecture](002-architecture.md)
-- **Want to contribute?** Read [Contributing](007-contributing.md)
-- **Found a bug?** Check [GitHub Issues](https://github.com/yuyudhan/LazyTables/issues)
-- **Need support?** Join [GitHub Discussions](https://github.com/yuyudhan/LazyTables/discussions)
+# Test your changes
+make test
+make lint
+```
+
+### 2. Database Testing
+
+```bash
+# Start test database
+make db-up
+
+# View logs
+make db-logs
+
+# Reset database
+make db-reset
+
+# Stop database
+make db-down
+```
+
+### 3. Code Quality
+
+```bash
+# Format code
+make format
+
+# Run linter
+make lint
+
+# Run all checks
+make check
+```
+
+## 📊 Performance Goals
+
+- **Startup**: < 100ms
+- **Query Display**: < 50ms for first results
+- **Scrolling**: 60 FPS smooth
+- **Memory**: < 50MB base usage
+- **Large Datasets**: Virtual scrolling for millions of rows
+
+## 🔧 Key Technologies
+
+- **Rust 1.70+** - Systems programming language
+- **Ratatui** - Terminal UI framework
+- **SQLx** - Async SQL toolkit
+- **Tokio** - Async runtime
+- **Crossterm** - Cross-platform terminal manipulation
+
+## 📝 Coding Standards
+
+### Rust Best Practices
+- Use `Result<T, E>` for error handling
+- Prefer `&str` over `String` for function parameters
+- Use `clippy` for linting
+- Write doc comments for public APIs
+- Keep functions small and focused
+
+### File Organization
+```rust
+// FilePath: src/module/file.rs
+
+// Module imports
+use crate::prelude::*;
+
+// External imports
+use external_crate::Type;
+
+// Module implementation
+impl Module {
+    // Public methods first
+    pub fn public_method() {}
+    
+    // Private methods last
+    fn private_method() {}
+}
+```
+
+### Commit Messages
+Follow conventional commits:
+```
+feat: add PostgreSQL connection pooling
+fix: resolve cursor position in SQL editor
+docs: update installation guide
+test: add integration tests for MySQL adapter
+```
+
+## 🧪 Testing Strategy
+
+### Test Types
+- **Unit Tests**: Individual functions and methods
+- **Integration Tests**: Database adapters and TUI components
+- **End-to-End Tests**: Full application workflows
+
+### Running Tests
+```bash
+# All tests
+make test
+
+# Specific module
+cargo test database::
+
+# With output
+cargo test -- --nocapture
+```
+
+## 🤝 Contributing
+
+1. **Fork** the repository
+2. **Create** a feature branch
+3. **Implement** your feature with tests
+4. **Ensure** all tests pass
+5. **Submit** a pull request
+
+See [Contributing Guide](007-contributing.md) for details.
+
+## 📚 Resources
+
+- [Rust Book](https://doc.rust-lang.org/book/)
+- [Ratatui Documentation](https://ratatui.rs/)
+- [SQLx Documentation](https://github.com/launchbadge/sqlx)
+- [Vim Motion Reference](https://vim.rtorr.com/)
+
+## 🆘 Getting Help
+
+- **Issues**: [GitHub Issues](https://github.com/yuyudhan/LazyTables/issues)
+- **Discussions**: [GitHub Discussions](https://github.com/yuyudhan/LazyTables/discussions)
+- **Documentation**: This guide and inline code comments
 
 ---
 
-**Ready to contribute?** We'd love your help making LazyTables the best terminal database tool! 🚀
+**Ready to contribute?** Start with [Getting Started](001-getting-started.md)!
