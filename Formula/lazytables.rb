@@ -4,40 +4,33 @@ class Lazytables < Formula
   license "WTFPL"
   version "0.1.3"
   
-  # Binary releases for different architectures
-  if OS.mac?
-    if Hardware::CPU.arm?
-      url "https://github.com/yuyudhan/LazyTables/releases/download/v0.1.3/lazytables-v0.1.3-aarch64-apple-darwin.tar.gz"
-      sha256 "PLACEHOLDER_SHA256_ARM64"  # Will be updated when release is created
-    else
-      url "https://github.com/yuyudhan/LazyTables/releases/download/v0.1.3/lazytables-v0.1.3-x86_64-apple-darwin.tar.gz"
-      sha256 "PLACEHOLDER_SHA256_X86_64"  # Will be updated when release is created
-    end
-  elsif OS.linux?
-    url "https://github.com/yuyudhan/LazyTables/releases/download/v0.1.3/lazytables-v0.1.3-x86_64-unknown-linux-gnu.tar.gz"
-    sha256 "PLACEHOLDER_SHA256_LINUX"  # Will be updated when release is created
-  end
+  # For now, build from source until we have GitHub releases set up
+  # Once releases are available, this will download prebuilt binaries
+  url "https://github.com/yuyudhan/LazyTables.git",
+      branch: "main",
+      shallow: false
   
-  # Fallback to building from source if binary not available
-  head do
-    url "https://github.com/yuyudhan/LazyTables.git", branch: "main"
-    depends_on "rust" => :build
-  end
+  # Future: Use prebuilt binaries when available
+  # if OS.mac? && Hardware::CPU.arm?
+  #   url "https://github.com/yuyudhan/LazyTables/releases/download/v0.1.3/lazytables-v0.1.3-aarch64-apple-darwin.tar.gz"
+  #   sha256 "50ead865a44f5d57fa00e6606cbbd5a67b9a9779513352744d37b7e66b950ddc"
+  # elsif OS.mac? && Hardware::CPU.intel?
+  #   url "https://github.com/yuyudhan/LazyTables/releases/download/v0.1.3/lazytables-v0.1.3-x86_64-apple-darwin.tar.gz"
+  #   sha256 "PLACEHOLDER_SHA256_X86_64"
+  # elsif OS.linux?
+  #   url "https://github.com/yuyudhan/LazyTables/releases/download/v0.1.3/lazytables-v0.1.3-x86_64-unknown-linux-gnu.tar.gz"
+  #   sha256 "PLACEHOLDER_SHA256_LINUX"
+  # end
   
-  # Option to build from source
-  option "with-source", "Build from source instead of using precompiled binary"
+  # Also support HEAD installations for development
+  head "https://github.com/yuyudhan/LazyTables.git", branch: "development"
   
-  depends_on "rust" => :build if build.with?("source") || build.head?
+  depends_on "rust" => :build
 
   def install
-    if build.with?("source") || build.head?
-      # Build from source
-      system "cargo", "build", "--release", "--locked"
-      bin.install "target/release/lazytables"
-    else
-      # Install precompiled binary
-      bin.install "lazytables"
-    end
+    # Build from source for now
+    system "cargo", "build", "--release", "--locked"
+    bin.install "target/release/lazytables"
     
     # Create configuration directories
     (var/"lazytables").mkpath
