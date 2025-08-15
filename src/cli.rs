@@ -34,7 +34,7 @@ pub struct Cli {
     /// Start in read-only mode
     #[arg(short = 'r', long)]
     pub read_only: bool,
-    
+
     /// Theme management commands
     #[command(subcommand)]
     pub theme: Option<Commands>,
