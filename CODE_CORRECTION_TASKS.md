@@ -3,11 +3,18 @@
 ## Overview
 Individual tasks for incrementally refactoring LazyTables into a maintainable, extensible architecture. Each task is self-contained and can be completed independently.
 
+## Priority Legend
+- **[CRITICAL]** - Essential for core architecture and extensibility
+- **[HIGH PRIORITY]** - Important for maintainability and design quality  
+- **[MEDIUM PRIORITY]** - Valuable but can be deferred
+- **[LOW PRIORITY]** - Nice to have, can be done later
+- **[COMPLETED]** - Already implemented
+
 ---
 
 ## Phase 1: Core Architecture Tasks
 
-### Task 1: Extract Constants and Magic Numbers
+### Task 1: Extract Constants and Magic Numbers **[COMPLETED]**
 **Goal:** Remove all hardcoded values from the codebase and centralize them.
 
 **Requirements:**
@@ -22,7 +29,7 @@ Individual tasks for incrementally refactoring LazyTables into a maintainable, e
 
 ---
 
-### Task 2: Create Error Type Hierarchy
+### Task 2: Create Error Type Hierarchy **[CRITICAL]**
 **Goal:** Implement consistent error handling across the application.
 
 **Requirements:**
@@ -34,7 +41,7 @@ Individual tasks for incrementally refactoring LazyTables into a maintainable, e
 
 ---
 
-### Task 3: Extract Theme System
+### Task 3: Extract Theme System **[COMPLETED]**
 **Goal:** Centralize all UI styling and colors into a configurable theme system.
 
 **Requirements:**
@@ -46,7 +53,7 @@ Individual tasks for incrementally refactoring LazyTables into a maintainable, e
 
 ---
 
-### Task 4: Implement Command Trait
+### Task 4: Implement Command Trait **[HIGH PRIORITY]**
 **Goal:** Create a command system to replace direct key handling.
 
 **Requirements:**
@@ -58,7 +65,7 @@ Individual tasks for incrementally refactoring LazyTables into a maintainable, e
 
 ---
 
-### Task 5: Split AppState - UI State
+### Task 5: Split AppState - UI State **[CRITICAL]**
 **Goal:** Extract UI-related state from the monolithic AppState.
 
 **Requirements:**
@@ -70,7 +77,7 @@ Individual tasks for incrementally refactoring LazyTables into a maintainable, e
 
 ---
 
-### Task 6: Split AppState - Database State
+### Task 6: Split AppState - Database State **[CRITICAL]**
 **Goal:** Extract database-related state from AppState.
 
 **Requirements:**
@@ -82,7 +89,7 @@ Individual tasks for incrementally refactoring LazyTables into a maintainable, e
 
 ---
 
-### Task 7: Split AppState - Editor State
+### Task 7: Split AppState - Editor State **[HIGH PRIORITY]**
 **Goal:** Extract editor-related state from AppState.
 
 **Requirements:**
@@ -94,7 +101,7 @@ Individual tasks for incrementally refactoring LazyTables into a maintainable, e
 
 ---
 
-### Task 8: Create Event System
+### Task 8: Create Event System **[HIGH PRIORITY]**
 **Goal:** Implement an event bus for component communication.
 
 **Requirements:**
@@ -108,7 +115,7 @@ Individual tasks for incrementally refactoring LazyTables into a maintainable, e
 
 ## Phase 2: UI Component Tasks
 
-### Task 9: Create UIComponent Trait
+### Task 9: Create UIComponent Trait **[HIGH PRIORITY]**
 **Goal:** Define a standard interface for all UI components.
 
 **Requirements:**
@@ -120,7 +127,7 @@ Individual tasks for incrementally refactoring LazyTables into a maintainable, e
 
 ---
 
-### Task 10: Extract Table Component
+### Task 10: Extract Table Component **[MEDIUM PRIORITY]**
 **Goal:** Create a reusable table component from existing code.
 
 **Requirements:**
@@ -132,7 +139,7 @@ Individual tasks for incrementally refactoring LazyTables into a maintainable, e
 
 ---
 
-### Task 11: Extract Input Component
+### Task 11: Extract Input Component **[MEDIUM PRIORITY]**
 **Goal:** Create a reusable input field component.
 
 **Requirements:**
@@ -144,7 +151,7 @@ Individual tasks for incrementally refactoring LazyTables into a maintainable, e
 
 ---
 
-### Task 12: Extract Modal Component
+### Task 12: Extract Modal Component **[MEDIUM PRIORITY]**
 **Goal:** Create a reusable modal dialog component.
 
 **Requirements:**
@@ -156,7 +163,7 @@ Individual tasks for incrementally refactoring LazyTables into a maintainable, e
 
 ---
 
-### Task 13: Create Layout System
+### Task 13: Create Layout System **[HIGH PRIORITY]**
 **Goal:** Implement a flexible layout system for UI arrangement.
 
 **Requirements:**
@@ -168,7 +175,7 @@ Individual tasks for incrementally refactoring LazyTables into a maintainable, e
 
 ---
 
-### Task 14: Implement Focus Manager
+### Task 14: Implement Focus Manager **[MEDIUM PRIORITY]**
 **Goal:** Create a centralized focus management system.
 
 **Requirements:**
@@ -182,7 +189,7 @@ Individual tasks for incrementally refactoring LazyTables into a maintainable, e
 
 ## Phase 3: Database Tasks
 
-### Task 15: Create Database Connection Trait
+### Task 15: Create Database Connection Trait **[CRITICAL]**
 **Goal:** Define a unified interface for all database adapters.
 
 **Requirements:**
@@ -194,7 +201,7 @@ Individual tasks for incrementally refactoring LazyTables into a maintainable, e
 
 ---
 
-### Task 16: Implement Query Builder
+### Task 16: Implement Query Builder **[HIGH PRIORITY]**
 **Goal:** Create a type-safe SQL query builder.
 
 **Requirements:**
@@ -206,7 +213,7 @@ Individual tasks for incrementally refactoring LazyTables into a maintainable, e
 
 ---
 
-### Task 17: Standardize Database Adapters
+### Task 17: Standardize Database Adapters **[HIGH PRIORITY]**
 **Goal:** Ensure all database adapters follow the same pattern.
 
 **Requirements:**
@@ -218,7 +225,7 @@ Individual tasks for incrementally refactoring LazyTables into a maintainable, e
 
 ---
 
-### Task 18: Add Connection Pool
+### Task 18: Add Connection Pool **[MEDIUM PRIORITY]**
 **Goal:** Implement proper database connection pooling.
 
 **Requirements:**
@@ -232,7 +239,7 @@ Individual tasks for incrementally refactoring LazyTables into a maintainable, e
 
 ## Phase 4: Configuration Tasks
 
-### Task 19: Create Configuration System
+### Task 19: Create Configuration System **[HIGH PRIORITY]**
 **Goal:** Implement comprehensive configuration management.
 
 **Requirements:**
@@ -244,7 +251,7 @@ Individual tasks for incrementally refactoring LazyTables into a maintainable, e
 
 ---
 
-### Task 20: Implement Keybinding Configuration
+### Task 20: Implement Keybinding Configuration **[MEDIUM PRIORITY]**
 **Goal:** Make all keybindings configurable.
 
 **Requirements:**
@@ -256,7 +263,7 @@ Individual tasks for incrementally refactoring LazyTables into a maintainable, e
 
 ---
 
-### Task 21: Add Plugin Configuration
+### Task 21: Add Plugin Configuration **[HIGH PRIORITY]**
 **Goal:** Create configuration structure for plugins.
 
 **Requirements:**
@@ -270,7 +277,7 @@ Individual tasks for incrementally refactoring LazyTables into a maintainable, e
 
 ## Phase 5: Key Handler Refactoring Tasks
 
-### Task 22: Extract Normal Mode Handler
+### Task 22: Extract Normal Mode Handler **[HIGH PRIORITY]**
 **Goal:** Move Normal mode key handling to separate module.
 
 **Requirements:**
@@ -282,7 +289,7 @@ Individual tasks for incrementally refactoring LazyTables into a maintainable, e
 
 ---
 
-### Task 23: Extract Query Mode Handler
+### Task 23: Extract Query Mode Handler **[HIGH PRIORITY]**
 **Goal:** Move Query mode key handling to separate module.
 
 **Requirements:**
@@ -294,7 +301,7 @@ Individual tasks for incrementally refactoring LazyTables into a maintainable, e
 
 ---
 
-### Task 24: Extract Modal Handlers
+### Task 24: Extract Modal Handlers **[MEDIUM PRIORITY]**
 **Goal:** Move modal dialog key handling to separate modules.
 
 **Requirements:**
@@ -306,7 +313,7 @@ Individual tasks for incrementally refactoring LazyTables into a maintainable, e
 
 ---
 
-### Task 25: Create Input Mapper
+### Task 25: Create Input Mapper **[HIGH PRIORITY]**
 **Goal:** Implement configurable input mapping system.
 
 **Requirements:**
@@ -320,7 +327,7 @@ Individual tasks for incrementally refactoring LazyTables into a maintainable, e
 
 ## Phase 6: Plugin System Tasks
 
-### Task 26: Define Plugin Trait
+### Task 26: Define Plugin Trait **[CRITICAL]**
 **Goal:** Create the plugin system interface.
 
 **Requirements:**
@@ -332,7 +339,7 @@ Individual tasks for incrementally refactoring LazyTables into a maintainable, e
 
 ---
 
-### Task 27: Implement Plugin Loader
+### Task 27: Implement Plugin Loader **[HIGH PRIORITY]**
 **Goal:** Create dynamic plugin loading system.
 
 **Requirements:**
@@ -344,7 +351,7 @@ Individual tasks for incrementally refactoring LazyTables into a maintainable, e
 
 ---
 
-### Task 28: Create Plugin API
+### Task 28: Create Plugin API **[CRITICAL]**
 **Goal:** Define the API exposed to plugins.
 
 **Requirements:**
@@ -356,7 +363,7 @@ Individual tasks for incrementally refactoring LazyTables into a maintainable, e
 
 ---
 
-### Task 29: Build Example Plugin
+### Task 29: Build Example Plugin **[MEDIUM PRIORITY]**
 **Goal:** Create a demonstration plugin.
 
 **Requirements:**
@@ -370,7 +377,7 @@ Individual tasks for incrementally refactoring LazyTables into a maintainable, e
 
 ## Phase 7: Performance Tasks
 
-### Task 30: Implement Lazy Loading
+### Task 30: Implement Lazy Loading **[HIGH PRIORITY]**
 **Goal:** Add lazy loading for large datasets.
 
 **Requirements:**
@@ -382,7 +389,7 @@ Individual tasks for incrementally refactoring LazyTables into a maintainable, e
 
 ---
 
-### Task 31: Add Render Optimization
+### Task 31: Add Render Optimization **[MEDIUM PRIORITY]**
 **Goal:** Optimize UI rendering performance.
 
 **Requirements:**
@@ -394,7 +401,7 @@ Individual tasks for incrementally refactoring LazyTables into a maintainable, e
 
 ---
 
-### Task 32: Implement Async Operations
+### Task 32: Implement Async Operations **[HIGH PRIORITY]**
 **Goal:** Convert blocking operations to async.
 
 **Requirements:**
@@ -408,7 +415,7 @@ Individual tasks for incrementally refactoring LazyTables into a maintainable, e
 
 ## Phase 8: Testing Tasks
 
-### Task 33: Add Unit Tests for Commands
+### Task 33: Add Unit Tests for Commands **[MEDIUM PRIORITY]**
 **Goal:** Create comprehensive command testing.
 
 **Requirements:**
@@ -420,7 +427,7 @@ Individual tasks for incrementally refactoring LazyTables into a maintainable, e
 
 ---
 
-### Task 34: Add Integration Tests
+### Task 34: Add Integration Tests **[MEDIUM PRIORITY]**
 **Goal:** Test component interactions.
 
 **Requirements:**
@@ -432,7 +439,7 @@ Individual tasks for incrementally refactoring LazyTables into a maintainable, e
 
 ---
 
-### Task 35: Add Performance Benchmarks
+### Task 35: Add Performance Benchmarks **[LOW PRIORITY]**
 **Goal:** Create performance testing suite.
 
 **Requirements:**
@@ -446,7 +453,7 @@ Individual tasks for incrementally refactoring LazyTables into a maintainable, e
 
 ## Phase 9: Documentation Tasks
 
-### Task 36: Document Public APIs
+### Task 36: Document Public APIs **[LOW PRIORITY]**
 **Goal:** Add comprehensive API documentation.
 
 **Requirements:**
@@ -458,7 +465,7 @@ Individual tasks for incrementally refactoring LazyTables into a maintainable, e
 
 ---
 
-### Task 37: Create Architecture Documentation
+### Task 37: Create Architecture Documentation **[LOW PRIORITY]**
 **Goal:** Document the system architecture.
 
 **Requirements:**
@@ -472,7 +479,7 @@ Individual tasks for incrementally refactoring LazyTables into a maintainable, e
 
 ## Phase 10: Final Cleanup Tasks
 
-### Task 38: Remove Dead Code
+### Task 38: Remove Dead Code **[LOW PRIORITY]**
 **Goal:** Clean up unused code and dependencies.
 
 **Requirements:**
@@ -484,7 +491,7 @@ Individual tasks for incrementally refactoring LazyTables into a maintainable, e
 
 ---
 
-### Task 39: Standardize Code Style
+### Task 39: Standardize Code Style **[LOW PRIORITY]**
 **Goal:** Ensure consistent code formatting.
 
 **Requirements:**
@@ -496,7 +503,7 @@ Individual tasks for incrementally refactoring LazyTables into a maintainable, e
 
 ---
 
-### Task 40: Create Migration Guide
+### Task 40: Create Migration Guide **[LOW PRIORITY]**
 **Goal:** Help users migrate to new architecture.
 
 **Requirements:**
