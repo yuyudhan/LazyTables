@@ -181,7 +181,7 @@ impl ConnectionConfig {
         // First check if we have a password source
         if let Some(ref source) = self.password_source {
             PasswordManager::resolve_password(source, encryption_key)
-                .map_err(|e| crate::core::error::LazyTablesError::PasswordError(e))
+                .map_err(crate::core::error::LazyTablesError::PasswordError)
         } else if let Some(ref password) = self.password {
             // Fall back to legacy plain text password field
             Ok(password.clone())
@@ -209,7 +209,7 @@ impl ConnectionConfig {
     pub fn requires_encryption_key(&self) -> bool {
         self.password_source
             .as_ref()
-            .map(|s| PasswordManager::requires_encryption_key(s))
+            .map(PasswordManager::requires_encryption_key)
             .unwrap_or(false)
     }
 
@@ -217,7 +217,7 @@ impl ConnectionConfig {
     pub fn get_password_hint(&self) -> Option<String> {
         self.password_source
             .as_ref()
-            .and_then(|s| PasswordManager::get_hint(s))
+            .and_then(PasswordManager::get_hint)
     }
 
     /// Migrate plain text password to encrypted
@@ -227,9 +227,8 @@ impl ConnectionConfig {
         hint: Option<String>,
     ) -> Result<()> {
         if let Some(ref password) = self.password {
-            let source =
-                PasswordManager::migrate_to_encrypted(password, encryption_key, hint)
-                    .map_err(|e| crate::core::error::LazyTablesError::PasswordError(e))?;
+            let source = PasswordManager::migrate_to_encrypted(password, encryption_key, hint)
+                .map_err(crate::core::error::LazyTablesError::PasswordError)?;
             self.set_password_source(source);
             Ok(())
         } else {

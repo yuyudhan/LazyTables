@@ -2,4 +2,4 @@
 
 mod password;
 
-pub use password::{PasswordManager, PasswordSource, EncryptedPassword};
+pub use password::{EncryptedPassword, PasswordManager, PasswordSource};
