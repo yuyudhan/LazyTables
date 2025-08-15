@@ -2,8 +2,7 @@
 
 use crate::core::error::{LazyTablesError, Result};
 use crate::database::{
-    connection::ConnectionConfig,
-    Connection, DataType, TableColumn, TableMetadata,
+    connection::ConnectionConfig, Connection, DataType, TableColumn, TableMetadata,
 };
 use async_trait::async_trait;
 use sqlx::mysql::{MySqlPool, MySqlPoolOptions};
@@ -46,9 +45,7 @@ impl Connection for MySqlConnection {
             .max_connections(5)
             .connect(&connection_string)
             .await
-            .map_err(|e| {
-                LazyTablesError::Connection(format!("Failed to connect to MySQL: {e}"))
-            })?;
+            .map_err(|e| LazyTablesError::Connection(format!("Failed to connect to MySQL: {e}")))?;
 
         self.pool = Some(pool);
         Ok(())
@@ -88,12 +85,11 @@ impl Connection for MySqlConnection {
             let rows = sqlx::query("SHOW DATABASES")
                 .fetch_all(pool)
                 .await
-                .map_err(|e| LazyTablesError::Connection(format!("Failed to list databases: {e}")))?;
+                .map_err(|e| {
+                    LazyTablesError::Connection(format!("Failed to list databases: {e}"))
+                })?;
 
-            let databases = rows
-                .iter()
-                .map(|row| row.get::<String, _>(0))
-                .collect();
+            let databases = rows.iter().map(|row| row.get::<String, _>(0)).collect();
 
             Ok(databases)
         } else {
@@ -110,10 +106,7 @@ impl Connection for MySqlConnection {
                 .await
                 .map_err(|e| LazyTablesError::Connection(format!("Failed to list tables: {e}")))?;
 
-            let tables = rows
-                .iter()
-                .map(|row| row.get::<String, _>(0))
-                .collect();
+            let tables = rows.iter().map(|row| row.get::<String, _>(0)).collect();
 
             Ok(tables)
         } else {
@@ -130,7 +123,9 @@ impl Connection for MySqlConnection {
             let count_row = sqlx::query(&count_query)
                 .fetch_one(pool)
                 .await
-                .map_err(|e| LazyTablesError::Connection(format!("Failed to get row count: {e}")))?;
+                .map_err(|e| {
+                    LazyTablesError::Connection(format!("Failed to get row count: {e}"))
+                })?;
             let row_count: i64 = count_row.get(0);
 
             // Get column count
@@ -149,12 +144,12 @@ impl Connection for MySqlConnection {
                 index_length AS indexes_size
                 FROM information_schema.tables 
                 WHERE table_schema = DATABASE() AND table_name = ?";
-            
+
             let size_row = sqlx::query(size_query)
                 .bind(table_name)
                 .fetch_one(pool)
                 .await?;
-            
+
             let total_size: Option<i64> = size_row.get(0);
             let table_size: Option<i64> = size_row.get(1);
             let indexes_size: Option<i64> = size_row.get(2);
@@ -166,16 +161,14 @@ impl Connection for MySqlConnection {
                            AND table_name = ? 
                            AND constraint_name = 'PRIMARY'
                            ORDER BY ordinal_position";
-            
+
             let pk_rows = sqlx::query(pk_query)
                 .bind(table_name)
                 .fetch_all(pool)
                 .await?;
-            
-            let primary_keys: Vec<String> = pk_rows
-                .iter()
-                .map(|row| row.get::<String, _>(0))
-                .collect();
+
+            let primary_keys: Vec<String> =
+                pk_rows.iter().map(|row| row.get::<String, _>(0)).collect();
 
             // Get foreign keys
             let fk_query = "SELECT 
@@ -184,16 +177,14 @@ impl Connection for MySqlConnection {
                 WHERE table_schema = DATABASE() 
                 AND table_name = ? 
                 AND referenced_table_name IS NOT NULL";
-            
+
             let fk_rows = sqlx::query(fk_query)
                 .bind(table_name)
                 .fetch_all(pool)
                 .await?;
-            
-            let foreign_keys: Vec<String> = fk_rows
-                .iter()
-                .map(|row| row.get::<String, _>(0))
-                .collect();
+
+            let foreign_keys: Vec<String> =
+                fk_rows.iter().map(|row| row.get::<String, _>(0)).collect();
 
             // Get indexes
             let index_query = "SELECT DISTINCT index_name 
@@ -201,12 +192,12 @@ impl Connection for MySqlConnection {
                               WHERE table_schema = DATABASE() 
                               AND table_name = ? 
                               AND index_name != 'PRIMARY'";
-            
+
             let index_rows = sqlx::query(index_query)
                 .bind(table_name)
                 .fetch_all(pool)
                 .await?;
-            
+
             let indexes: Vec<String> = index_rows
                 .iter()
                 .map(|row| row.get::<String, _>(0))
@@ -217,14 +208,18 @@ impl Connection for MySqlConnection {
                                 FROM information_schema.tables 
                                 WHERE table_schema = DATABASE() 
                                 AND table_name = ?";
-            
+
             let comment_row = sqlx::query(comment_query)
                 .bind(table_name)
                 .fetch_one(pool)
                 .await?;
-            
+
             let comment: String = comment_row.get(0);
-            let comment = if comment.is_empty() { None } else { Some(comment) };
+            let comment = if comment.is_empty() {
+                None
+            } else {
+                Some(comment)
+            };
 
             Ok(TableMetadata {
                 table_name: table_name.to_string(),
@@ -258,10 +253,7 @@ impl Connection for MySqlConnection {
                 AND table_name = ?
                 ORDER BY ordinal_position";
 
-            let rows = sqlx::query(query)
-                .bind(table_name)
-                .fetch_all(pool)
-                .await?;
+            let rows = sqlx::query(query).bind(table_name).fetch_all(pool).await?;
 
             let columns = rows
                 .iter()
@@ -293,9 +285,7 @@ impl Connection for MySqlConnection {
     async fn get_table_row_count(&self, table_name: &str) -> Result<usize> {
         if let Some(pool) = &self.pool {
             let query = format!("SELECT COUNT(*) FROM `{table_name}`");
-            let row = sqlx::query(&query)
-                .fetch_one(pool)
-                .await?;
+            let row = sqlx::query(&query).fetch_one(pool).await?;
             let count: i64 = row.get(0);
             Ok(count as usize)
         } else {
@@ -339,9 +329,8 @@ impl Connection for MySqlConnection {
                 .collect::<Vec<_>>()
                 .join(", ");
 
-            let query = format!(
-                "SELECT {select_list} FROM `{table_name}` LIMIT {limit} OFFSET {offset}"
-            );
+            let query =
+                format!("SELECT {select_list} FROM `{table_name}` LIMIT {limit} OFFSET {offset}");
 
             let rows = sqlx::query(&query).fetch_all(pool).await?;
 
@@ -368,7 +357,7 @@ impl Connection for MySqlConnection {
 /// Parse MySQL data type string to internal DataType enum
 fn parse_mysql_type(type_str: &str) -> DataType {
     let type_lower = type_str.to_lowercase();
-    
+
     match type_lower.as_str() {
         "tinyint" | "smallint" | "mediumint" | "int" | "integer" => DataType::Integer,
         "bigint" => DataType::BigInt,

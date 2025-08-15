@@ -2,8 +2,7 @@
 
 use crate::core::error::{LazyTablesError, Result};
 use crate::database::{
-    connection::ConnectionConfig,
-    Connection, DataType, TableColumn, TableMetadata,
+    connection::ConnectionConfig, Connection, DataType, TableColumn, TableMetadata,
 };
 use async_trait::async_trait;
 use sqlx::sqlite::{SqlitePool, SqlitePoolOptions};
@@ -26,14 +25,14 @@ impl SqliteConnection {
     fn build_connection_string(&self) -> String {
         // For SQLite, we use the database field as the file path
         let db_path = self.config.database.as_deref().unwrap_or(":memory:");
-        
+
         // Ensure the path exists if it's not in-memory
         if db_path != ":memory:" {
             if let Some(parent) = Path::new(db_path).parent() {
                 let _ = std::fs::create_dir_all(parent);
             }
         }
-        
+
         format!("sqlite://{db_path}")
     }
 }
@@ -93,7 +92,12 @@ impl Connection for SqliteConnection {
         // SQLite doesn't have multiple databases in the same connection
         // Return the current database name
         if self.pool.is_some() {
-            let db_name = self.config.database.as_deref().unwrap_or("main").to_string();
+            let db_name = self
+                .config
+                .database
+                .as_deref()
+                .unwrap_or("main")
+                .to_string();
             Ok(vec![db_name])
         } else {
             Err(LazyTablesError::Connection(
@@ -108,7 +112,7 @@ impl Connection for SqliteConnection {
                 "SELECT name FROM sqlite_master 
                  WHERE type='table' 
                  AND name NOT LIKE 'sqlite_%'
-                 ORDER BY name"
+                 ORDER BY name",
             )
             .fetch_all(pool)
             .await
@@ -134,14 +138,14 @@ impl Connection for SqliteConnection {
             let count_row = sqlx::query(&count_query)
                 .fetch_one(pool)
                 .await
-                .map_err(|e| LazyTablesError::Connection(format!("Failed to get row count: {e}")))?;
+                .map_err(|e| {
+                    LazyTablesError::Connection(format!("Failed to get row count: {e}"))
+                })?;
             let row_count: i64 = count_row.get(0);
 
             // Get column info
             let pragma_query = format!("PRAGMA table_info(\"{table_name}\")");
-            let col_rows = sqlx::query(&pragma_query)
-                .fetch_all(pool)
-                .await?;
+            let col_rows = sqlx::query(&pragma_query).fetch_all(pool).await?;
             let column_count = col_rows.len();
 
             // Get primary keys
@@ -153,10 +157,8 @@ impl Connection for SqliteConnection {
 
             // Get foreign keys
             let fk_query = format!("PRAGMA foreign_key_list(\"{table_name}\")");
-            let fk_rows = sqlx::query(&fk_query)
-                .fetch_all(pool)
-                .await?;
-            
+            let fk_rows = sqlx::query(&fk_query).fetch_all(pool).await?;
+
             let foreign_keys: Vec<String> = fk_rows
                 .iter()
                 .map(|row| {
@@ -169,10 +171,8 @@ impl Connection for SqliteConnection {
 
             // Get indexes
             let index_query = format!("PRAGMA index_list(\"{table_name}\")");
-            let index_rows = sqlx::query(&index_query)
-                .fetch_all(pool)
-                .await?;
-            
+            let index_rows = sqlx::query(&index_query).fetch_all(pool).await?;
+
             let indexes: Vec<String> = index_rows
                 .iter()
                 .map(|row| row.get::<String, _>("name"))
@@ -180,13 +180,16 @@ impl Connection for SqliteConnection {
 
             // SQLite doesn't track table size in the same way
             // We can estimate based on page count
-            let page_count_query = "SELECT COUNT(*) * (SELECT page_size FROM pragma_page_size()) as size 
-                 FROM dbstat WHERE name = ?".to_string();
-            
+            let page_count_query =
+                "SELECT COUNT(*) * (SELECT page_size FROM pragma_page_size()) as size 
+                 FROM dbstat WHERE name = ?"
+                    .to_string();
+
             let size = if let Ok(size_row) = sqlx::query(&page_count_query)
                 .bind(table_name)
                 .fetch_one(pool)
-                .await {
+                .await
+            {
                 size_row.get::<Option<i64>, _>(0).unwrap_or(0)
             } else {
                 0
@@ -215,9 +218,7 @@ impl Connection for SqliteConnection {
         if let Some(pool) = &self.pool {
             let query = format!("PRAGMA table_info(\"{table_name}\")");
 
-            let rows = sqlx::query(&query)
-                .fetch_all(pool)
-                .await?;
+            let rows = sqlx::query(&query).fetch_all(pool).await?;
 
             let columns = rows
                 .iter()
@@ -249,9 +250,7 @@ impl Connection for SqliteConnection {
     async fn get_table_row_count(&self, table_name: &str) -> Result<usize> {
         if let Some(pool) = &self.pool {
             let query = format!("SELECT COUNT(*) FROM \"{table_name}\"");
-            let row = sqlx::query(&query)
-                .fetch_one(pool)
-                .await?;
+            let row = sqlx::query(&query).fetch_one(pool).await?;
             let count: i64 = row.get(0);
             Ok(count as usize)
         } else {
@@ -270,9 +269,7 @@ impl Connection for SqliteConnection {
         if let Some(pool) = &self.pool {
             // Get column names first to maintain order
             let pragma_query = format!("PRAGMA table_info(\"{table_name}\")");
-            let column_rows = sqlx::query(&pragma_query)
-                .fetch_all(pool)
-                .await?;
+            let column_rows = sqlx::query(&pragma_query).fetch_all(pool).await?;
 
             let column_names: Vec<String> = column_rows
                 .iter()
@@ -290,9 +287,8 @@ impl Connection for SqliteConnection {
                 .collect::<Vec<_>>()
                 .join(", ");
 
-            let query = format!(
-                "SELECT {select_list} FROM \"{table_name}\" LIMIT {limit} OFFSET {offset}"
-            );
+            let query =
+                format!("SELECT {select_list} FROM \"{table_name}\" LIMIT {limit} OFFSET {offset}");
 
             let rows = sqlx::query(&query).fetch_all(pool).await?;
 
@@ -319,15 +315,21 @@ impl Connection for SqliteConnection {
 /// Parse SQLite data type string to internal DataType enum
 fn parse_sqlite_type(type_str: &str) -> DataType {
     let type_upper = type_str.to_uppercase();
-    
+
     // SQLite has flexible typing, so we check for common patterns
     if type_upper.contains("INT") {
         DataType::Integer
-    } else if type_upper.contains("REAL") || type_upper.contains("FLOAT") || type_upper.contains("DOUBLE") {
+    } else if type_upper.contains("REAL")
+        || type_upper.contains("FLOAT")
+        || type_upper.contains("DOUBLE")
+    {
         DataType::Float
     } else if type_upper.contains("DECIMAL") || type_upper.contains("NUMERIC") {
         DataType::Decimal
-    } else if type_upper.contains("CHAR") || type_upper.contains("TEXT") || type_upper.contains("CLOB") {
+    } else if type_upper.contains("CHAR")
+        || type_upper.contains("TEXT")
+        || type_upper.contains("CLOB")
+    {
         DataType::Text
     } else if type_upper.contains("BLOB") {
         DataType::Bytea

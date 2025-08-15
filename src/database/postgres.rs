@@ -2,8 +2,7 @@
 
 use crate::core::error::{LazyTablesError, Result};
 use crate::database::{
-    connection::ConnectionConfig,
-    Connection, DataType, TableColumn, TableMetadata,
+    connection::ConnectionConfig, Connection, DataType, TableColumn, TableMetadata,
 };
 use async_trait::async_trait;
 use sqlx::postgres::{PgPool, PgPoolOptions};
@@ -88,7 +87,9 @@ impl Connection for PostgresConnection {
             let rows = sqlx::query("SELECT datname FROM pg_database WHERE datistemplate = false")
                 .fetch_all(pool)
                 .await
-                .map_err(|e| LazyTablesError::Connection(format!("Failed to list databases: {e}")))?;
+                .map_err(|e| {
+                    LazyTablesError::Connection(format!("Failed to list databases: {e}"))
+                })?;
 
             let databases = rows
                 .iter()
@@ -138,7 +139,9 @@ impl Connection for PostgresConnection {
             let count_row = sqlx::query(&count_query)
                 .fetch_one(pool)
                 .await
-                .map_err(|e| LazyTablesError::Connection(format!("Failed to get row count: {e}")))?;
+                .map_err(|e| {
+                    LazyTablesError::Connection(format!("Failed to get row count: {e}"))
+                })?;
             let row_count: i64 = count_row.get(0);
 
             // Get column count
@@ -158,12 +161,12 @@ impl Connection for PostgresConnection {
                 pg_total_relation_size($1) as total_bytes,
                 pg_table_size($1) as table_bytes,
                 pg_indexes_size($1) as index_bytes";
-            
+
             let size_row = sqlx::query(size_query)
                 .bind(format!("public.{table_name}"))
                 .fetch_one(pool)
                 .await?;
-            
+
             let total_size: i64 = size_row.get("total_bytes");
             let table_size: i64 = size_row.get("table_bytes");
             let indexes_size: i64 = size_row.get("index_bytes");
@@ -175,12 +178,12 @@ impl Connection for PostgresConnection {
                            AND a.attnum = ANY(i.indkey)
                            WHERE i.indrelid = $1::regclass
                            AND i.indisprimary";
-            
+
             let pk_rows = sqlx::query(pk_query)
                 .bind(format!("public.{table_name}"))
                 .fetch_all(pool)
                 .await?;
-            
+
             let primary_keys: Vec<String> = pk_rows
                 .iter()
                 .map(|row| row.get::<String, _>("attname"))
@@ -200,12 +203,12 @@ impl Connection for PostgresConnection {
                 WHERE tc.constraint_type = 'FOREIGN KEY' 
                     AND tc.table_name = $1
                     AND tc.table_schema = 'public'";
-            
+
             let fk_rows = sqlx::query(fk_query)
                 .bind(table_name)
                 .fetch_all(pool)
                 .await?;
-            
+
             let foreign_keys: Vec<String> = fk_rows
                 .iter()
                 .map(|row| row.get::<String, _>("fk_info"))
@@ -217,12 +220,12 @@ impl Connection for PostgresConnection {
                 FROM pg_indexes 
                 WHERE tablename = $1 
                 AND schemaname = 'public'";
-            
+
             let index_rows = sqlx::query(index_query)
                 .bind(table_name)
                 .fetch_all(pool)
                 .await?;
-            
+
             let indexes: Vec<String> = index_rows
                 .iter()
                 .map(|row| row.get::<String, _>("indexname"))
@@ -230,12 +233,12 @@ impl Connection for PostgresConnection {
 
             // Get table comment
             let comment_query = "SELECT obj_description($1::regclass, 'pg_class') as comment";
-            
+
             let comment_row = sqlx::query(comment_query)
                 .bind(format!("public.{table_name}"))
                 .fetch_one(pool)
                 .await?;
-            
+
             let comment: Option<String> = comment_row.get("comment");
 
             Ok(TableMetadata {
@@ -283,10 +286,7 @@ impl Connection for PostgresConnection {
                 AND c.table_name = $1
                 ORDER BY c.ordinal_position";
 
-            let rows = sqlx::query(query)
-                .bind(table_name)
-                .fetch_all(pool)
-                .await?;
+            let rows = sqlx::query(query).bind(table_name).fetch_all(pool).await?;
 
             let columns = rows
                 .iter()
@@ -318,9 +318,7 @@ impl Connection for PostgresConnection {
     async fn get_table_row_count(&self, table_name: &str) -> Result<usize> {
         if let Some(pool) = &self.pool {
             let query = format!("SELECT COUNT(*) FROM \"{table_name}\"");
-            let row = sqlx::query(&query)
-                .fetch_one(pool)
-                .await?;
+            let row = sqlx::query(&query).fetch_one(pool).await?;
             let count: i64 = row.get(0);
             Ok(count as usize)
         } else {
@@ -393,27 +391,22 @@ impl Connection for PostgresConnection {
 
 impl PostgresConnection {
     /// Execute a raw SQL query and return columns and rows
-    pub async fn execute_raw_query(
-        &self,
-        query: &str,
-    ) -> Result<(Vec<String>, Vec<Vec<String>>)> {
+    pub async fn execute_raw_query(&self, query: &str) -> Result<(Vec<String>, Vec<Vec<String>>)> {
         if let Some(pool) = &self.pool {
             // Try to execute the query
             let rows = sqlx::query(query).fetch_all(pool).await?;
-            
+
             if rows.is_empty() {
                 return Ok((Vec::new(), Vec::new()));
             }
-            
+
             // Get column information from the first row
             let first_row = &rows[0];
             let columns = first_row.columns();
-            
-            let column_names: Vec<String> = columns
-                .iter()
-                .map(|col| col.name().to_string())
-                .collect();
-            
+
+            let column_names: Vec<String> =
+                columns.iter().map(|col| col.name().to_string()).collect();
+
             // Extract data from all rows
             let mut result_rows = Vec::new();
             for row in &rows {
@@ -425,7 +418,7 @@ impl PostgresConnection {
                 }
                 result_rows.push(row_data);
             }
-            
+
             Ok((column_names, result_rows))
         } else {
             Err(LazyTablesError::Connection(
@@ -450,7 +443,9 @@ fn parse_postgres_type(type_str: &str) -> DataType {
         "character" | "char" => DataType::Char(None),
         "date" => DataType::Date,
         "time" | "time without time zone" => DataType::Time,
-        "timestamp" | "timestamp without time zone" | "timestamp with time zone" => DataType::Timestamp,
+        "timestamp" | "timestamp without time zone" | "timestamp with time zone" => {
+            DataType::Timestamp
+        }
         "json" | "jsonb" => DataType::Json,
         "uuid" => DataType::Uuid,
         "bytea" => DataType::Bytea,
