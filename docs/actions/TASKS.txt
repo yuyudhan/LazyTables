@@ -1,10 +1,12 @@
 # FilePath: TASKS.txt
 
-TASK:
-I see a themes/ directory at the root, it is not inside the src/ directory, is it useful? Verify if it is proper and implement proper.
+IN the sql editing and the sql file panes. files I should be able to open one file at a time saved corresponding to a database.  I should be able to run one command at a time. whcihever is under the cursor at the moment, put a keybinding properly to run the query.
 
 TASK:
 Support picking of the password for connections from the environment variable. also support encrypted storage of the password, using aes encryption by a key provided by user during creation, the editing and reading again of that password shall require user to provide the password which he used to encrypt the password.
+
+TASK done:
+I see a themes/ directory at the root, it is not inside the src/ directory, is it useful? Verify if it is proper and implement proper.
 
 TASK DONE:
 In the connections pane, can you also write the database which it connects to. Can use Format CONN: <connection name>, DB: <database name> along with the existing things already showing like status etc.
