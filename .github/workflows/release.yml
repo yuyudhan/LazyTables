@@ -143,39 +143,3 @@ jobs:
           CARGO_REGISTRY_TOKEN: ${{ secrets.CARGO_REGISTRY_TOKEN }}
         continue-on-error: true
   
-  update-homebrew-formula:
-    name: Update Homebrew Formula
-    needs: release
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout tap repository
-        uses: actions/checkout@v4
-        with:
-          repository: yuyudhan/homebrew-lazytables
-          token: ${{ secrets.HOMEBREW_TAP_TOKEN }}
-          path: homebrew-lazytables
-
-      - name: Download release assets
-        run: |
-          VERSION=${{ github.ref_name }}
-          wget https://github.com/yuyudhan/LazyTables/archive/refs/tags/${VERSION}.tar.gz
-          sha256sum ${VERSION}.tar.gz
-
-      - name: Update formula
-        run: |
-          VERSION=${{ github.ref_name }}
-          SHA256=$(sha256sum ${VERSION}.tar.gz | cut -d' ' -f1)
-          
-          cd homebrew-lazytables
-          sed -i "s/version \".*\"/version \"${VERSION#v}\"/" Formula/lazytables.rb
-          sed -i "s|url \".*\.tar\.gz\"|url \"https://github.com/yuyudhan/LazyTables/archive/refs/tags/${VERSION}.tar.gz\"|" Formula/lazytables.rb
-          sed -i "s/sha256 \".*\"/sha256 \"${SHA256}\"/" Formula/lazytables.rb
-
-      - name: Commit and push changes
-        run: |
-          cd homebrew-lazytables
-          git config user.name "GitHub Actions"
-          git config user.email "actions@github.com"
-          git add Formula/lazytables.rb
-          git commit -m "Update LazyTables to ${{ github.ref_name }}"
-          git push
