@@ -50,7 +50,7 @@ impl UI {
     /// Create a new UI instance
     pub fn new(config: &Config) -> Result<Self> {
         let layout_manager = LayoutManager::new();
-        
+
         // Load theme based on config or use default
         let theme = if !config.theme.name.is_empty() {
             // Try to load theme from available themes
@@ -78,39 +78,43 @@ impl UI {
     fn render_confirmation_modal(&self, frame: &mut Frame, modal: &ConfirmationModal, area: Rect) {
         use ratatui::layout::{Direction, Layout, Margin};
         use ratatui::widgets::Clear;
-        
+
         // Center the modal
         let modal_area = self.center_modal(area, 50, 30);
-        
+
         // Clear the background
         frame.render_widget(Clear, modal_area);
-        
+
         // Draw modal border
         let block = Block::default()
             .borders(Borders::ALL)
             .border_style(Style::default().fg(Color::Yellow))
             .title(format!(" {} ", modal.title))
-            .title_style(Style::default().fg(Color::Yellow).add_modifier(Modifier::BOLD));
-        
+            .title_style(
+                Style::default()
+                    .fg(Color::Yellow)
+                    .add_modifier(Modifier::BOLD),
+            );
+
         frame.render_widget(block.clone(), modal_area);
-        
+
         // Layout for modal content
         let inner = modal_area.inner(Margin::new(2, 1));
         let chunks = Layout::default()
             .direction(Direction::Vertical)
             .constraints([
-                Constraint::Min(0),      // Message
-                Constraint::Length(1),   // Empty line
-                Constraint::Length(1),   // Instructions
+                Constraint::Min(0),    // Message
+                Constraint::Length(1), // Empty line
+                Constraint::Length(1), // Instructions
             ])
             .split(inner);
-        
+
         // Render message
         let message = Paragraph::new(modal.message.clone())
             .wrap(Wrap { trim: true })
             .style(Style::default().fg(Color::White));
         frame.render_widget(message, chunks[0]);
-        
+
         // Render instructions
         let instructions = Paragraph::new("Press Y to confirm, N or ESC to cancel")
             .alignment(Alignment::Center)
