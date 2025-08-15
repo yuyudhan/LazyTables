@@ -21,17 +21,19 @@ impl PostgresConnection {
     }
 
     /// Build PostgreSQL connection string
-    fn build_connection_string(&self) -> String {
+    fn build_connection_string(&self, encryption_key: Option<&str>) -> Result<String> {
         let host = &self.config.host;
         let port = self.config.port;
         let database = self.config.database.as_deref().unwrap_or("postgres");
         let username = &self.config.username;
-        let password = self.config.password.as_deref().unwrap_or("");
+        
+        // Try to resolve password from various sources
+        let password = self.config.resolve_password(encryption_key).unwrap_or_default();
 
         if !password.is_empty() {
-            format!("postgresql://{username}:{password}@{host}:{port}/{database}")
+            Ok(format!("postgresql://{username}:{password}@{host}:{port}/{database}"))
         } else {
-            format!("postgresql://{username}@{host}:{port}/{database}")
+            Ok(format!("postgresql://{username}@{host}:{port}/{database}"))
         }
     }
 }
@@ -39,7 +41,12 @@ impl PostgresConnection {
 #[async_trait]
 impl Connection for PostgresConnection {
     async fn connect(&mut self) -> Result<()> {
-        let connection_string = self.build_connection_string();
+        // Use connect_with_key with None for backward compatibility
+        self.connect_with_key(None).await
+    }
+
+    async fn connect_with_key(&mut self, encryption_key: Option<&str>) -> Result<()> {
+        let connection_string = self.build_connection_string(encryption_key)?;
 
         let pool = PgPoolOptions::new()
             .max_connections(5)
@@ -60,15 +67,18 @@ impl Connection for PostgresConnection {
         Ok(())
     }
 
-    async fn is_connected(&self) -> bool {
-        if let Some(pool) = &self.pool {
-            pool.acquire().await.is_ok()
-        } else {
-            false
-        }
+    fn is_connected(&self) -> bool {
+        self.pool.is_some()
     }
 
-    async fn test_connection(&self) -> Result<()> {
+    fn config(&self) -> &ConnectionConfig {
+        &self.config
+    }
+}
+
+impl PostgresConnection {
+    /// Test the connection by running a simple query
+    pub async fn test_connection(&self) -> Result<()> {
         if let Some(pool) = &self.pool {
             sqlx::query("SELECT 1")
                 .fetch_one(pool)
@@ -82,7 +92,9 @@ impl Connection for PostgresConnection {
         }
     }
 
-    async fn list_databases(&self) -> Result<Vec<String>> {
+    /// List all databases accessible to the user
+    #[allow(dead_code)]
+    pub async fn list_databases(&self) -> Result<Vec<String>> {
         if let Some(pool) = &self.pool {
             let rows = sqlx::query("SELECT datname FROM pg_database WHERE datistemplate = false")
                 .fetch_all(pool)
@@ -104,7 +116,8 @@ impl Connection for PostgresConnection {
         }
     }
 
-    async fn list_tables(&self) -> Result<Vec<String>> {
+    /// List all tables in the current database
+    pub async fn list_tables(&self) -> Result<Vec<String>> {
         if let Some(pool) = &self.pool {
             let query = "
                 SELECT table_name 
@@ -132,7 +145,8 @@ impl Connection for PostgresConnection {
         }
     }
 
-    async fn get_table_metadata(&self, table_name: &str) -> Result<TableMetadata> {
+    /// Get metadata for a specific table
+    pub async fn get_table_metadata(&self, table_name: &str) -> Result<TableMetadata> {
         if let Some(pool) = &self.pool {
             // Get row count
             let count_query = format!("SELECT COUNT(*) FROM \"{table_name}\"");
@@ -260,7 +274,8 @@ impl Connection for PostgresConnection {
         }
     }
 
-    async fn get_table_columns(&self, table_name: &str) -> Result<Vec<TableColumn>> {
+    /// Get column information for a table
+    pub async fn get_table_columns(&self, table_name: &str) -> Result<Vec<TableColumn>> {
         if let Some(pool) = &self.pool {
             let query = "SELECT 
                 c.column_name,
@@ -315,7 +330,8 @@ impl Connection for PostgresConnection {
         }
     }
 
-    async fn get_table_row_count(&self, table_name: &str) -> Result<usize> {
+    /// Get the row count for a table
+    pub async fn get_table_row_count(&self, table_name: &str) -> Result<usize> {
         if let Some(pool) = &self.pool {
             let query = format!("SELECT COUNT(*) FROM \"{table_name}\"");
             let row = sqlx::query(&query).fetch_one(pool).await?;
@@ -328,7 +344,8 @@ impl Connection for PostgresConnection {
         }
     }
 
-    async fn get_table_data(
+    /// Get table data with pagination
+    pub async fn get_table_data(
         &self,
         table_name: &str,
         limit: usize,

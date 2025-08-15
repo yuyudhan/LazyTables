@@ -2,6 +2,7 @@
 
 use crate::config::Config;
 use crate::core::error::Result;
+use crate::security::{PasswordManager, PasswordSource};
 use serde::{Deserialize, Serialize};
 use std::fs;
 
@@ -85,7 +86,10 @@ pub struct ConnectionConfig {
     pub database: Option<String>,
     /// Username for authentication
     pub username: String,
-    /// Password (stored encrypted, not serialized in plain text)
+    /// Password source (environment variable or encrypted)
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub password_source: Option<PasswordSource>,
+    /// Legacy password field (for backward compatibility)
     #[serde(skip_serializing_if = "Option::is_none")]
     pub password: Option<String>,
     /// SSL/TLS configuration
@@ -115,6 +119,7 @@ impl ConnectionConfig {
             database: None,
             username,
             password: None,
+            password_source: None,
             ssl_mode: SslMode::default(),
             timeout: Some(30),
             status: ConnectionStatus::default(),
@@ -167,6 +172,70 @@ impl ConnectionConfig {
             Some(error)
         } else {
             None
+        }
+    }
+
+    /// Resolve the actual password for this connection
+    /// Takes an optional encryption key for encrypted passwords
+    pub fn resolve_password(&self, encryption_key: Option<&str>) -> Result<String> {
+        // First check if we have a password source
+        if let Some(ref source) = self.password_source {
+            PasswordManager::resolve_password(source, encryption_key)
+                .map_err(|e| crate::core::error::LazyTablesError::PasswordError(e))
+        } else if let Some(ref password) = self.password {
+            // Fall back to legacy plain text password field
+            Ok(password.clone())
+        } else {
+            Err(crate::core::error::LazyTablesError::PasswordError(
+                "No password configured".to_string(),
+            ))
+        }
+    }
+
+    /// Set password using a source (environment variable or encrypted)
+    pub fn set_password_source(&mut self, source: PasswordSource) {
+        self.password_source = Some(source);
+        // Clear legacy password field when using new source
+        self.password = None;
+    }
+
+    /// Set plain text password (deprecated, for backward compatibility)
+    pub fn set_plain_password(&mut self, password: String) {
+        self.password = Some(password);
+        self.password_source = None;
+    }
+
+    /// Check if this connection requires an encryption key
+    pub fn requires_encryption_key(&self) -> bool {
+        self.password_source
+            .as_ref()
+            .map(|s| PasswordManager::requires_encryption_key(s))
+            .unwrap_or(false)
+    }
+
+    /// Get hint for encrypted password if available
+    pub fn get_password_hint(&self) -> Option<String> {
+        self.password_source
+            .as_ref()
+            .and_then(|s| PasswordManager::get_hint(s))
+    }
+
+    /// Migrate plain text password to encrypted
+    pub fn migrate_to_encrypted_password(
+        &mut self,
+        encryption_key: &str,
+        hint: Option<String>,
+    ) -> Result<()> {
+        if let Some(ref password) = self.password {
+            let source =
+                PasswordManager::migrate_to_encrypted(password, encryption_key, hint)
+                    .map_err(|e| crate::core::error::LazyTablesError::PasswordError(e))?;
+            self.set_password_source(source);
+            Ok(())
+        } else {
+            Err(crate::core::error::LazyTablesError::PasswordError(
+                "No plain text password to migrate".to_string(),
+            ))
         }
     }
 }
@@ -259,6 +328,9 @@ impl ConnectionStorage {
 pub trait Connection: Send + Sync {
     /// Connect to the database
     async fn connect(&mut self) -> Result<()>;
+
+    /// Connect to the database with an encryption key for encrypted passwords
+    async fn connect_with_key(&mut self, encryption_key: Option<&str>) -> Result<()>;
 
     /// Disconnect from the database
     async fn disconnect(&mut self) -> Result<()>;

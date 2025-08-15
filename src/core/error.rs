@@ -44,6 +44,9 @@ pub enum LazyTablesError {
     #[error("Connection '{0}' not found")]
     ConnectionNotFound(String),
 
+    #[error("Password error: {0}")]
+    PasswordError(String),
+
     #[error("{0}")]
     Other(String),
 }
