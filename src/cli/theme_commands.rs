@@ -8,20 +8,20 @@ use std::path::PathBuf;
 pub enum ThemeCommand {
     /// List all available themes
     List,
-    
+
     /// Install a theme from a TOML file
     Install {
         /// Path to the theme TOML file
         path: PathBuf,
     },
-    
+
     /// Export built-in themes to a directory
     Export {
         /// Directory to export themes to (defaults to ./themes)
         #[arg(default_value = "./themes")]
         dir: PathBuf,
     },
-    
+
     /// Show theme directories
     Dirs,
 }
@@ -32,7 +32,7 @@ impl ThemeCommand {
             ThemeCommand::List => {
                 println!("Available themes:");
                 println!();
-                
+
                 let themes = ThemeLoader::list_available_themes();
                 if themes.is_empty() {
                     println!("No themes found. You can:");
@@ -44,7 +44,7 @@ impl ThemeCommand {
                     }
                 }
             }
-            
+
             ThemeCommand::Install { path } => {
                 println!("Installing theme from: {}", path.display());
                 ThemeLoader::install_theme(path)?;
@@ -56,7 +56,7 @@ impl ThemeCommand {
                 println!("  [ui]");
                 println!("  theme = \"<theme_name>\"");
             }
-            
+
             ThemeCommand::Export { dir } => {
                 println!("Exporting built-in themes to: {}", dir.display());
                 ThemeLoader::export_builtin_themes(dir)?;
@@ -66,21 +66,21 @@ impl ThemeCommand {
                 println!("  • {}/dark.toml", dir.display());
                 println!("  • {}/light.toml", dir.display());
             }
-            
+
             ThemeCommand::Dirs => {
                 println!("Theme directories (in order of priority):");
                 println!();
-                
+
                 for (i, dir) in ThemeLoader::theme_directories().iter().enumerate() {
                     let exists = if dir.exists() { "✓" } else { "✗" };
                     println!("  {}. [{}] {}", i + 1, exists, dir.display());
                 }
-                
+
                 println!();
                 println!("Legend: ✓ = exists, ✗ = does not exist");
             }
         }
-        
+
         Ok(())
     }
 }
