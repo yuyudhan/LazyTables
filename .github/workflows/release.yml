@@ -1,0 +1,130 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  create-release:
+    name: Create Release
+    runs-on: ubuntu-latest
+    outputs:
+      upload_url: ${{ steps.create_release.outputs.upload_url }}
+    steps:
+      - name: Create Release
+        id: create_release
+        uses: actions/create-release@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          tag_name: ${{ github.ref }}
+          release_name: LazyTables ${{ github.ref }}
+          draft: false
+          prerelease: false
+
+  build-release:
+    name: Build Release
+    needs: create-release
+    strategy:
+      matrix:
+        include:
+          # macOS Intel
+          - os: macos-latest
+            target: x86_64-apple-darwin
+            artifact_name: lazytables
+            asset_name: lazytables-${{ github.ref_name }}-x86_64-apple-darwin
+
+          # macOS ARM64
+          - os: macos-latest
+            target: aarch64-apple-darwin
+            artifact_name: lazytables
+            asset_name: lazytables-${{ github.ref_name }}-aarch64-apple-darwin
+
+          # Linux x86_64
+          - os: ubuntu-latest
+            target: x86_64-unknown-linux-gnu
+            artifact_name: lazytables
+            asset_name: lazytables-${{ github.ref_name }}-x86_64-linux
+
+    runs-on: ${{ matrix.os }}
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Rust
+        uses: actions-rust-lang/setup-rust-toolchain@v1
+        with:
+          toolchain: stable
+          target: ${{ matrix.target }}
+
+      - name: Build
+        run: cargo build --release --target ${{ matrix.target }}
+
+      - name: Create tarball
+        run: |
+          cd target/${{ matrix.target }}/release
+          tar czf ../../../${{ matrix.asset_name }}.tar.gz ${{ matrix.artifact_name }}
+          cd ../../../
+          sha256sum ${{ matrix.asset_name }}.tar.gz > ${{ matrix.asset_name }}.tar.gz.sha256
+
+      - name: Upload Release Asset
+        uses: actions/upload-release-asset@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          upload_url: ${{ needs.create-release.outputs.upload_url }}
+          asset_path: ./${{ matrix.asset_name }}.tar.gz
+          asset_name: ${{ matrix.asset_name }}.tar.gz
+          asset_content_type: application/gzip
+
+      - name: Upload SHA256 checksum
+        uses: actions/upload-release-asset@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          upload_url: ${{ needs.create-release.outputs.upload_url }}
+          asset_path: ./${{ matrix.asset_name }}.tar.gz.sha256
+          asset_name: ${{ matrix.asset_name }}.tar.gz.sha256
+          asset_content_type: text/plain
+
+  update-homebrew-formula:
+    name: Update Homebrew Formula
+    needs: build-release
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout tap repository
+        uses: actions/checkout@v4
+        with:
+          repository: yuyudhan/homebrew-lazytables
+          token: ${{ secrets.HOMEBREW_TAP_TOKEN }}
+          path: homebrew-lazytables
+
+      - name: Download release assets
+        run: |
+          VERSION=${{ github.ref_name }}
+          wget https://github.com/yuyudhan/LazyTables/archive/refs/tags/${VERSION}.tar.gz
+          sha256sum ${VERSION}.tar.gz
+
+      - name: Update formula
+        run: |
+          VERSION=${{ github.ref_name }}
+          SHA256=$(sha256sum ${VERSION}.tar.gz | cut -d' ' -f1)
+          
+          cd homebrew-lazytables
+          sed -i "s/version \".*\"/version \"${VERSION#v}\"/" Formula/lazytables.rb
+          sed -i "s|url \".*\.tar\.gz\"|url \"https://github.com/yuyudhan/LazyTables/archive/refs/tags/${VERSION}.tar.gz\"|" Formula/lazytables.rb
+          sed -i "s/sha256 \".*\"/sha256 \"${SHA256}\"/" Formula/lazytables.rb
+
+      - name: Commit and push changes
+        run: |
+          cd homebrew-lazytables
+          git config user.name "GitHub Actions"
+          git config user.email "actions@github.com"
+          git add Formula/lazytables.rb
+          git commit -m "Update LazyTables to ${{ github.ref_name }}"
+          git push

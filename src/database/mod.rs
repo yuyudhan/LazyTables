@@ -1,8 +1,109 @@
 // FilePath: src/database/mod.rs
 
-// Database adapter modules will be added here
+// Database adapter modules
 pub mod connection;
+pub mod mysql;
 pub mod postgres;
+pub mod sqlite;
 
-pub use connection::{Connection, ConnectionInfo};
+pub use connection::{
+    ConnectionConfig, ConnectionStatus, ConnectionStorage, DatabaseType, SslMode,
+};
 
+// Re-export the Connection trait from connection module
+pub use connection::Connection;
+
+/// Represents a table column
+#[derive(Debug, Clone)]
+pub struct TableColumn {
+    pub name: String,
+    pub data_type: DataType,
+    pub is_nullable: bool,
+    pub default_value: Option<String>,
+    pub is_primary_key: bool,
+}
+
+/// Column definition for table creation
+#[derive(Debug, Clone)]
+pub struct ColumnDefinition {
+    pub name: String,
+    pub data_type: DataType,
+    pub is_nullable: bool,
+    pub is_primary_key: bool,
+    pub is_unique: bool,
+    pub default_value: Option<String>,
+}
+
+/// Supported data types
+#[derive(Debug, Clone, PartialEq)]
+pub enum DataType {
+    Integer,
+    BigInt,
+    SmallInt,
+    Decimal,
+    Float,
+    Double,
+    Boolean,
+    Text,
+    Varchar(Option<usize>),
+    Char(Option<usize>),
+    Date,
+    Time,
+    Timestamp,
+    Json,
+    Uuid,
+    Bytea,
+    Array(Box<DataType>),
+}
+
+impl DataType {
+    /// Convert to SQL type string for the given database
+    pub fn to_sql(&self) -> String {
+        match self {
+            DataType::Integer => "INTEGER".to_string(),
+            DataType::BigInt => "BIGINT".to_string(),
+            DataType::SmallInt => "SMALLINT".to_string(),
+            DataType::Decimal => "DECIMAL".to_string(),
+            DataType::Float => "FLOAT".to_string(),
+            DataType::Double => "DOUBLE".to_string(),
+            DataType::Boolean => "BOOLEAN".to_string(),
+            DataType::Text => "TEXT".to_string(),
+            DataType::Varchar(len) => {
+                if let Some(l) = len {
+                    format!("VARCHAR({l})")
+                } else {
+                    "VARCHAR".to_string()
+                }
+            }
+            DataType::Char(len) => {
+                if let Some(l) = len {
+                    format!("CHAR({l})")
+                } else {
+                    "CHAR".to_string()
+                }
+            }
+            DataType::Date => "DATE".to_string(),
+            DataType::Time => "TIME".to_string(),
+            DataType::Timestamp => "TIMESTAMP".to_string(),
+            DataType::Json => "JSON".to_string(),
+            DataType::Uuid => "UUID".to_string(),
+            DataType::Bytea => "BYTEA".to_string(),
+            DataType::Array(inner) => format!("{}[]", inner.to_sql()),
+        }
+    }
+}
+
+/// Represents detailed metadata about a database table
+#[derive(Debug, Clone)]
+pub struct TableMetadata {
+    pub table_name: String,
+    pub row_count: usize,
+    pub column_count: usize,
+    pub total_size: i64,
+    pub table_size: i64,
+    pub indexes_size: i64,
+    pub primary_keys: Vec<String>,
+    pub foreign_keys: Vec<String>,
+    pub indexes: Vec<String>,
+    pub comment: Option<String>,
+}

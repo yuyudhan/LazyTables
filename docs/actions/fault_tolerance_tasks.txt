@@ -1,0 +1,265 @@
+FAULT TOLERANCE & STABILITY TASKS FOR LAZYTABLES
+=================================================
+
+CRITICAL - CRASH PREVENTION
+----------------------------
+
+1. Add panic handler in main.rs
+   - Catch all panics with custom handler
+   - Log panic details to ~/.lazytables/crash.log
+   - Show user-friendly error message
+   - Attempt graceful terminal restoration
+
+2. Fix unwrap() calls throughout codebase
+   - src/app/state.rs:48 - UIState::load().unwrap_or_default()
+   - src/app/state.rs:506,583,770 - Multiple unwrap_or_else with proper errors
+   - src/database/postgres.rs:424 - unwrap_or_else for NULL values
+   - Replace ALL unwrap() with ? or proper error handling
+
+3. Add connection timeout handling
+   - src/database/postgres.rs:46-52 - Add connection timeout (30s max)
+   - Implement retry logic with exponential backoff
+   - Show progress to user during connection attempts
+   - Allow user to cancel connection attempts
+
+4. Handle terminal resize gracefully
+   - Add SIGWINCH signal handler
+   - Recalculate layout on terminal resize
+   - Prevent panic when terminal too small
+   - Show minimum size warning
+
+5. Protect against SQL injection
+   - src/database/postgres.rs:138,371 - Use parameterized queries
+   - Never concatenate user input into SQL strings
+   - Validate table/column names against whitelist
+   - Escape special characters in identifiers
+
+
+HIGH - DATA INTEGRITY
+---------------------
+
+6. Add transaction rollback on errors
+   - Wrap all multi-step operations in transactions
+   - src/app/state.rs:862-890 - Table edits need transaction
+   - src/app/state.rs:930-960 - Table creation needs transaction
+   - Rollback on any error
+
+7. Implement connection pool recovery
+   - src/database/postgres.rs:15 - Pool needs health checks
+   - Auto-reconnect on connection loss
+   - Test connection before each operation
+   - Clear stale connections periodically
+
+8. Add data validation before operations
+   - Validate connection config before saving
+   - Check table names for invalid characters
+   - Verify column types before updates
+   - Prevent operations on system tables
+
+9. Handle concurrent access
+   - Add row-level locking for edits
+   - Detect and warn about external changes
+   - Implement optimistic locking
+   - Show conflict resolution dialog
+
+10. Backup before destructive operations
+    - Auto-backup before DROP/ALTER operations
+    - Store backups in ~/.lazytables/backups/
+    - Implement undo for last 10 operations
+    - Add confirmation for destructive actions
+
+
+MEDIUM - ERROR RECOVERY
+------------------------
+
+11. Add comprehensive error types
+    - Create specific error variants for each failure mode
+    - Include context and recovery suggestions
+    - Map database errors to user-friendly messages
+    - Log technical details separately
+
+12. Implement retry mechanisms
+    - Retry failed database operations (3 attempts)
+    - Exponential backoff between retries
+    - Different strategies for different error types
+    - User option to skip/retry/abort
+
+13. Handle file system errors
+    - Check disk space before writes
+    - Handle permission errors gracefully
+    - Validate file paths before operations
+    - Create missing directories automatically
+
+14. Add operation cancellation
+    - Allow ESC to cancel long operations
+    - Clean up partial state on cancel
+    - Show progress for long operations
+    - Implement timeout for all async operations
+
+15. Validate UI state consistency
+    - src/app/state.rs - Check bounds before array access
+    - Prevent selection of non-existent items
+    - Reset invalid states to defaults
+    - Sync UI state with actual data
+
+
+MEDIUM - RESOURCE MANAGEMENT
+-----------------------------
+
+16. Implement memory limits
+    - Cap query result size (10MB default)
+    - Paginate large result sets
+    - Stream large data instead of loading all
+    - Monitor and log memory usage
+
+17. Add connection pooling limits
+    - Max 10 connections per database
+    - Connection idle timeout (5 minutes)
+    - Queue connection requests
+    - Show connection pool status
+
+18. Handle large datasets safely
+    - Virtual scrolling for tables >1000 rows
+    - Lazy load table data on demand
+    - Cancel queries taking >30 seconds
+    - Show data size warnings
+
+19. Clean up resources properly
+    - Close connections on app exit
+    - Flush logs before shutdown
+    - Save state before exit
+    - Clean temp files on startup
+
+20. Rate limit operations
+    - Limit query execution (10/second)
+    - Throttle UI updates (60fps max)
+    - Batch database operations
+    - Prevent accidental DOS
+
+
+LOW - DIAGNOSTICS & MONITORING
+-------------------------------
+
+21. Add health check endpoint
+    - Check database connectivity
+    - Verify file system access
+    - Test memory availability
+    - Report component status
+
+22. Implement debug mode
+    - Verbose logging when --debug flag
+    - SQL query logging
+    - Performance metrics
+    - State change tracking
+
+23. Add crash reporting
+    - Collect crash dumps
+    - Anonymize sensitive data
+    - Optional automatic reporting
+    - Include system info
+
+24. Create diagnostic commands
+    - :health - Show system health
+    - :connections - List all connections
+    - :memory - Show memory usage
+    - :logs - View recent errors
+
+25. Add performance monitoring
+    - Track query execution time
+    - Monitor render performance
+    - Log slow operations (>1s)
+    - Create performance report
+
+
+VALIDATION CHECKLIST
+--------------------
+
+Before each operation:
+[ ] Connection is active
+[ ] User has permission
+[ ] Input is validated
+[ ] Resources are available
+[ ] State is consistent
+
+After each operation:
+[ ] Result is verified
+[ ] State is updated
+[ ] UI is refreshed
+[ ] Errors are handled
+[ ] Resources are released
+
+
+ERROR HANDLING PATTERNS
+------------------------
+
+Pattern 1: Database Operations
+```rust
+match operation().await {
+    Ok(result) => {
+        state.update(result);
+        toast.success("Operation completed");
+    }
+    Err(e) if e.is_recoverable() => {
+        if retry_count < 3 {
+            // Retry with backoff
+        } else {
+            toast.error("Operation failed after 3 attempts");
+            log::error!("Details: {:?}", e);
+        }
+    }
+    Err(e) => {
+        toast.error(format!("Operation failed: {}", e.user_message()));
+        log::error!("Fatal error: {:?}", e);
+        // Rollback any partial changes
+    }
+}
+```
+
+Pattern 2: User Input Validation
+```rust
+if let Err(validation_error) = validate_input(&input) {
+    toast.warning(validation_error.to_string());
+    return; // Don't proceed
+}
+```
+
+Pattern 3: Resource Cleanup
+```rust
+let _guard = ResourceGuard::new(&resource);
+// Resource automatically cleaned up when guard drops
+```
+
+
+TESTING REQUIREMENTS
+--------------------
+
+Each fault tolerance feature needs:
+1. Unit test for happy path
+2. Unit test for error condition
+3. Integration test with real database
+4. Stress test with extreme inputs
+5. Recovery test after failure
+
+
+PRIORITY ORDER
+--------------
+
+1. Fix all unwrap() calls (prevents crashes)
+2. Add connection timeouts (prevents hangs)
+3. Implement transactions (prevents corruption)
+4. Add input validation (prevents errors)
+5. Implement retry logic (improves reliability)
+6. Add resource limits (prevents OOM)
+7. Implement diagnostics (helps debugging)
+
+
+SUCCESS METRICS
+---------------
+
+[ ] Zero panics in 24 hours of usage
+[ ] All operations can be cancelled
+[ ] Database stays consistent after errors
+[ ] App recovers from connection loss
+[ ] Memory usage stays under 100MB
+[ ] No data loss on crash
+[ ] All errors show helpful messages
