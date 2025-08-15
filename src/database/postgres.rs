@@ -7,7 +7,7 @@ use crate::database::{
 };
 use async_trait::async_trait;
 use sqlx::postgres::{PgPool, PgPoolOptions};
-use sqlx::Row;
+use sqlx::{Column, Row};
 
 /// PostgreSQL database connection implementation
 pub struct PostgresConnection {
@@ -383,6 +383,50 @@ impl Connection for PostgresConnection {
             }
 
             Ok(result)
+        } else {
+            Err(LazyTablesError::Connection(
+                "Not connected to database".to_string(),
+            ))
+        }
+    }
+}
+
+impl PostgresConnection {
+    /// Execute a raw SQL query and return columns and rows
+    pub async fn execute_raw_query(
+        &self,
+        query: &str,
+    ) -> Result<(Vec<String>, Vec<Vec<String>>)> {
+        if let Some(pool) = &self.pool {
+            // Try to execute the query
+            let rows = sqlx::query(query).fetch_all(pool).await?;
+            
+            if rows.is_empty() {
+                return Ok((Vec::new(), Vec::new()));
+            }
+            
+            // Get column information from the first row
+            let first_row = &rows[0];
+            let columns = first_row.columns();
+            
+            let column_names: Vec<String> = columns
+                .iter()
+                .map(|col| col.name().to_string())
+                .collect();
+            
+            // Extract data from all rows
+            let mut result_rows = Vec::new();
+            for row in &rows {
+                let mut row_data = Vec::new();
+                for col in columns {
+                    // Try to get value as string
+                    let value: Option<String> = row.try_get(col.ordinal()).ok();
+                    row_data.push(value.unwrap_or_else(|| "NULL".to_string()));
+                }
+                result_rows.push(row_data);
+            }
+            
+            Ok((column_names, result_rows))
         } else {
             Err(LazyTablesError::Connection(
                 "Not connected to database".to_string(),
