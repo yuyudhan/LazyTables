@@ -1,5 +1,6 @@
 // FilePath: src/ui/components/table_viewer.rs
 
+use crate::ui::theme::Theme;
 use ratatui::{
     layout::{Alignment, Constraint, Direction, Layout, Rect},
     style::{Modifier, Style, Stylize},
@@ -8,7 +9,6 @@ use ratatui::{
     Frame,
 };
 use std::collections::HashMap;
-use crate::ui::theme::Theme;
 
 /// Represents a single table tab
 #[derive(Debug, Clone)]
@@ -427,13 +427,14 @@ impl TableViewerState {
                     })
                     .collect::<Vec<_>>()
                     .join(",");
-                
+
                 // Copy to clipboard
                 let mut clipboard = arboard::Clipboard::new()
                     .map_err(|e| format!("Failed to access clipboard: {e}"))?;
-                clipboard.set_text(csv_row)
+                clipboard
+                    .set_text(csv_row)
                     .map_err(|e| format!("Failed to copy to clipboard: {e}"))?;
-                
+
                 Ok(())
             } else {
                 Err("No row selected".to_string())
@@ -458,12 +459,12 @@ impl TableViewerState {
                         }
                     }
                 }
-                
+
                 if primary_key_values.is_empty() {
                     // Can't delete without primary key
                     return None;
                 }
-                
+
                 Some(DeleteConfirmation {
                     row_index: tab.selected_row,
                     table_name: tab.table_name.clone(),
@@ -529,13 +530,13 @@ fn render_delete_confirmation(
     theme: &Theme,
 ) {
     // No full-screen overlay - just render the modal
-    
+
     // Create a compact centered modal
     let modal_width = 50u16.min(area.width - 4);
     let modal_height = 7;
     let x = (area.width.saturating_sub(modal_width)) / 2;
     let y = (area.height.saturating_sub(modal_height)) / 2;
-    
+
     let modal_area = Rect {
         x,
         y,
@@ -548,7 +549,11 @@ fn render_delete_confirmation(
         .borders(Borders::ALL)
         .title(" ⚠ Delete Confirmation ")
         .title_alignment(Alignment::Center)
-        .border_style(Style::default().fg(theme.get_color("danger")).add_modifier(Modifier::BOLD))
+        .border_style(
+            Style::default()
+                .fg(theme.get_color("danger"))
+                .add_modifier(Modifier::BOLD),
+        )
         .style(Style::default().bg(theme.get_color("modal_background")));
 
     f.render_widget(inner_block, modal_area);
@@ -565,19 +570,53 @@ fn render_delete_confirmation(
     let lines = vec![
         Line::from(""),
         Line::from(vec![
-            Span::styled("Delete row ", Style::default().fg(theme.get_color("text_primary"))),
-            Span::styled(format!("#{}", confirmation.row_index + 1), Style::default().fg(theme.get_color("primary_highlight")).add_modifier(Modifier::BOLD)),
-            Span::styled(" from table ", Style::default().fg(theme.get_color("text_primary"))),
-            Span::styled(format!("'{}'", confirmation.table_name), Style::default().fg(theme.get_color("secondary_highlight")).add_modifier(Modifier::BOLD)),
+            Span::styled(
+                "Delete row ",
+                Style::default().fg(theme.get_color("text_primary")),
+            ),
+            Span::styled(
+                format!("#{}", confirmation.row_index + 1),
+                Style::default()
+                    .fg(theme.get_color("primary_highlight"))
+                    .add_modifier(Modifier::BOLD),
+            ),
+            Span::styled(
+                " from table ",
+                Style::default().fg(theme.get_color("text_primary")),
+            ),
+            Span::styled(
+                format!("'{}'", confirmation.table_name),
+                Style::default()
+                    .fg(theme.get_color("secondary_highlight"))
+                    .add_modifier(Modifier::BOLD),
+            ),
             Span::styled("?", Style::default().fg(theme.get_color("text_primary"))),
         ]),
         Line::from(""),
-        Line::from("─────────────────").fg(theme.get_color("border_muted")).centered(),
+        Line::from("─────────────────")
+            .fg(theme.get_color("border_muted"))
+            .centered(),
         Line::from(vec![
-            Span::styled("[Y/Enter] ", Style::default().fg(theme.get_color("success")).add_modifier(Modifier::BOLD)),
-            Span::styled("Confirm  ", Style::default().fg(theme.get_color("text_secondary"))),
-            Span::styled("[N/Esc] ", Style::default().fg(theme.get_color("danger")).add_modifier(Modifier::BOLD)),
-            Span::styled("Cancel", Style::default().fg(theme.get_color("text_secondary"))),
+            Span::styled(
+                "[Y/Enter] ",
+                Style::default()
+                    .fg(theme.get_color("success"))
+                    .add_modifier(Modifier::BOLD),
+            ),
+            Span::styled(
+                "Confirm  ",
+                Style::default().fg(theme.get_color("text_secondary")),
+            ),
+            Span::styled(
+                "[N/Esc] ",
+                Style::default()
+                    .fg(theme.get_color("danger"))
+                    .add_modifier(Modifier::BOLD),
+            ),
+            Span::styled(
+                "Cancel",
+                Style::default().fg(theme.get_color("text_secondary")),
+            ),
         ]),
     ];
 
@@ -593,7 +632,8 @@ fn render_empty_state(f: &mut Frame, area: Rect, theme: &Theme) {
         Line::from(""),
         Line::from("No tables open").fg(theme.get_color("text_muted")),
         Line::from(""),
-        Line::from("Press Enter on a table in the Tables pane to open it").fg(theme.get_color("text_muted")),
+        Line::from("Press Enter on a table in the Tables pane to open it")
+            .fg(theme.get_color("text_muted")),
     ];
 
     let paragraph = Paragraph::new(text)
@@ -731,7 +771,8 @@ fn render_table_content(f: &mut Frame, tab: &TableTab, area: Rect, theme: &Theme
                     let display_value = if is_selected && tab.in_edit_mode {
                         format!(" {}▌ ", tab.edit_buffer)
                     } else if is_modified {
-                        let val = tab.modified_cells
+                        let val = tab
+                            .modified_cells
                             .get(&(row_idx, col_idx))
                             .cloned()
                             .unwrap_or_else(|| value.clone());
@@ -758,7 +799,9 @@ fn render_table_content(f: &mut Frame, tab: &TableTab, area: Rect, theme: &Theme
                             .bg(theme.get_color("search_current_bg"))
                             .add_modifier(Modifier::BOLD)
                     } else if is_selected {
-                        Style::default().fg(theme.get_color("selected_text")).bg(theme.get_color("selected_bg"))
+                        Style::default()
+                            .fg(theme.get_color("selected_text"))
+                            .bg(theme.get_color("selected_bg"))
                     } else if is_search_match {
                         base_style
                             .fg(theme.get_color("search_match"))
@@ -777,9 +820,7 @@ fn render_table_content(f: &mut Frame, tab: &TableTab, area: Rect, theme: &Theme
                 })
                 .collect();
 
-            Row::new(cells)
-                .height(1)
-                .bottom_margin(0)
+            Row::new(cells).height(1).bottom_margin(0)
         })
         .collect();
 

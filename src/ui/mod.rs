@@ -32,9 +32,25 @@ pub struct UI {
 
 impl UI {
     /// Create a new UI instance
-    pub fn new(_config: &Config) -> Result<Self> {
+    pub fn new(config: &Config) -> Result<Self> {
         let layout_manager = LayoutManager::new();
-        let theme = Theme::default();
+        
+        // Load theme based on config or use default
+        let theme = if !config.theme.name.is_empty() {
+            // Try to load theme from available themes
+            let themes = theme::ThemeLoader::list_available_themes();
+            if let Some((_, path)) = themes.iter().find(|(name, _)| name == &config.theme.name) {
+                Theme::load_from_file(path).unwrap_or_else(|e| {
+                    tracing::warn!("Failed to load theme '{}': {}", config.theme.name, e);
+                    Theme::default()
+                })
+            } else {
+                tracing::warn!("Theme '{}' not found, using default", config.theme.name);
+                Theme::default()
+            }
+        } else {
+            Theme::default()
+        };
 
         Ok(Self {
             layout_manager,
@@ -184,16 +200,10 @@ impl UI {
                 let line = Line::from(vec![
                     Span::styled(format!("{} ", connection.status_symbol()), symbol_style),
                     Span::styled("CONN: ", Style::default().fg(Color::DarkGray)),
-                    Span::styled(
-                        &connection.name,
-                        Style::default().fg(Color::White),
-                    ),
+                    Span::styled(&connection.name, Style::default().fg(Color::White)),
                     Span::styled(", ", Style::default().fg(Color::DarkGray)),
                     Span::styled("DB: ", Style::default().fg(Color::DarkGray)),
-                    Span::styled(
-                        db_name,
-                        Style::default().fg(Color::Cyan),
-                    ),
+                    Span::styled(db_name, Style::default().fg(Color::Cyan)),
                     Span::styled(": ", Style::default().fg(Color::DarkGray)),
                     Span::styled(connection.status_text(), text_style),
                 ]);
@@ -247,8 +257,11 @@ impl UI {
                 ])));
 
                 // Show error message if the selected connection has failed
-                if let Some(connection) =
-                    state.db.connections.connections.get(state.ui.selected_connection)
+                if let Some(connection) = state
+                    .db
+                    .connections
+                    .connections
+                    .get(state.ui.selected_connection)
                 {
                     if let Some(error) = connection.get_error() {
                         items.push(ListItem::new(""));
@@ -440,7 +453,8 @@ impl UI {
         if !state.db.tables.is_empty() && has_active_connection {
             // Add 1 to account for the "▼ Tables" header
             state
-                .ui.tables_list_state
+                .ui
+                .tables_list_state
                 .select(Some(state.ui.selected_table + 1));
         }
         frame.render_stateful_widget(tables, area, &mut state.ui.tables_list_state);
@@ -506,15 +520,24 @@ impl UI {
                 Line::from(""),
                 Line::from(vec![
                     Span::styled("Total Size: ", Style::default().fg(Color::Cyan)),
-                    Span::styled(format_bytes(metadata.total_size), Style::default().fg(Color::White)),
+                    Span::styled(
+                        format_bytes(metadata.total_size),
+                        Style::default().fg(Color::White),
+                    ),
                 ]),
                 Line::from(vec![
                     Span::styled("Table Size: ", Style::default().fg(Color::Cyan)),
-                    Span::styled(format_bytes(metadata.table_size), Style::default().fg(Color::White)),
+                    Span::styled(
+                        format_bytes(metadata.table_size),
+                        Style::default().fg(Color::White),
+                    ),
                 ]),
                 Line::from(vec![
                     Span::styled("Indexes Size: ", Style::default().fg(Color::Cyan)),
-                    Span::styled(format_bytes(metadata.indexes_size), Style::default().fg(Color::White)),
+                    Span::styled(
+                        format_bytes(metadata.indexes_size),
+                        Style::default().fg(Color::White),
+                    ),
                 ]),
             ];
 
@@ -625,7 +648,12 @@ impl UI {
     fn draw_tabular_output(&self, frame: &mut Frame, area: Rect, state: &mut AppState) {
         // Use table viewer if tables are open
         if !state.table_viewer_state.tabs.is_empty() {
-            crate::ui::components::render_table_viewer(frame, &mut state.table_viewer_state, area, &self.theme);
+            crate::ui::components::render_table_viewer(
+                frame,
+                &mut state.table_viewer_state,
+                area,
+                &self.theme,
+            );
             return;
         }
 
@@ -926,7 +954,8 @@ impl UI {
                         if is_focused {
                             spans.push(Span::styled(
                                 if state.ui.query_cursor_column < line.len() {
-                                    &line[state.ui.query_cursor_column..state.ui.query_cursor_column + 1]
+                                    &line[state.ui.query_cursor_column
+                                        ..state.ui.query_cursor_column + 1]
                                 } else {
                                     " "
                                 },
@@ -970,15 +999,17 @@ impl UI {
                     crate::app::state::QueryEditMode::Insert => "-- INSERT --".to_string(),
                 }
             };
-            
+
             query_lines.push(Line::from(vec![Span::styled(
                 mode_info,
                 Style::default()
-                    .fg(if state.ui.query_edit_mode == crate::app::state::QueryEditMode::Insert {
-                        Color::Green
-                    } else {
-                        Color::Yellow
-                    })
+                    .fg(
+                        if state.ui.query_edit_mode == crate::app::state::QueryEditMode::Insert {
+                            Color::Green
+                        } else {
+                            Color::Yellow
+                        },
+                    )
                     .add_modifier(Modifier::BOLD),
             )]));
 
@@ -1034,8 +1065,11 @@ impl UI {
         let brand = format!("{} v{}", constants::APP_NAME, constants::VERSION);
 
         // Get real connection info
-        let connection_text = if let Some(connection) =
-            state.db.connections.connections.get(state.ui.selected_connection)
+        let connection_text = if let Some(connection) = state
+            .db
+            .connections
+            .connections
+            .get(state.ui.selected_connection)
         {
             match &connection.status {
                 ConnectionStatus::Connected => format!(
@@ -1061,7 +1095,11 @@ impl UI {
                 if state.db.tables.is_empty() {
                     "No tables".to_string()
                 } else {
-                    format!("Table {}/{}", state.ui.selected_table + 1, state.db.tables.len())
+                    format!(
+                        "Table {}/{}",
+                        state.ui.selected_table + 1,
+                        state.db.tables.len()
+                    )
                 }
             }
             FocusedPane::TabularOutput => {
@@ -1097,9 +1135,7 @@ impl UI {
         };
 
         // Calculate the width of left side content
-        let left_content = format!(
-            "{brand} | {connection_text} | {position_text}{help_hint}"
-        );
+        let left_content = format!("{brand} | {connection_text} | {position_text}{help_hint}");
 
         // Calculate padding needed to right-align the date/time
         let available_width = area.width as usize;
@@ -1144,12 +1180,12 @@ fn format_bytes(bytes: i64) -> String {
     if bytes == 0 {
         return "0 B".to_string();
     }
-    
+
     let bytes = bytes.abs() as f64;
     let i = (bytes.ln() / 1024_f64.ln()).floor() as usize;
     let i = i.min(UNITS.len() - 1);
     let size = bytes / 1024_f64.powi(i as i32);
-    
+
     if i == 0 {
         format!("{:.0} {}", size, UNITS[i])
     } else {
