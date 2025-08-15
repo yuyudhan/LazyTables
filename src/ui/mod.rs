@@ -150,6 +150,7 @@ impl UI {
 
         // Create list items from stored connections
         let mut items: Vec<ListItem> = state
+            .db
             .connections
             .connections
             .iter()
@@ -323,6 +324,7 @@ impl UI {
 
         // Check if there's an active connection
         let has_active_connection = state
+            .db
             .connections
             .connections
             .iter()
@@ -455,6 +457,7 @@ impl UI {
 
         // Check if there's an active connection and table selected
         let has_active_connection = state
+            .db
             .connections
             .connections
             .iter()
@@ -645,6 +648,7 @@ impl UI {
 
         // Check if there's an active connection and table selected
         let has_active_connection = state
+            .db
             .connections
             .connections
             .iter()
@@ -844,6 +848,7 @@ impl UI {
 
         // Check if there's an active connection for better help messages
         let has_active_connection = state
+            .db
             .connections
             .connections
             .iter()
