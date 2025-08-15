@@ -1,9 +1,9 @@
 // FilePath: src/state/ui.rs
 
-use serde::{Deserialize, Serialize};
 use ratatui::widgets::ListState;
-use std::path::PathBuf;
+use serde::{Deserialize, Serialize};
 use std::fs;
+use std::path::PathBuf;
 
 /// Which pane currently has focus
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
@@ -85,7 +85,7 @@ pub struct UIState {
     pub last_left_pane: FocusedPane,
     /// Current help display mode
     pub help_mode: HelpMode,
-    
+
     // Selection indices
     /// Selected connection index
     pub selected_connection: usize,
@@ -93,7 +93,7 @@ pub struct UIState {
     pub selected_table: usize,
     /// Selected SQL file index in the browser
     pub selected_sql_file: usize,
-    
+
     // Cursor positions
     /// Current row in main content
     pub current_row: usize,
@@ -102,7 +102,7 @@ pub struct UIState {
     /// Current cursor position in query editor
     pub query_cursor_line: usize,
     pub query_cursor_column: usize,
-    
+
     // Query editor state
     /// Query editor mode
     pub query_edit_mode: QueryEditMode,
@@ -110,13 +110,13 @@ pub struct UIState {
     pub query_modified: bool,
     /// Currently loaded SQL file path
     pub current_sql_file: Option<String>,
-    
+
     // Vim command state
     /// Vim command buffer for :w, :q, etc
     pub vim_command_buffer: String,
     /// Whether we're in vim command mode (after pressing :)
     pub in_vim_command: bool,
-    
+
     // Modal visibility states
     /// Show connection creation modal
     pub show_add_connection_modal: bool,
@@ -126,7 +126,7 @@ pub struct UIState {
     pub show_table_creator: bool,
     /// Show table editor view
     pub show_table_editor: bool,
-    
+
     // List UI states (not serialized)
     #[serde(skip)]
     pub connections_list_state: ListState,
@@ -139,7 +139,7 @@ impl UIState {
     pub fn new() -> Self {
         let mut connections_list_state = ListState::default();
         connections_list_state.select(Some(0));
-        
+
         Self {
             focused_pane: FocusedPane::Connections,
             last_left_pane: FocusedPane::Connections,
@@ -164,7 +164,7 @@ impl UIState {
             tables_list_state: ListState::default(),
         }
     }
-    
+
     /// Save UI state to disk
     pub fn save(&self) -> Result<(), Box<dyn std::error::Error>> {
         let state_file = Self::state_file_path()?;
@@ -172,54 +172,58 @@ impl UIState {
         fs::write(state_file, json)?;
         Ok(())
     }
-    
+
     /// Load UI state from disk
     pub fn load() -> Result<Self, Box<dyn std::error::Error>> {
         let state_file = Self::state_file_path()?;
-        
+
         if !state_file.exists() {
             return Ok(Self::new());
         }
-        
+
         let json = fs::read_to_string(state_file)?;
         let mut state: Self = serde_json::from_str(&json)?;
-        
+
         // Initialize non-serialized fields
         state.connections_list_state = ListState::default();
         if state.selected_connection > 0 {
-            state.connections_list_state.select(Some(state.selected_connection));
+            state
+                .connections_list_state
+                .select(Some(state.selected_connection));
         }
-        
+
         state.tables_list_state = ListState::default();
         if state.selected_table > 0 {
-            state.tables_list_state.select(Some(state.selected_table + 1));
+            state
+                .tables_list_state
+                .select(Some(state.selected_table + 1));
         }
-        
+
         Ok(state)
     }
-    
+
     /// Get the path to the UI state file
     fn state_file_path() -> Result<PathBuf, Box<dyn std::error::Error>> {
         let config_dir = dirs::config_dir()
             .ok_or("Could not find config directory")?
             .join("lazytables");
-        
+
         fs::create_dir_all(&config_dir)?;
         Ok(config_dir.join("ui_state.json"))
     }
-    
+
     /// Cycle focus to the next pane
     pub fn cycle_focus_forward(&mut self) {
         let new_pane = self.focused_pane.next();
         self.update_focus(new_pane);
     }
-    
+
     /// Cycle focus to the previous pane
     pub fn cycle_focus_backward(&mut self) {
         let new_pane = self.focused_pane.previous();
         self.update_focus(new_pane);
     }
-    
+
     /// Move focus left (Ctrl+h)
     pub fn move_focus_left(&mut self) {
         let new_pane = match self.focused_pane {
@@ -237,10 +241,10 @@ impl UIState {
             // Left column panes don't have anything to the left
             _ => self.focused_pane,
         };
-        
+
         self.update_focus(new_pane);
     }
-    
+
     /// Move focus down (Ctrl+j)
     pub fn move_focus_down(&mut self) {
         let new_pane = match self.focused_pane {
@@ -250,10 +254,10 @@ impl UIState {
             // Bottom panes don't have anything below
             _ => self.focused_pane,
         };
-        
+
         self.update_focus(new_pane);
     }
-    
+
     /// Move focus up (Ctrl+k)
     pub fn move_focus_up(&mut self) {
         let new_pane = match self.focused_pane {
@@ -264,10 +268,10 @@ impl UIState {
             // Top panes don't have anything above
             _ => self.focused_pane,
         };
-        
+
         self.update_focus(new_pane);
     }
-    
+
     /// Move focus right (Ctrl+l)
     pub fn move_focus_right(&mut self) {
         let new_pane = match self.focused_pane {
@@ -278,10 +282,10 @@ impl UIState {
             // Right column panes don't have anything to the right
             _ => self.focused_pane,
         };
-        
+
         self.update_focus(new_pane);
     }
-    
+
     /// Update focus and track left pane usage for smart navigation
     fn update_focus(&mut self, new_pane: FocusedPane) {
         // Track the last focused left column pane for smart navigation
@@ -291,10 +295,10 @@ impl UIState {
         ) {
             self.last_left_pane = self.focused_pane;
         }
-        
+
         self.focused_pane = new_pane;
     }
-    
+
     /// Update connection list selection state
     pub fn update_connection_selection(&mut self, count: usize) {
         if count > 0 {
@@ -302,13 +306,14 @@ impl UIState {
             if self.selected_connection >= count {
                 self.selected_connection = count - 1;
             }
-            self.connections_list_state.select(Some(self.selected_connection));
+            self.connections_list_state
+                .select(Some(self.selected_connection));
         } else {
             self.selected_connection = 0;
             self.connections_list_state.select(None);
         }
     }
-    
+
     /// Update table list selection state
     pub fn update_table_selection(&mut self, count: usize) {
         if count > 0 {
@@ -323,7 +328,7 @@ impl UIState {
             self.tables_list_state.select(None);
         }
     }
-    
+
     /// Update SQL file list selection
     pub fn update_sql_file_selection(&mut self, count: usize) {
         if count > 0 && self.selected_sql_file >= count {
@@ -332,15 +337,16 @@ impl UIState {
             self.selected_sql_file = 0;
         }
     }
-    
+
     /// Move connection selection down
     pub fn connection_down(&mut self, max_count: usize) {
         if max_count > 0 {
             self.selected_connection = (self.selected_connection + 1) % max_count;
-            self.connections_list_state.select(Some(self.selected_connection));
+            self.connections_list_state
+                .select(Some(self.selected_connection));
         }
     }
-    
+
     /// Move connection selection up
     pub fn connection_up(&mut self, max_count: usize) {
         if max_count > 0 {
@@ -349,10 +355,11 @@ impl UIState {
             } else {
                 max_count - 1
             };
-            self.connections_list_state.select(Some(self.selected_connection));
+            self.connections_list_state
+                .select(Some(self.selected_connection));
         }
     }
-    
+
     /// Move table selection down
     pub fn table_down(&mut self, max_count: usize) {
         if max_count > 0 {
@@ -361,7 +368,7 @@ impl UIState {
             self.tables_list_state.select(Some(self.selected_table + 1));
         }
     }
-    
+
     /// Move table selection up
     pub fn table_up(&mut self, max_count: usize) {
         if max_count > 0 {
@@ -374,12 +381,12 @@ impl UIState {
             self.tables_list_state.select(Some(self.selected_table + 1));
         }
     }
-    
+
     /// Reset all UI state to defaults
     pub fn reset(&mut self) {
         *self = Self::new();
     }
-    
+
     /// Clear modal states
     pub fn clear_modals(&mut self) {
         self.show_add_connection_modal = false;
@@ -387,13 +394,13 @@ impl UIState {
         self.show_table_creator = false;
         self.show_table_editor = false;
     }
-    
+
     /// Enter vim command mode
     pub fn enter_vim_command(&mut self) {
         self.in_vim_command = true;
         self.vim_command_buffer.clear();
     }
-    
+
     /// Exit vim command mode
     pub fn exit_vim_command(&mut self) {
         self.in_vim_command = false;

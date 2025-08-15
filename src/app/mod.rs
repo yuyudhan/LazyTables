@@ -124,9 +124,7 @@ impl App {
                 self.state.toast_manager.error(&msg);
             }
             CommandResult::RequiresConfirmation(msg) => {
-                self.state
-                    .toast_manager
-                    .warning(&format!("Confirm: {}", msg));
+                self.state.toast_manager.warning(format!("Confirm: {msg}"));
             }
             CommandResult::Cancelled => {}
             CommandResult::Action(action) => {
@@ -163,25 +161,20 @@ impl App {
             }
             CommandAction::ExecuteQuery(query) => {
                 // TODO: Execute query through database connection
-                self.state
-                    .toast_manager
-                    .info(&format!("Executing: {}", query));
+                self.state.toast_manager.info(format!("Executing: {query}"));
             }
             CommandAction::LoadFile(path) => {
                 // TODO: Load file
-                self.state.toast_manager.info(&format!("Loading: {}", path));
+                self.state.toast_manager.info(format!("Loading: {path}"));
             }
             CommandAction::SaveFile(path) => {
                 // TODO: Save file
-                self.state.toast_manager.info(&format!("Saving: {}", path));
+                self.state.toast_manager.info(format!("Saving: {path}"));
             }
             CommandAction::Navigate(target) => {
                 use crate::commands::NavigationTarget;
-                match target {
-                    NavigationTarget::Pane(pane) => {
-                        self.state.ui.focused_pane = pane;
-                    }
-                    _ => {}
+                if let NavigationTarget::Pane(pane) = target {
+                    self.state.ui.focused_pane = pane;
                 }
             }
         }
@@ -536,8 +529,12 @@ impl App {
                         } else if self.state.ui.focused_pane == FocusedPane::Details {
                             // Load metadata for current table if not already loaded
                             if self.state.db.current_table_metadata.is_none() {
-                                if let Some(table_name) =
-                                    self.state.db.tables.get(self.state.ui.selected_table).cloned()
+                                if let Some(table_name) = self
+                                    .state
+                                    .db
+                                    .tables
+                                    .get(self.state.ui.selected_table)
+                                    .cloned()
                                 {
                                     if let Err(e) =
                                         self.state.load_table_metadata(&table_name).await
@@ -1592,4 +1589,3 @@ impl App {
         Ok(())
     }
 }
-

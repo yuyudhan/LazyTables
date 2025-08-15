@@ -4,4 +4,4 @@ pub mod database;
 pub mod ui;
 
 pub use database::DatabaseState;
-pub use ui::{UIState, FocusedPane, HelpMode, QueryEditMode};
+pub use ui::{FocusedPane, HelpMode, QueryEditMode, UIState};
