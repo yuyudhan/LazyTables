@@ -87,7 +87,7 @@ impl UI {
 
         // Draw help overlay if active
         use crate::ui::help::HelpSystem;
-        HelpSystem::render_help(frame, state.help_mode);
+        HelpSystem::render_help(frame, state.ui.help_mode);
 
         // Cleanup expired toasts
         state.toast_manager.cleanup();
@@ -98,7 +98,7 @@ impl UI {
         // Command mode is handled internally, not shown in UI
 
         // Draw connection modal if active (either add or edit)
-        if state.show_add_connection_modal || state.show_edit_connection_modal {
+        if state.ui.show_add_connection_modal || state.ui.show_edit_connection_modal {
             crate::ui::components::render_connection_modal(
                 frame,
                 &state.connection_modal_state,
@@ -107,7 +107,7 @@ impl UI {
         }
 
         // Draw table creator if active
-        if state.show_table_creator {
+        if state.ui.show_table_creator {
             crate::ui::components::render_table_creator(
                 frame,
                 &mut state.table_creator_state,
@@ -116,7 +116,7 @@ impl UI {
         }
 
         // Draw table editor if active
-        if state.show_table_editor {
+        if state.ui.show_table_editor {
             crate::ui::components::render_table_editor(
                 frame,
                 &mut state.table_editor_state,
@@ -141,7 +141,7 @@ impl UI {
 
     /// Draw the connections pane
     fn draw_connections_pane(&self, frame: &mut Frame, area: Rect, state: &mut AppState) {
-        let is_focused = state.focused_pane == FocusedPane::Connections;
+        let is_focused = state.ui.focused_pane == FocusedPane::Connections;
         let border_style = if is_focused {
             Style::default().fg(self.theme.get_color("active_border"))
         } else {
@@ -247,7 +247,7 @@ impl UI {
 
                 // Show error message if the selected connection has failed
                 if let Some(connection) =
-                    state.connections.connections.get(state.selected_connection)
+                    state.connections.connections.get(state.ui.selected_connection)
                 {
                     if let Some(error) = connection.get_error() {
                         items.push(ListItem::new(""));
@@ -305,16 +305,16 @@ impl UI {
             );
 
         // Use stateful widget to show selection
-        let mut list_state = state.connections_list_state.clone();
+        let mut list_state = state.ui.connections_list_state.clone();
         frame.render_stateful_widget(connections, area, &mut list_state);
 
         // Update the state with any changes
-        state.connections_list_state = list_state;
+        state.ui.connections_list_state = list_state;
     }
 
     /// Draw the tables/views pane
     fn draw_tables_pane(&self, frame: &mut Frame, area: Rect, state: &mut AppState) {
-        let is_focused = state.focused_pane == FocusedPane::Tables;
+        let is_focused = state.ui.focused_pane == FocusedPane::Tables;
         let border_style = if is_focused {
             Style::default().fg(self.theme.get_color("active_border"))
         } else {
@@ -438,15 +438,15 @@ impl UI {
         if !state.tables.is_empty() && has_active_connection {
             // Add 1 to account for the "▼ Tables" header
             state
-                .tables_list_state
-                .select(Some(state.selected_table + 1));
+                .ui.tables_list_state
+                .select(Some(state.ui.selected_table + 1));
         }
-        frame.render_stateful_widget(tables, area, &mut state.tables_list_state);
+        frame.render_stateful_widget(tables, area, &mut state.ui.tables_list_state);
     }
 
     /// Draw the table details pane
     fn draw_details_pane(&self, frame: &mut Frame, area: Rect, state: &AppState) {
-        let is_focused = state.focused_pane == FocusedPane::Details;
+        let is_focused = state.ui.focused_pane == FocusedPane::Details;
         let border_style = if is_focused {
             Style::default().fg(self.theme.get_color("active_border"))
         } else {
@@ -627,7 +627,7 @@ impl UI {
         }
 
         // Check if table creator is active
-        if state.show_table_creator {
+        if state.ui.show_table_creator {
             crate::ui::components::render_table_creator(
                 frame,
                 &mut state.table_creator_state,
@@ -636,7 +636,7 @@ impl UI {
             return;
         }
 
-        let is_focused = state.focused_pane == FocusedPane::TabularOutput;
+        let is_focused = state.ui.focused_pane == FocusedPane::TabularOutput;
         let border_style = if is_focused {
             Style::default().fg(self.theme.get_color("active_border"))
         } else {
@@ -756,7 +756,7 @@ impl UI {
 
     /// Draw the SQL files browser pane
     fn draw_sql_files_pane(&self, frame: &mut Frame, area: Rect, state: &AppState) {
-        let is_focused = state.focused_pane == FocusedPane::SqlFiles;
+        let is_focused = state.ui.focused_pane == FocusedPane::SqlFiles;
         let border_style = if is_focused {
             Style::default().fg(self.theme.get_color("active_border"))
         } else {
@@ -769,17 +769,17 @@ impl UI {
             .iter()
             .enumerate()
             .map(|(i, filename)| {
-                let prefix = if Some(filename) == state.current_sql_file.as_ref() {
+                let prefix = if Some(filename) == state.ui.current_sql_file.as_ref() {
                     "● " // Indicate currently loaded file
                 } else {
                     "  "
                 };
 
-                let style = if Some(filename) == state.current_sql_file.as_ref() {
+                let style = if Some(filename) == state.ui.current_sql_file.as_ref() {
                     Style::default()
                         .fg(Color::Green)
                         .add_modifier(Modifier::BOLD)
-                } else if i == state.selected_sql_file && is_focused {
+                } else if i == state.ui.selected_sql_file && is_focused {
                     Style::default().fg(self.theme.get_color("primary_highlight"))
                 } else {
                     Style::default().fg(self.theme.get_color("text"))
@@ -835,7 +835,7 @@ impl UI {
 
     /// Draw the query window area
     fn draw_query_window(&self, frame: &mut Frame, area: Rect, state: &AppState) {
-        let is_focused = state.focused_pane == FocusedPane::QueryWindow;
+        let is_focused = state.ui.focused_pane == FocusedPane::QueryWindow;
         let border_style = if is_focused {
             Style::default().fg(self.theme.get_color("active_border"))
         } else {
@@ -912,24 +912,24 @@ impl UI {
                 .lines()
                 .enumerate()
                 .map(|(i, line)| {
-                    if i == state.query_cursor_line {
+                    if i == state.ui.query_cursor_line {
                         // Highlight current line
                         let mut spans = Vec::new();
-                        if state.query_cursor_column > 0 {
-                            spans.push(Span::raw(&line[..state.query_cursor_column]));
+                        if state.ui.query_cursor_column > 0 {
+                            spans.push(Span::raw(&line[..state.ui.query_cursor_column]));
                         }
                         if is_focused {
                             spans.push(Span::styled(
-                                if state.query_cursor_column < line.len() {
-                                    &line[state.query_cursor_column..state.query_cursor_column + 1]
+                                if state.ui.query_cursor_column < line.len() {
+                                    &line[state.ui.query_cursor_column..state.ui.query_cursor_column + 1]
                                 } else {
                                     " "
                                 },
                                 Style::default().bg(Color::Gray).fg(Color::Black),
                             ));
                         }
-                        if state.query_cursor_column + 1 < line.len() {
-                            spans.push(Span::raw(&line[state.query_cursor_column + 1..]));
+                        if state.ui.query_cursor_column + 1 < line.len() {
+                            spans.push(Span::raw(&line[state.ui.query_cursor_column + 1..]));
                         }
                         Line::from(spans)
                     } else {
@@ -944,8 +944,8 @@ impl UI {
             query_lines.push(Line::from(""));
 
             // Show current file info
-            let file_info = if let Some(ref filename) = state.current_sql_file {
-                let modified_indicator = if state.query_modified { " [+]" } else { "" };
+            let file_info = if let Some(ref filename) = state.ui.current_sql_file {
+                let modified_indicator = if state.ui.query_modified { " [+]" } else { "" };
                 format!("File: {filename}{modified_indicator}")
             } else {
                 "New file (unsaved)".to_string()
@@ -957,10 +957,10 @@ impl UI {
             )]));
 
             // Show vim mode and command
-            let mode_info = if state.in_vim_command {
-                format!(":{}", state.vim_command_buffer)
+            let mode_info = if state.ui.in_vim_command {
+                format!(":{}", state.ui.vim_command_buffer)
             } else {
-                match state.query_edit_mode {
+                match state.ui.query_edit_mode {
                     crate::app::state::QueryEditMode::Normal => "-- NORMAL --".to_string(),
                     crate::app::state::QueryEditMode::Insert => "-- INSERT --".to_string(),
                 }
@@ -969,7 +969,7 @@ impl UI {
             query_lines.push(Line::from(vec![Span::styled(
                 mode_info,
                 Style::default()
-                    .fg(if state.query_edit_mode == crate::app::state::QueryEditMode::Insert {
+                    .fg(if state.ui.query_edit_mode == crate::app::state::QueryEditMode::Insert {
                         Color::Green
                     } else {
                         Color::Yellow
@@ -1030,7 +1030,7 @@ impl UI {
 
         // Get real connection info
         let connection_text = if let Some(connection) =
-            state.connections.connections.get(state.selected_connection)
+            state.connections.connections.get(state.ui.selected_connection)
         {
             match &connection.status {
                 ConnectionStatus::Connected => format!(
@@ -1046,17 +1046,17 @@ impl UI {
         };
 
         // Get real position/context info
-        let position_text = match state.focused_pane {
+        let position_text = match state.ui.focused_pane {
             FocusedPane::Connections => format!(
                 "Connection {}/{}",
-                state.selected_connection + 1,
+                state.ui.selected_connection + 1,
                 state.connections.connections.len()
             ),
             FocusedPane::Tables => {
                 if state.tables.is_empty() {
                     "No tables".to_string()
                 } else {
-                    format!("Table {}/{}", state.selected_table + 1, state.tables.len())
+                    format!("Table {}/{}", state.ui.selected_table + 1, state.tables.len())
                 }
             }
             FocusedPane::TabularOutput => {
@@ -1085,7 +1085,7 @@ impl UI {
         let datetime_text = now.format("%b %d, %Y  %H:%M:%S").to_string();
 
         // Add help hint when not showing help
-        let help_hint = if state.help_mode == crate::app::state::HelpMode::None {
+        let help_hint = if state.ui.help_mode == crate::app::state::HelpMode::None {
             " | Press ? for help or q to quit"
         } else {
             ""

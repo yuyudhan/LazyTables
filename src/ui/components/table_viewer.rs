@@ -528,10 +528,7 @@ fn render_delete_confirmation(
     area: Rect,
     theme: &Theme,
 ) {
-    // First, render a full-screen dark overlay to hide the background
-    let full_overlay = Block::default()
-        .style(Style::default().bg(theme.get_color("modal_overlay")));
-    f.render_widget(full_overlay, area);
+    // No full-screen overlay - just render the modal
     
     // Create a compact centered modal
     let modal_width = 50u16.min(area.width - 4);
