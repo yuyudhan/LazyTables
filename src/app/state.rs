@@ -1,149 +1,42 @@
 // FilePath: src/app/state.rs
 
+use sqlx;
 use crate::{
     config::Config,
     database::{
         connection::ConnectionStorage, ConnectionConfig, ConnectionStatus, DatabaseType,
         TableMetadata,
     },
+    state::ui::UIState,
     ui::components::{
         ConnectionModalState, TableCreatorState, TableEditorState, TableViewerState, ToastManager,
     },
 };
-use ratatui::widgets::ListState;
-use serde::{Deserialize, Serialize};
 
-/// Help display mode for context-aware help
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum HelpMode {
-    /// No help displayed
-    None,
-    /// Connections pane help
-    Connections,
-    /// Tables pane help
-    Tables,
-    /// Details pane help
-    Details,
-    /// Tabular output help
-    TabularOutput,
-    /// SQL Files help
-    SqlFiles,
-    /// Query window help
-    QueryWindow,
-}
-
-/// Internal editing state for query window
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum QueryEditMode {
-    /// Normal navigation mode
-    Normal,
-    /// Insert/edit mode for typing
-    Insert,
-}
-
-/// Which pane currently has focus
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
-pub enum FocusedPane {
-    /// Connections list pane
-    Connections,
-    /// Tables/Views list pane
-    Tables,
-    /// Table details pane
-    Details,
-    /// Tabular output area
-    TabularOutput,
-    /// SQL file browser
-    SqlFiles,
-    /// Query window (SQL editor)
-    QueryWindow,
-}
-
-impl FocusedPane {
-    /// Get the next pane in clockwise order
-    pub fn next(&self) -> Self {
-        match self {
-            Self::Connections => Self::Tables,
-            Self::Tables => Self::Details,
-            Self::Details => Self::TabularOutput,
-            Self::TabularOutput => Self::SqlFiles,
-            Self::SqlFiles => Self::QueryWindow,
-            Self::QueryWindow => Self::Connections,
-        }
-    }
-
-    /// Get the previous pane in counter-clockwise order
-    pub fn previous(&self) -> Self {
-        match self {
-            Self::Connections => Self::QueryWindow,
-            Self::Tables => Self::Connections,
-            Self::Details => Self::Tables,
-            Self::TabularOutput => Self::Details,
-            Self::SqlFiles => Self::TabularOutput,
-            Self::QueryWindow => Self::SqlFiles,
-        }
-    }
-}
+// Re-export for backward compatibility
+pub use crate::state::ui::{FocusedPane, HelpMode, QueryEditMode};
 
 /// Main application state
 #[derive(Debug, Clone)]
 pub struct AppState {
-    /// Currently focused pane
-    pub focused_pane: FocusedPane,
-    /// Current help display mode
-    pub help_mode: HelpMode,
-    /// Selected connection index
-    pub selected_connection: usize,
-    /// Selected table index
-    pub selected_table: usize,
-    /// Current row in main content
-    pub current_row: usize,
-    /// Current column in main content
-    pub current_column: usize,
+    /// UI state that can be saved/restored
+    pub ui: UIState,
     /// Connections storage
     pub connections: ConnectionStorage,
-    /// Connections list state for UI selection
-    pub connections_list_state: ListState,
-    /// Tables list state for UI selection
-    pub tables_list_state: ListState,
-    /// Show connection creation modal
-    pub show_add_connection_modal: bool,
-    /// Show connection edit modal
-    pub show_edit_connection_modal: bool,
     /// Connection modal state
     pub connection_modal_state: ConnectionModalState,
     /// SQL query editor content
     pub query_content: String,
-    /// Current cursor position in query editor
-    pub query_cursor_line: usize,
-    pub query_cursor_column: usize,
-    /// Query editor mode
-    pub query_edit_mode: QueryEditMode,
     /// List of saved SQL files for current project
     pub saved_sql_files: Vec<String>,
-    /// Selected SQL file index in the browser
-    pub selected_sql_file: usize,
-    /// Currently loaded SQL file path
-    pub current_sql_file: Option<String>,
-    /// Whether query content has been modified
-    pub query_modified: bool,
-    /// Vim command buffer for :w, :q, etc
-    pub vim_command_buffer: String,
-    /// Whether we're in vim command mode (after pressing :)
-    pub in_vim_command: bool,
-    /// Last focused left column pane (for smarter navigation)
-    pub last_left_pane: FocusedPane,
     /// Tables in the currently connected database
     pub tables: Vec<String>,
     /// Error message for table loading
     pub table_load_error: Option<String>,
     /// Table creator state
     pub table_creator_state: TableCreatorState,
-    /// Show table creator view
-    pub show_table_creator: bool,
     /// Table editor state
     pub table_editor_state: TableEditorState,
-    /// Show table editor view
-    pub show_table_editor: bool,
     /// Table viewer state
     pub table_viewer_state: TableViewerState,
     /// Toast notifications manager
@@ -160,46 +53,23 @@ impl AppState {
 
         let connections = ConnectionStorage::load().unwrap_or_default();
         let saved_sql_files = Vec::new(); // Will be loaded when connection is selected
-
-        // Initialize connections list state
-        let mut connections_list_state = ListState::default();
-        if !connections.connections.is_empty() {
-            connections_list_state.select(Some(0));
-        }
-
-        // Initialize tables list state
-        let tables_list_state = ListState::default();
+        
+        // Load or create UI state
+        let mut ui = UIState::load().unwrap_or_default();
+        
+        // Update list states based on loaded connections
+        ui.update_connection_selection(connections.connections.len());
 
         Self {
-            focused_pane: FocusedPane::Connections,
-            help_mode: HelpMode::None,
-            selected_connection: 0,
-            selected_table: 0,
-            current_row: 0,
-            current_column: 0,
+            ui,
             connections,
-            connections_list_state,
-            tables_list_state,
-            show_add_connection_modal: false,
-            show_edit_connection_modal: false,
             connection_modal_state: ConnectionModalState::new(),
             query_content: String::new(),
-            query_cursor_line: 0,
-            query_cursor_column: 0,
-            query_edit_mode: QueryEditMode::Normal,
             saved_sql_files,
-            selected_sql_file: 0,
-            current_sql_file: None,
-            query_modified: false,
-            vim_command_buffer: String::new(),
-            in_vim_command: false,
-            last_left_pane: FocusedPane::Connections,
             tables: Vec::new(),
             table_load_error: None,
             table_creator_state: TableCreatorState::new(),
-            show_table_creator: false,
             table_editor_state: TableEditorState::new("table".to_string()),
-            show_table_editor: false,
             table_viewer_state: TableViewerState::new(),
             toast_manager: ToastManager::new(),
             current_table_metadata: None,
@@ -208,94 +78,37 @@ impl AppState {
 
     /// Cycle focus to the next pane
     pub fn cycle_focus_forward(&mut self) {
-        let new_pane = self.focused_pane.next();
-        self.update_focus(new_pane);
+        self.ui.cycle_focus_forward();
     }
 
     /// Cycle focus to the previous pane
     pub fn cycle_focus_backward(&mut self) {
-        let new_pane = self.focused_pane.previous();
-        self.update_focus(new_pane);
+        self.ui.cycle_focus_backward();
     }
 
     /// Move focus left (Ctrl+h)
     pub fn move_focus_left(&mut self) {
-        let new_pane = match self.focused_pane {
-            FocusedPane::TabularOutput => {
-                // Smart selection: go to the last focused left pane, defaulting to middle (Tables)
-                match self.last_left_pane {
-                    FocusedPane::Connections | FocusedPane::Tables | FocusedPane::Details => {
-                        self.last_left_pane
-                    }
-                    _ => FocusedPane::Tables, // Default to middle pane
-                }
-            }
-            FocusedPane::QueryWindow => FocusedPane::Details,
-            FocusedPane::SqlFiles => FocusedPane::QueryWindow,
-            // Left column panes don't have anything to the left
-            _ => self.focused_pane,
-        };
-
-        self.update_focus(new_pane);
+        self.ui.move_focus_left();
     }
 
     /// Move focus down (Ctrl+j)
     pub fn move_focus_down(&mut self) {
-        let new_pane = match self.focused_pane {
-            FocusedPane::Connections => FocusedPane::Tables,
-            FocusedPane::Tables => FocusedPane::Details,
-            FocusedPane::TabularOutput => FocusedPane::QueryWindow,
-            // Bottom panes don't have anything below
-            _ => self.focused_pane,
-        };
-
-        self.update_focus(new_pane);
+        self.ui.move_focus_down();
     }
 
     /// Move focus up (Ctrl+k)
     pub fn move_focus_up(&mut self) {
-        let new_pane = match self.focused_pane {
-            FocusedPane::Tables => FocusedPane::Connections,
-            FocusedPane::Details => FocusedPane::Tables,
-            FocusedPane::QueryWindow => FocusedPane::TabularOutput,
-            FocusedPane::SqlFiles => FocusedPane::TabularOutput,
-            // Top panes don't have anything above
-            _ => self.focused_pane,
-        };
-
-        self.update_focus(new_pane);
+        self.ui.move_focus_up();
     }
 
     /// Move focus right (Ctrl+l)
     pub fn move_focus_right(&mut self) {
-        let new_pane = match self.focused_pane {
-            FocusedPane::Connections => FocusedPane::TabularOutput,
-            FocusedPane::Tables => FocusedPane::TabularOutput,
-            FocusedPane::Details => FocusedPane::QueryWindow,
-            FocusedPane::QueryWindow => FocusedPane::SqlFiles,
-            // Right column panes don't have anything to the right
-            _ => self.focused_pane,
-        };
-
-        self.update_focus(new_pane);
-    }
-
-    /// Update focus and track left pane usage for smart navigation
-    fn update_focus(&mut self, new_pane: FocusedPane) {
-        // Track the last focused left column pane for smart navigation
-        if matches!(
-            self.focused_pane,
-            FocusedPane::Connections | FocusedPane::Tables | FocusedPane::Details
-        ) {
-            self.last_left_pane = self.focused_pane;
-        }
-
-        self.focused_pane = new_pane;
+        self.ui.move_focus_right();
     }
 
     /// Move selection up based on current focus
     pub fn move_up(&mut self) {
-        match self.focused_pane {
+        match self.ui.focused_pane {
             FocusedPane::Connections => {
                 self.connection_up();
             }
@@ -310,10 +123,10 @@ impl AppState {
                 }
             }
             FocusedPane::SqlFiles => {
-                self.selected_sql_file = self.selected_sql_file.saturating_sub(1);
+                self.ui.selected_sql_file = self.ui.selected_sql_file.saturating_sub(1);
             }
             FocusedPane::QueryWindow => {
-                self.query_cursor_line = self.query_cursor_line.saturating_sub(1);
+                self.ui.query_cursor_line = self.ui.query_cursor_line.saturating_sub(1);
             }
             _ => {}
         }
@@ -321,7 +134,7 @@ impl AppState {
 
     /// Move selection down based on current focus
     pub fn move_down(&mut self) {
-        match self.focused_pane {
+        match self.ui.focused_pane {
             FocusedPane::Connections => {
                 self.connection_down();
             }
@@ -337,14 +150,14 @@ impl AppState {
             }
             FocusedPane::SqlFiles => {
                 let max_files = self.saved_sql_files.len().saturating_sub(1);
-                if self.selected_sql_file < max_files {
-                    self.selected_sql_file += 1;
+                if self.ui.selected_sql_file < max_files {
+                    self.ui.selected_sql_file += 1;
                 }
             }
             FocusedPane::QueryWindow => {
                 let lines = self.query_content.lines().count();
-                if self.query_cursor_line < lines.saturating_sub(1) {
-                    self.query_cursor_line += 1;
+                if self.ui.query_cursor_line < lines.saturating_sub(1) {
+                    self.ui.query_cursor_line += 1;
                 }
             }
             _ => {}
@@ -353,7 +166,7 @@ impl AppState {
 
     /// Move selection left based on current focus
     pub fn move_left(&mut self) {
-        match self.focused_pane {
+        match self.ui.focused_pane {
             FocusedPane::TabularOutput => {
                 if let Some(tab) = self.table_viewer_state.current_tab_mut() {
                     if !tab.in_edit_mode {
@@ -362,7 +175,7 @@ impl AppState {
                 }
             }
             FocusedPane::QueryWindow => {
-                self.query_cursor_column = self.query_cursor_column.saturating_sub(1);
+                self.ui.query_cursor_column = self.ui.query_cursor_column.saturating_sub(1);
             }
             _ => {}
         }
@@ -370,7 +183,7 @@ impl AppState {
 
     /// Move selection right based on current focus
     pub fn move_right(&mut self) {
-        match self.focused_pane {
+        match self.ui.focused_pane {
             FocusedPane::TabularOutput => {
                 if let Some(tab) = self.table_viewer_state.current_tab_mut() {
                     if !tab.in_edit_mode {
@@ -379,9 +192,9 @@ impl AppState {
                 }
             }
             FocusedPane::QueryWindow => {
-                if let Some(current_line) = self.query_content.lines().nth(self.query_cursor_line) {
-                    if self.query_cursor_column < current_line.len() {
-                        self.query_cursor_column += 1;
+                if let Some(current_line) = self.query_content.lines().nth(self.ui.query_cursor_line) {
+                    if self.ui.query_cursor_column < current_line.len() {
+                        self.ui.query_cursor_column += 1;
                     }
                 }
             }
@@ -393,7 +206,7 @@ impl AppState {
     pub fn get_selected_connection(
         &self,
     ) -> Option<&crate::database::connection::ConnectionConfig> {
-        self.connections.connections.get(self.selected_connection)
+        self.connections.connections.get(self.ui.selected_connection)
     }
 
     /// Get currently selected connection (mutable)
@@ -402,33 +215,33 @@ impl AppState {
     ) -> Option<&mut crate::database::connection::ConnectionConfig> {
         self.connections
             .connections
-            .get_mut(self.selected_connection)
+            .get_mut(self.ui.selected_connection)
     }
 
     /// Open the add connection modal
     pub fn open_add_connection_modal(&mut self) {
-        self.show_add_connection_modal = true;
+        self.ui.show_add_connection_modal = true;
         self.connection_modal_state = ConnectionModalState::new(); // Reset state
     }
 
     /// Close the add connection modal
     pub fn close_add_connection_modal(&mut self) {
-        self.show_add_connection_modal = false;
+        self.ui.show_add_connection_modal = false;
         self.connection_modal_state.clear(); // Clear any input
     }
 
     /// Open the edit connection modal for the currently selected connection
     pub fn open_edit_connection_modal(&mut self) {
-        if let Some(connection) = self.connections.connections.get(self.selected_connection) {
+        if let Some(connection) = self.connections.connections.get(self.ui.selected_connection) {
             self.connection_modal_state
                 .populate_from_connection(connection);
-            self.show_edit_connection_modal = true;
+            self.ui.show_edit_connection_modal = true;
         }
     }
 
     /// Close the edit connection modal
     pub fn close_edit_connection_modal(&mut self) {
-        self.show_edit_connection_modal = false;
+        self.ui.show_edit_connection_modal = false;
         self.connection_modal_state.clear(); // Clear any input
     }
 
@@ -436,9 +249,9 @@ impl AppState {
     pub fn save_connection_from_modal(&mut self) -> Result<(), String> {
         let mut connection = self.connection_modal_state.try_create_connection()?;
 
-        if self.show_edit_connection_modal {
+        if self.ui.show_edit_connection_modal {
             // Update existing connection - preserve ID
-            if let Some(existing) = self.connections.connections.get(self.selected_connection) {
+            if let Some(existing) = self.connections.connections.get(self.ui.selected_connection) {
                 connection.id = existing.id.clone();
                 if let Err(e) = self.connections.update_connection(connection) {
                     return Err(format!("Failed to update connection: {e}"));
@@ -461,14 +274,14 @@ impl AppState {
     pub fn clamp_connection_selection(&mut self) {
         if !self.connections.connections.is_empty() {
             let max_index = self.connections.connections.len() - 1;
-            if self.selected_connection > max_index {
-                self.selected_connection = max_index;
+            if self.ui.selected_connection > max_index {
+                self.ui.selected_connection = max_index;
             }
-            self.connections_list_state
-                .select(Some(self.selected_connection));
+            self.ui.connections_list_state
+                .select(Some(self.ui.selected_connection));
         } else {
-            self.selected_connection = 0;
-            self.connections_list_state.select(None);
+            self.ui.selected_connection = 0;
+            self.ui.connections_list_state.select(None);
         }
     }
 
@@ -476,9 +289,9 @@ impl AppState {
     pub fn connection_down(&mut self) {
         if !self.connections.connections.is_empty() {
             let len = self.connections.connections.len();
-            self.selected_connection = (self.selected_connection + 1) % len;
-            self.connections_list_state
-                .select(Some(self.selected_connection));
+            self.ui.selected_connection = (self.ui.selected_connection + 1) % len;
+            self.ui.connections_list_state
+                .select(Some(self.ui.selected_connection));
         }
     }
 
@@ -486,13 +299,13 @@ impl AppState {
     pub fn connection_up(&mut self) {
         if !self.connections.connections.is_empty() {
             let len = self.connections.connections.len();
-            self.selected_connection = if self.selected_connection > 0 {
-                self.selected_connection - 1
+            self.ui.selected_connection = if self.ui.selected_connection > 0 {
+                self.ui.selected_connection - 1
             } else {
                 len - 1
             };
-            self.connections_list_state
-                .select(Some(self.selected_connection));
+            self.ui.connections_list_state
+                .select(Some(self.ui.selected_connection));
         }
     }
 
@@ -500,9 +313,9 @@ impl AppState {
     pub fn table_down(&mut self) {
         if !self.tables.is_empty() {
             let len = self.tables.len();
-            self.selected_table = (self.selected_table + 1) % len;
+            self.ui.selected_table = (self.ui.selected_table + 1) % len;
             // Add 1 to account for the "▼ Tables" header in the UI
-            self.tables_list_state.select(Some(self.selected_table + 1));
+            self.ui.tables_list_state.select(Some(self.ui.selected_table + 1));
 
             // Clear metadata when selection changes (will load when Enter is pressed)
             self.current_table_metadata = None;
@@ -513,13 +326,13 @@ impl AppState {
     pub fn table_up(&mut self) {
         if !self.tables.is_empty() {
             let len = self.tables.len();
-            self.selected_table = if self.selected_table > 0 {
-                self.selected_table - 1
+            self.ui.selected_table = if self.ui.selected_table > 0 {
+                self.ui.selected_table - 1
             } else {
                 len - 1
             };
             // Add 1 to account for the "▼ Tables" header in the UI
-            self.tables_list_state.select(Some(self.selected_table + 1));
+            self.ui.tables_list_state.select(Some(self.ui.selected_table + 1));
 
             // Clear metadata when selection changes (will load when Enter is pressed)
             self.current_table_metadata = None;
@@ -531,14 +344,14 @@ impl AppState {
         if !self.tables.is_empty() {
             // Preserve selection if possible, otherwise clamp to valid range
             let max_index = self.tables.len() - 1;
-            if self.selected_table > max_index {
-                self.selected_table = max_index;
+            if self.ui.selected_table > max_index {
+                self.ui.selected_table = max_index;
             }
             // Add 1 to account for the "▼ Tables" header in the UI
-            self.tables_list_state.select(Some(self.selected_table + 1));
+            self.ui.tables_list_state.select(Some(self.ui.selected_table + 1));
         } else {
-            self.selected_table = 0;
-            self.tables_list_state.select(None);
+            self.ui.selected_table = 0;
+            self.ui.tables_list_state.select(None);
         }
     }
 
@@ -547,14 +360,14 @@ impl AppState {
         if let Some(connection) = self
             .connections
             .connections
-            .get(self.selected_connection)
+            .get(self.ui.selected_connection)
             .cloned()
         {
             // Set connection status to connecting
             if let Some(conn) = self
                 .connections
                 .connections
-                .get_mut(self.selected_connection)
+                .get_mut(self.ui.selected_connection)
             {
                 conn.status = ConnectionStatus::Connecting;
             }
@@ -573,7 +386,7 @@ impl AppState {
             if let Some(conn) = self
                 .connections
                 .connections
-                .get_mut(self.selected_connection)
+                .get_mut(self.ui.selected_connection)
             {
                 match result {
                     Ok(tables) => {
@@ -658,7 +471,7 @@ impl AppState {
         if let Some(connection) = self
             .connections
             .connections
-            .get_mut(self.selected_connection)
+            .get_mut(self.ui.selected_connection)
         {
             connection.status = ConnectionStatus::Disconnected;
             self.tables.clear();
@@ -672,7 +485,7 @@ impl AppState {
 
     /// Get currently selected SQL file name
     pub fn get_selected_sql_file(&self) -> Option<&String> {
-        self.saved_sql_files.get(self.selected_sql_file)
+        self.saved_sql_files.get(self.ui.selected_sql_file)
     }
 
     /// Load the currently selected SQL file
@@ -688,11 +501,11 @@ impl AppState {
     pub fn clamp_sql_file_selection(&mut self) {
         if !self.saved_sql_files.is_empty() {
             let max_index = self.saved_sql_files.len() - 1;
-            if self.selected_sql_file > max_index {
-                self.selected_sql_file = max_index;
+            if self.ui.selected_sql_file > max_index {
+                self.ui.selected_sql_file = max_index;
             }
         } else {
-            self.selected_sql_file = 0;
+            self.ui.selected_sql_file = 0;
         }
     }
 
@@ -703,7 +516,7 @@ impl AppState {
         let mut files = Vec::new();
         
         // Get connection-specific directory
-        let connection_name = if let Some(connection) = self.connections.connections.get(self.selected_connection) {
+        let connection_name = if let Some(connection) = self.connections.connections.get(self.ui.selected_connection) {
             connection.name.clone()
         } else {
             "default".to_string()
@@ -759,8 +572,8 @@ impl AppState {
         let file_path = sql_dir.join(format!("{filename}.sql"));
         fs::write(&file_path, &self.query_content)?;
 
-        self.current_sql_file = Some(filename.to_string());
-        self.query_modified = false;
+        self.ui.current_sql_file = Some(filename.to_string());
+        self.ui.query_modified = false;
         self.refresh_sql_files();
 
         Ok(())
@@ -768,7 +581,7 @@ impl AppState {
 
     /// Save current query content to the currently loaded file
     pub fn save_query(&mut self) -> Result<(), Box<dyn std::error::Error>> {
-        if let Some(filename) = &self.current_sql_file.clone() {
+        if let Some(filename) = &self.ui.current_sql_file.clone() {
             self.save_query_as(filename)
         } else {
             Err("No file is currently loaded".into())
@@ -780,7 +593,7 @@ impl AppState {
         use std::fs;
 
         // Get connection-specific directory
-        let connection_name = if let Some(connection) = self.connections.connections.get(self.selected_connection) {
+        let connection_name = if let Some(connection) = self.connections.connections.get(self.ui.selected_connection) {
             connection.name.clone()
         } else {
             "default".to_string()
@@ -797,11 +610,11 @@ impl AppState {
 
         let content = fs::read_to_string(&file_path)?;
         self.query_content = content;
-        self.current_sql_file = Some(filename.to_string());
-        self.query_modified = false;
-        self.query_cursor_line = 0;
-        self.query_cursor_column = 0;
-        self.query_edit_mode = QueryEditMode::Normal;
+        self.ui.current_sql_file = Some(filename.to_string());
+        self.ui.query_modified = false;
+        self.ui.query_cursor_line = 0;
+        self.ui.query_cursor_column = 0;
+        self.ui.query_edit_mode = QueryEditMode::Normal;
 
         Ok(())
     }
@@ -809,10 +622,10 @@ impl AppState {
     /// Create a new SQL file
     pub fn new_query_file(&mut self, filename: &str) -> Result<(), Box<dyn std::error::Error>> {
         self.query_content.clear();
-        self.current_sql_file = Some(filename.to_string());
-        self.query_modified = false;
-        self.query_cursor_line = 0;
-        self.query_cursor_column = 0;
+        self.ui.current_sql_file = Some(filename.to_string());
+        self.ui.query_modified = false;
+        self.ui.query_cursor_line = 0;
+        self.ui.query_cursor_column = 0;
 
         // Save the empty file
         self.save_query_as(filename)
@@ -822,9 +635,9 @@ impl AppState {
     pub fn insert_char_at_cursor(&mut self, c: char) {
         let lines: Vec<&str> = self.query_content.lines().collect();
 
-        if self.query_cursor_line >= lines.len() {
+        if self.ui.query_cursor_line >= lines.len() {
             // Add new lines if needed
-            while self.query_content.lines().count() <= self.query_cursor_line {
+            while self.query_content.lines().count() <= self.ui.query_cursor_line {
                 self.query_content.push('\n');
             }
         }
@@ -832,30 +645,30 @@ impl AppState {
         let lines: Vec<&str> = self.query_content.lines().collect();
         let mut new_lines: Vec<String> = lines.iter().map(|s| s.to_string()).collect();
 
-        if let Some(line) = new_lines.get_mut(self.query_cursor_line) {
+        if let Some(line) = new_lines.get_mut(self.ui.query_cursor_line) {
             let mut chars: Vec<char> = line.chars().collect();
-            chars.insert(self.query_cursor_column, c);
+            chars.insert(self.ui.query_cursor_column, c);
             *line = chars.iter().collect();
         }
 
         self.query_content = new_lines.join("\n");
-        self.query_cursor_column += 1;
-        self.query_modified = true;
+        self.ui.query_cursor_column += 1;
+        self.ui.query_modified = true;
     }
 
     /// Delete character at current cursor position in query editor
     pub fn delete_char_at_cursor(&mut self) {
-        if self.query_cursor_column > 0 {
+        if self.ui.query_cursor_column > 0 {
             let lines: Vec<&str> = self.query_content.lines().collect();
             let mut new_lines: Vec<String> = lines.iter().map(|s| s.to_string()).collect();
 
-            if let Some(line) = new_lines.get_mut(self.query_cursor_line) {
+            if let Some(line) = new_lines.get_mut(self.ui.query_cursor_line) {
                 let mut chars: Vec<char> = line.chars().collect();
-                if self.query_cursor_column <= chars.len() && self.query_cursor_column > 0 {
-                    chars.remove(self.query_cursor_column - 1);
+                if self.ui.query_cursor_column <= chars.len() && self.ui.query_cursor_column > 0 {
+                    chars.remove(self.ui.query_cursor_column - 1);
                     *line = chars.iter().collect();
-                    self.query_cursor_column -= 1;
-                    self.query_modified = true;
+                    self.ui.query_cursor_column -= 1;
+                    self.ui.query_modified = true;
                 }
             }
 
@@ -870,9 +683,9 @@ impl AppState {
             return;
         }
 
-        if let Some(current_line) = lines.get(self.query_cursor_line) {
+        if let Some(current_line) = lines.get(self.ui.query_cursor_line) {
             let chars: Vec<char> = current_line.chars().collect();
-            let mut pos = self.query_cursor_column;
+            let mut pos = self.ui.query_cursor_column;
             
             // Skip current word
             while pos < chars.len() && !chars[pos].is_whitespace() {
@@ -884,11 +697,11 @@ impl AppState {
             }
             
             if pos < chars.len() {
-                self.query_cursor_column = pos;
-            } else if self.query_cursor_line < lines.len() - 1 {
+                self.ui.query_cursor_column = pos;
+            } else if self.ui.query_cursor_line < lines.len() - 1 {
                 // Move to beginning of next line
-                self.query_cursor_line += 1;
-                self.query_cursor_column = 0;
+                self.ui.query_cursor_line += 1;
+                self.ui.query_cursor_column = 0;
             }
         }
     }
@@ -900,11 +713,11 @@ impl AppState {
             return;
         }
 
-        if let Some(current_line) = lines.get(self.query_cursor_line) {
+        if let Some(current_line) = lines.get(self.ui.query_cursor_line) {
             let chars: Vec<char> = current_line.chars().collect();
             
-            if self.query_cursor_column > 0 {
-                let mut pos = self.query_cursor_column - 1;
+            if self.ui.query_cursor_column > 0 {
+                let mut pos = self.ui.query_cursor_column - 1;
                 
                 // Skip whitespace
                 while pos > 0 && chars[pos].is_whitespace() {
@@ -915,12 +728,12 @@ impl AppState {
                     pos -= 1;
                 }
                 
-                self.query_cursor_column = pos;
-            } else if self.query_cursor_line > 0 {
+                self.ui.query_cursor_column = pos;
+            } else if self.ui.query_cursor_line > 0 {
                 // Move to end of previous line
-                self.query_cursor_line -= 1;
-                if let Some(prev_line) = lines.get(self.query_cursor_line) {
-                    self.query_cursor_column = prev_line.len();
+                self.ui.query_cursor_line -= 1;
+                if let Some(prev_line) = lines.get(self.ui.query_cursor_line) {
+                    self.ui.query_cursor_column = prev_line.len();
                 }
             }
         }
@@ -933,9 +746,9 @@ impl AppState {
             return;
         }
 
-        if let Some(current_line) = lines.get(self.query_cursor_line) {
+        if let Some(current_line) = lines.get(self.ui.query_cursor_line) {
             let chars: Vec<char> = current_line.chars().collect();
-            let mut pos = self.query_cursor_column;
+            let mut pos = self.ui.query_cursor_column;
             
             if pos < chars.len() - 1 {
                 pos += 1;
@@ -943,28 +756,28 @@ impl AppState {
                 while pos < chars.len() - 1 && !chars[pos + 1].is_whitespace() {
                     pos += 1;
                 }
-                self.query_cursor_column = pos;
+                self.ui.query_cursor_column = pos;
             }
         }
     }
 
     /// Move to beginning of line (vim '0' motion)
     pub fn move_to_line_start(&mut self) {
-        self.query_cursor_column = 0;
+        self.ui.query_cursor_column = 0;
     }
 
     /// Move to end of line (vim '$' motion)  
     pub fn move_to_line_end(&mut self) {
         let lines: Vec<&str> = self.query_content.lines().collect();
-        if let Some(current_line) = lines.get(self.query_cursor_line) {
-            self.query_cursor_column = current_line.len().saturating_sub(1);
+        if let Some(current_line) = lines.get(self.ui.query_cursor_line) {
+            self.ui.query_cursor_column = current_line.len().saturating_sub(1);
         }
     }
 
     /// Save current SQL file with connection-specific directory
     pub fn save_sql_file_with_connection(&mut self) -> Result<(), String> {
         // Get the current connection name
-        let connection_name = if let Some(connection) = self.connections.connections.get(self.selected_connection) {
+        let connection_name = if let Some(connection) = self.connections.connections.get(self.ui.selected_connection) {
             connection.name.clone()
         } else {
             "default".to_string()
@@ -976,7 +789,7 @@ impl AppState {
             .map_err(|e| format!("Failed to create directory: {e}"))?;
 
         // Determine filename
-        let filename = if let Some(ref current_file) = self.current_sql_file {
+        let filename = if let Some(ref current_file) = self.ui.current_sql_file {
             current_file.clone()
         } else {
             format!("query_{}.sql", chrono::Local::now().format("%Y%m%d_%H%M%S"))
@@ -987,8 +800,8 @@ impl AppState {
         std::fs::write(&file_path, &self.query_content)
             .map_err(|e| format!("Failed to save file: {e}"))?;
 
-        self.current_sql_file = Some(filename);
-        self.query_modified = false;
+        self.ui.current_sql_file = Some(filename);
+        self.ui.query_modified = false;
         self.refresh_sql_files();
         
         Ok(())
@@ -996,20 +809,20 @@ impl AppState {
 
     /// Open table creator view
     pub fn open_table_creator(&mut self) {
-        self.show_table_creator = true;
+        self.ui.show_table_creator = true;
         self.table_creator_state = TableCreatorState::new();
     }
 
     /// Close table creator view
     pub fn close_table_creator(&mut self) {
-        self.show_table_creator = false;
+        self.ui.show_table_creator = false;
         self.table_creator_state.clear();
     }
 
     /// Open table editor view
     pub async fn open_table_editor(&mut self) {
-        if let Some(table_name) = self.tables.get(self.selected_table).cloned() {
-            self.show_table_editor = true;
+        if let Some(table_name) = self.tables.get(self.ui.selected_table).cloned() {
+            self.ui.show_table_editor = true;
             self.table_editor_state = TableEditorState::new(table_name.clone());
 
             // Load table schema from database
@@ -1022,7 +835,7 @@ impl AppState {
 
     /// Close table editor view
     pub fn close_table_editor(&mut self) {
-        self.show_table_editor = false;
+        self.ui.show_table_editor = false;
         self.table_editor_state.clear();
     }
 
@@ -1032,7 +845,7 @@ impl AppState {
         if let Some(connection) = self
             .connections
             .connections
-            .get(self.selected_connection)
+            .get(self.ui.selected_connection)
             .cloned()
         {
             match &connection.status {
@@ -1112,7 +925,7 @@ impl AppState {
         if let Some(connection) = self
             .connections
             .connections
-            .get(self.selected_connection)
+            .get(self.ui.selected_connection)
             .cloned()
         {
             match &connection.status {
@@ -1179,7 +992,7 @@ impl AppState {
         if let Some(connection) = self
             .connections
             .connections
-            .get(self.selected_connection)
+            .get(self.ui.selected_connection)
             .cloned()
         {
             match &connection.status {
@@ -1238,7 +1051,7 @@ impl AppState {
 
     /// Open a table for viewing
     pub async fn open_table_for_viewing(&mut self) {
-        if let Some(table_name) = self.tables.get(self.selected_table).cloned() {
+        if let Some(table_name) = self.tables.get(self.ui.selected_table).cloned() {
             // Add tab to viewer
             let tab_idx = self.table_viewer_state.add_tab(table_name.clone());
 
@@ -1257,7 +1070,7 @@ impl AppState {
             }
 
             // Switch focus to tabular output
-            self.focused_pane = FocusedPane::TabularOutput;
+            self.ui.focused_pane = FocusedPane::TabularOutput;
         }
     }
 
@@ -1273,7 +1086,7 @@ impl AppState {
             if let Some(connection) = self
                 .connections
                 .connections
-                .get(self.selected_connection)
+                .get(self.ui.selected_connection)
                 .cloned()
             {
                 match &connection.status {
@@ -1381,7 +1194,7 @@ impl AppState {
         if let Some(connection) = self
             .connections
             .connections
-            .get(self.selected_connection)
+            .get(self.ui.selected_connection)
             .cloned()
         {
             match &connection.status {
@@ -1431,7 +1244,7 @@ impl AppState {
         if let Some(connection) = self
             .connections
             .connections
-            .get(self.selected_connection)
+            .get(self.ui.selected_connection)
             .cloned()
         {
             match &connection.status {
@@ -1506,7 +1319,7 @@ impl AppState {
         if let Some(connection) = self
             .connections
             .connections
-            .get(self.selected_connection)
+            .get(self.ui.selected_connection)
             .cloned()
         {
             match &connection.status {
@@ -1554,16 +1367,21 @@ impl AppState {
             return Err("Cannot delete row without primary key".to_string());
         }
 
-        let _sql = format!(
+        let sql = format!(
             "DELETE FROM {} WHERE {}",
             confirmation.table_name,
             where_clauses.join(" AND ")
         );
-// 
-//         pg_connection
-//             .execute_sql(&sql)
-//             .await
-//             .map_err(|e| format!("Failed to delete row: {e}"))?;
+
+        // Execute the delete query using the pool directly
+        if let Some(pool) = &pg_connection.pool {
+            sqlx::query(&sql)
+                .execute(pool)
+                .await
+                .map_err(|e| format!("Failed to delete row: {e}"))?;
+        } else {
+            return Err("No active database connection".to_string());
+        }
 
         let _ = pg_connection.disconnect().await;
 
@@ -1587,13 +1405,13 @@ impl AppState {
     /// Get the SQL statement under the cursor
     pub fn get_statement_under_cursor(&self) -> Option<String> {
         let lines: Vec<&str> = self.query_content.lines().collect();
-        if lines.is_empty() || self.query_cursor_line >= lines.len() {
+        if lines.is_empty() || self.ui.query_cursor_line >= lines.len() {
             return None;
         }
 
         // Find the SQL statement boundaries (statements separated by semicolons or empty lines)
-        let mut start_line = self.query_cursor_line;
-        let mut end_line = self.query_cursor_line;
+        let mut start_line = self.ui.query_cursor_line;
+        let mut end_line = self.ui.query_cursor_line;
 
         // Find start of statement (go backwards until we find a semicolon or empty line)
         while start_line > 0 {
