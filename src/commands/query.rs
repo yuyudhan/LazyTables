@@ -76,7 +76,7 @@ impl Command for SaveQueryCommand {
         
         // Generate filename with timestamp
         let timestamp = chrono::Local::now().format("%Y%m%d_%H%M%S");
-        let filename = if let Some(ref current_file) = context.state.current_sql_file {
+        let filename = if let Some(ref current_file) = context.state.ui.current_sql_file {
             current_file.clone()
         } else {
             format!("query_{}.sql", timestamp)
@@ -95,8 +95,8 @@ impl Command for SaveQueryCommand {
         std::fs::write(&filepath, query)?;
         
         // Update state
-        context.state.current_sql_file = Some(filename.clone());
-        context.state.query_modified = false;
+        context.state.ui.current_sql_file = Some(filename.clone());
+        context.state.ui.query_modified = false;
         
         // Add success toast
         context.state.toast_manager.success(
@@ -136,13 +136,13 @@ impl Command for NewQueryCommand {
     fn execute(&self, context: &mut CommandContext) -> Result<CommandResult> {
         // Clear current query
         context.state.query_content.clear();
-        context.state.current_sql_file = None;
-        context.state.query_modified = false;
-        context.state.query_cursor_line = 0;
-        context.state.query_cursor_column = 0;
+        context.state.ui.current_sql_file = None;
+        context.state.ui.query_modified = false;
+        context.state.ui.query_cursor_line = 0;
+        context.state.ui.query_cursor_column = 0;
         
         // Switch to query window
-        context.state.focused_pane = crate::app::FocusedPane::QueryWindow;
+        context.state.ui.focused_pane = crate::app::FocusedPane::QueryWindow;
         
         Ok(CommandResult::SuccessWithMessage("New query created".to_string()))
     }

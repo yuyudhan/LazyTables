@@ -9,6 +9,7 @@ pub mod core;
 pub mod database;
 pub mod event;
 pub mod logging;
+pub mod state;
 pub mod terminal;
 pub mod themes;
 pub mod ui;

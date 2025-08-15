@@ -9,35 +9,35 @@ pub struct NavigateUpCommand;
 
 impl Command for NavigateUpCommand {
     fn execute(&self, context: &mut CommandContext) -> Result<CommandResult> {
-        match context.state.focused_pane {
+        match context.state.ui.focused_pane {
             FocusedPane::Connections => {
-                if context.state.selected_connection > 0 {
-                    context.state.selected_connection -= 1;
-                    context.state.connections_list_state.select(Some(context.state.selected_connection));
+                if context.state.ui.selected_connection > 0 {
+                    context.state.ui.selected_connection -= 1;
+                    context.state.ui.connections_list_state.select(Some(context.state.ui.selected_connection));
                 }
             }
             FocusedPane::Tables => {
-                if context.state.selected_table > 0 {
-                    context.state.selected_table -= 1;
-                    context.state.tables_list_state.select(Some(context.state.selected_table));
+                if context.state.ui.selected_table > 0 {
+                    context.state.ui.selected_table -= 1;
+                    context.state.ui.tables_list_state.select(Some(context.state.ui.selected_table));
                 }
             }
             FocusedPane::SqlFiles => {
-                if context.state.selected_sql_file > 0 {
-                    context.state.selected_sql_file -= 1;
+                if context.state.ui.selected_sql_file > 0 {
+                    context.state.ui.selected_sql_file -= 1;
                 }
             }
             FocusedPane::QueryWindow => {
-                if context.state.query_cursor_line > 0 {
-                    context.state.query_cursor_line -= 1;
+                if context.state.ui.query_cursor_line > 0 {
+                    context.state.ui.query_cursor_line -= 1;
                     // Adjust column if line is shorter
                     let line_len = context.state.query_content
                         .lines()
-                        .nth(context.state.query_cursor_line)
+                        .nth(context.state.ui.query_cursor_line)
                         .map(|l| l.len())
                         .unwrap_or(0);
-                    context.state.query_cursor_column = 
-                        context.state.query_cursor_column.min(line_len);
+                    context.state.ui.query_cursor_column = 
+                        context.state.ui.query_cursor_column.min(line_len);
                 }
             }
             _ => {}
@@ -67,39 +67,39 @@ pub struct NavigateDownCommand;
 
 impl Command for NavigateDownCommand {
     fn execute(&self, context: &mut CommandContext) -> Result<CommandResult> {
-        match context.state.focused_pane {
+        match context.state.ui.focused_pane {
             FocusedPane::Connections => {
                 let max = context.state.connections.connections.len();
-                if context.state.selected_connection < max.saturating_sub(1) {
-                    context.state.selected_connection += 1;
-                    context.state.connections_list_state.select(Some(context.state.selected_connection));
+                if context.state.ui.selected_connection < max.saturating_sub(1) {
+                    context.state.ui.selected_connection += 1;
+                    context.state.ui.connections_list_state.select(Some(context.state.ui.selected_connection));
                 }
             }
             FocusedPane::Tables => {
                 let max = context.state.tables.len();
-                if context.state.selected_table < max.saturating_sub(1) {
-                    context.state.selected_table += 1;
-                    context.state.tables_list_state.select(Some(context.state.selected_table));
+                if context.state.ui.selected_table < max.saturating_sub(1) {
+                    context.state.ui.selected_table += 1;
+                    context.state.ui.tables_list_state.select(Some(context.state.ui.selected_table));
                 }
             }
             FocusedPane::SqlFiles => {
                 let max = context.state.saved_sql_files.len();
-                if context.state.selected_sql_file < max.saturating_sub(1) {
-                    context.state.selected_sql_file += 1;
+                if context.state.ui.selected_sql_file < max.saturating_sub(1) {
+                    context.state.ui.selected_sql_file += 1;
                 }
             }
             FocusedPane::QueryWindow => {
                 let line_count = context.state.query_content.lines().count();
-                if context.state.query_cursor_line < line_count.saturating_sub(1) {
-                    context.state.query_cursor_line += 1;
+                if context.state.ui.query_cursor_line < line_count.saturating_sub(1) {
+                    context.state.ui.query_cursor_line += 1;
                     // Adjust column if line is shorter
                     let line_len = context.state.query_content
                         .lines()
-                        .nth(context.state.query_cursor_line)
+                        .nth(context.state.ui.query_cursor_line)
                         .map(|l| l.len())
                         .unwrap_or(0);
-                    context.state.query_cursor_column = 
-                        context.state.query_cursor_column.min(line_len);
+                    context.state.ui.query_cursor_column = 
+                        context.state.ui.query_cursor_column.min(line_len);
                 }
             }
             _ => {}
@@ -129,10 +129,10 @@ pub struct NavigateLeftCommand;
 
 impl Command for NavigateLeftCommand {
     fn execute(&self, context: &mut CommandContext) -> Result<CommandResult> {
-        match context.state.focused_pane {
+        match context.state.ui.focused_pane {
             FocusedPane::QueryWindow => {
-                if context.state.query_cursor_column > 0 {
-                    context.state.query_cursor_column -= 1;
+                if context.state.ui.query_cursor_column > 0 {
+                    context.state.ui.query_cursor_column -= 1;
                 }
             }
             _ => {
@@ -165,15 +165,15 @@ pub struct NavigateRightCommand;
 
 impl Command for NavigateRightCommand {
     fn execute(&self, context: &mut CommandContext) -> Result<CommandResult> {
-        match context.state.focused_pane {
+        match context.state.ui.focused_pane {
             FocusedPane::QueryWindow => {
                 let line_len = context.state.query_content
                     .lines()
-                    .nth(context.state.query_cursor_line)
+                    .nth(context.state.ui.query_cursor_line)
                     .map(|l| l.len())
                     .unwrap_or(0);
-                if context.state.query_cursor_column < line_len {
-                    context.state.query_cursor_column += 1;
+                if context.state.ui.query_cursor_column < line_len {
+                    context.state.ui.query_cursor_column += 1;
                 }
             }
             _ => {
@@ -208,7 +208,7 @@ impl Command for NextPaneCommand {
     fn execute(&self, context: &mut CommandContext) -> Result<CommandResult> {
         use FocusedPane::*;
         
-        context.state.focused_pane = match context.state.focused_pane {
+        context.state.ui.focused_pane = match context.state.ui.focused_pane {
             Connections => Tables,
             Tables => Details,
             Details => TabularOutput,
@@ -244,7 +244,7 @@ impl Command for PreviousPaneCommand {
     fn execute(&self, context: &mut CommandContext) -> Result<CommandResult> {
         use FocusedPane::*;
         
-        context.state.focused_pane = match context.state.focused_pane {
+        context.state.ui.focused_pane = match context.state.ui.focused_pane {
             Connections => QueryWindow,
             Tables => Connections,
             Details => Tables,
@@ -278,7 +278,7 @@ pub struct FocusConnectionsPaneCommand;
 
 impl Command for FocusConnectionsPaneCommand {
     fn execute(&self, context: &mut CommandContext) -> Result<CommandResult> {
-        context.state.focused_pane = FocusedPane::Connections;
+        context.state.ui.focused_pane = FocusedPane::Connections;
         Ok(CommandResult::Success)
     }
     

@@ -61,7 +61,7 @@ impl Command for HelpCommand {
         use crate::app::state::HelpMode;
         
         // Toggle help based on current pane
-        context.state.help_mode = match context.state.focused_pane {
+        context.state.ui.help_mode = match context.state.ui.focused_pane {
             crate::app::FocusedPane::Connections => HelpMode::Connections,
             crate::app::FocusedPane::Tables => HelpMode::Tables,
             crate::app::FocusedPane::Details => HelpMode::Details,
@@ -97,8 +97,8 @@ impl Command for ToggleHelpCommand {
     fn execute(&self, context: &mut CommandContext) -> Result<CommandResult> {
         use crate::app::state::HelpMode;
         
-        if context.state.help_mode != HelpMode::None {
-            context.state.help_mode = HelpMode::None;
+        if context.state.ui.help_mode != HelpMode::None {
+            context.state.ui.help_mode = HelpMode::None;
             Ok(CommandResult::SuccessWithMessage("Help overlay closed".to_string()))
         } else {
             // Delegate to HelpCommand
@@ -125,7 +125,7 @@ pub struct SaveCommand;
 impl Command for SaveCommand {
     fn execute(&self, context: &mut CommandContext) -> Result<CommandResult> {
         // Check what needs to be saved based on current focus
-        match context.state.focused_pane {
+        match context.state.ui.focused_pane {
             crate::app::FocusedPane::QueryWindow => {
                 // Save current query
                 if !context.state.query_content.is_empty() {
@@ -187,7 +187,7 @@ impl Command for SaveCommand {
     
     fn can_execute(&self, context: &CommandContext) -> bool {
         // Can save if in query window with content or results pane with data
-        match context.state.focused_pane {
+        match context.state.ui.focused_pane {
             crate::app::FocusedPane::QueryWindow => {
                 !context.state.query_content.is_empty()
             }
@@ -232,11 +232,11 @@ pub struct OpenCommand;
 
 impl Command for OpenCommand {
     fn execute(&self, context: &mut CommandContext) -> Result<CommandResult> {
-        match context.state.focused_pane {
+        match context.state.ui.focused_pane {
             crate::app::FocusedPane::SqlFiles => {
                 // Load selected SQL file
                 {
-                    let selected = context.state.selected_sql_file;
+                    let selected = context.state.ui.selected_sql_file;
                     let sql_dir = dirs::home_dir()
                         .unwrap_or_else(|| std::path::PathBuf::from("."))
                         .join(".lazytables")
@@ -255,7 +255,7 @@ impl Command for OpenCommand {
                     if selected < files.len() {
                         let content = std::fs::read_to_string(files[selected].path())?;
                         context.state.query_content = content;
-                        context.state.current_sql_file = Some(
+                        context.state.ui.current_sql_file = Some(
                             files[selected].file_name().to_string_lossy().to_string()
                         );
                         
