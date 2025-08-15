@@ -126,6 +126,10 @@ pub struct UIState {
     pub show_table_creator: bool,
     /// Show table editor view
     pub show_table_editor: bool,
+    
+    /// Confirmation modal state
+    #[serde(skip)]
+    pub confirmation_modal: Option<crate::ui::ConfirmationModal>,
 
     // List UI states (not serialized)
     #[serde(skip)]
@@ -160,6 +164,7 @@ impl UIState {
             show_edit_connection_modal: false,
             show_table_creator: false,
             show_table_editor: false,
+            confirmation_modal: None,
             connections_list_state,
             tables_list_state: ListState::default(),
         }

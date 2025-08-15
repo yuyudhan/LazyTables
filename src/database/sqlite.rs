@@ -40,6 +40,12 @@ impl SqliteConnection {
 #[async_trait]
 impl Connection for SqliteConnection {
     async fn connect(&mut self) -> Result<()> {
+        // SQLite doesn't use passwords, so just call connect_with_key with None
+        self.connect_with_key(None).await
+    }
+
+    async fn connect_with_key(&mut self, _encryption_key: Option<&str>) -> Result<()> {
+        // SQLite doesn't use passwords, so ignore encryption_key
         let connection_string = self.build_connection_string();
 
         let pool = SqlitePoolOptions::new()
@@ -66,15 +72,18 @@ impl Connection for SqliteConnection {
         Ok(())
     }
 
-    async fn is_connected(&self) -> bool {
-        if let Some(pool) = &self.pool {
-            pool.acquire().await.is_ok()
-        } else {
-            false
-        }
+    fn is_connected(&self) -> bool {
+        self.pool.is_some()
     }
 
-    async fn test_connection(&self) -> Result<()> {
+    fn config(&self) -> &ConnectionConfig {
+        &self.config
+    }
+}
+
+impl SqliteConnection {
+    /// Test the connection by running a simple query
+    pub async fn test_connection(&self) -> Result<()> {
         if let Some(pool) = &self.pool {
             sqlx::query("SELECT 1")
                 .fetch_one(pool)
@@ -88,7 +97,9 @@ impl Connection for SqliteConnection {
         }
     }
 
-    async fn list_databases(&self) -> Result<Vec<String>> {
+    /// List all databases (SQLite doesn't have multiple databases)
+    #[allow(dead_code)]
+    pub async fn list_databases(&self) -> Result<Vec<String>> {
         // SQLite doesn't have multiple databases in the same connection
         // Return the current database name
         if self.pool.is_some() {
@@ -106,7 +117,8 @@ impl Connection for SqliteConnection {
         }
     }
 
-    async fn list_tables(&self) -> Result<Vec<String>> {
+    /// List all tables in the database
+    pub async fn list_tables(&self) -> Result<Vec<String>> {
         if let Some(pool) = &self.pool {
             let rows = sqlx::query(
                 "SELECT name FROM sqlite_master 
@@ -131,7 +143,8 @@ impl Connection for SqliteConnection {
         }
     }
 
-    async fn get_table_metadata(&self, table_name: &str) -> Result<TableMetadata> {
+    /// Get metadata for a specific table
+    pub async fn get_table_metadata(&self, table_name: &str) -> Result<TableMetadata> {
         if let Some(pool) = &self.pool {
             // Get row count
             let count_query = format!("SELECT COUNT(*) FROM \"{table_name}\"");
@@ -214,7 +227,8 @@ impl Connection for SqliteConnection {
         }
     }
 
-    async fn get_table_columns(&self, table_name: &str) -> Result<Vec<TableColumn>> {
+    /// Get column information for a table
+    pub async fn get_table_columns(&self, table_name: &str) -> Result<Vec<TableColumn>> {
         if let Some(pool) = &self.pool {
             let query = format!("PRAGMA table_info(\"{table_name}\")");
 
@@ -247,7 +261,8 @@ impl Connection for SqliteConnection {
         }
     }
 
-    async fn get_table_row_count(&self, table_name: &str) -> Result<usize> {
+    /// Get the row count for a table
+    pub async fn get_table_row_count(&self, table_name: &str) -> Result<usize> {
         if let Some(pool) = &self.pool {
             let query = format!("SELECT COUNT(*) FROM \"{table_name}\"");
             let row = sqlx::query(&query).fetch_one(pool).await?;
@@ -260,7 +275,8 @@ impl Connection for SqliteConnection {
         }
     }
 
-    async fn get_table_data(
+    /// Get table data with pagination
+    pub async fn get_table_data(
         &self,
         table_name: &str,
         limit: usize,

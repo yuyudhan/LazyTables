@@ -24,6 +24,22 @@ pub mod widgets;
 use layout::LayoutManager;
 use theme::Theme;
 
+/// Confirmation modal for destructive actions
+#[derive(Debug, Clone)]
+pub struct ConfirmationModal {
+    pub title: String,
+    pub message: String,
+    pub action: ConfirmationAction,
+}
+
+/// Actions that can be confirmed
+#[derive(Debug, Clone)]
+pub enum ConfirmationAction {
+    DeleteConnection(usize),
+    DeleteTable(String),
+    // Add more actions as needed
+}
+
 /// Main UI structure
 pub struct UI {
     layout_manager: LayoutManager,
@@ -59,6 +75,49 @@ impl UI {
     }
 
     /// Calculate centered modal area
+    fn render_confirmation_modal(&self, frame: &mut Frame, modal: &ConfirmationModal, area: Rect) {
+        use ratatui::layout::{Direction, Layout, Margin};
+        use ratatui::widgets::Clear;
+        
+        // Center the modal
+        let modal_area = self.center_modal(area, 50, 30);
+        
+        // Clear the background
+        frame.render_widget(Clear, modal_area);
+        
+        // Draw modal border
+        let block = Block::default()
+            .borders(Borders::ALL)
+            .border_style(Style::default().fg(Color::Yellow))
+            .title(format!(" {} ", modal.title))
+            .title_style(Style::default().fg(Color::Yellow).add_modifier(Modifier::BOLD));
+        
+        frame.render_widget(block.clone(), modal_area);
+        
+        // Layout for modal content
+        let inner = modal_area.inner(Margin::new(2, 1));
+        let chunks = Layout::default()
+            .direction(Direction::Vertical)
+            .constraints([
+                Constraint::Min(0),      // Message
+                Constraint::Length(1),   // Empty line
+                Constraint::Length(1),   // Instructions
+            ])
+            .split(inner);
+        
+        // Render message
+        let message = Paragraph::new(modal.message.clone())
+            .wrap(Wrap { trim: true })
+            .style(Style::default().fg(Color::White));
+        frame.render_widget(message, chunks[0]);
+        
+        // Render instructions
+        let instructions = Paragraph::new("Press Y to confirm, N or ESC to cancel")
+            .alignment(Alignment::Center)
+            .style(Style::default().fg(Color::Gray));
+        frame.render_widget(instructions, chunks[2]);
+    }
+
     fn center_modal(&self, area: Rect, width_percent: u16, height_percent: u16) -> Rect {
         let width = (area.width * width_percent / 100).min(area.width);
         let height = (area.height * height_percent / 100).min(area.height);
@@ -112,6 +171,11 @@ impl UI {
         components::toast::render_toasts(frame, &state.toast_manager, frame.area(), &self.theme);
 
         // Command mode is handled internally, not shown in UI
+
+        // Draw confirmation modal if active
+        if let Some(modal) = &state.ui.confirmation_modal {
+            self.render_confirmation_modal(frame, modal, frame.area());
+        }
 
         // Draw connection modal if active (either add or edit)
         if state.ui.show_add_connection_modal || state.ui.show_edit_connection_modal {
@@ -227,22 +291,32 @@ impl UI {
             items.push(ListItem::new(Line::from(vec![
                 Span::styled("Press ", Style::default().fg(Color::Gray)),
                 Span::styled(
+                    "Enter/Space",
+                    Style::default()
+                        .fg(Color::Yellow)
+                        .add_modifier(Modifier::BOLD),
+                ),
+                Span::styled(" to connect", Style::default().fg(Color::Gray)),
+            ])));
+            items.push(ListItem::new(Line::from(vec![
+                Span::styled("Press ", Style::default().fg(Color::Gray)),
+                Span::styled(
+                    "x",
+                    Style::default()
+                        .fg(Color::Yellow)
+                        .add_modifier(Modifier::BOLD),
+                ),
+                Span::styled(" to disconnect", Style::default().fg(Color::Gray)),
+            ])));
+            items.push(ListItem::new(Line::from(vec![
+                Span::styled("Press ", Style::default().fg(Color::Gray)),
+                Span::styled(
                     "a",
                     Style::default()
                         .fg(Color::Yellow)
                         .add_modifier(Modifier::BOLD),
                 ),
                 Span::styled(" to add connection", Style::default().fg(Color::Gray)),
-            ])));
-            items.push(ListItem::new(Line::from(vec![
-                Span::styled("Press ", Style::default().fg(Color::Gray)),
-                Span::styled(
-                    "Enter",
-                    Style::default()
-                        .fg(Color::Yellow)
-                        .add_modifier(Modifier::BOLD),
-                ),
-                Span::styled(" to connect/disconnect", Style::default().fg(Color::Gray)),
             ])));
             if !state.db.connections.connections.is_empty() {
                 items.push(ListItem::new(Line::from(vec![
@@ -254,6 +328,16 @@ impl UI {
                             .add_modifier(Modifier::BOLD),
                     ),
                     Span::styled(" to edit connection", Style::default().fg(Color::Gray)),
+                ])));
+                items.push(ListItem::new(Line::from(vec![
+                    Span::styled("Press ", Style::default().fg(Color::Gray)),
+                    Span::styled(
+                        "d",
+                        Style::default()
+                            .fg(Color::Yellow)
+                            .add_modifier(Modifier::BOLD),
+                    ),
+                    Span::styled(" to delete connection", Style::default().fg(Color::Gray)),
                 ])));
 
                 // Show error message if the selected connection has failed

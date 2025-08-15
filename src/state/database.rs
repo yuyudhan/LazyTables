@@ -430,24 +430,46 @@ impl DatabaseState {
     ) -> Result<Vec<String>, String> {
         use crate::database::Connection;
 
-        // Create appropriate connection based on database type
-        let mut db_connection: Box<dyn Connection> = match connection.database_type {
+        // Query actual tables from the database based on database type
+        let tables = match connection.database_type {
             DatabaseType::PostgreSQL => {
                 use crate::database::postgres::PostgresConnection;
-                Box::new(PostgresConnection::new(connection.clone()))
+                let mut conn = PostgresConnection::new(connection.clone());
+                conn.connect()
+                    .await
+                    .map_err(|e| format!("Connection failed: {e}"))?;
+                let tables = conn
+                    .list_tables()
+                    .await
+                    .map_err(|e| format!("Failed to retrieve tables: {e}"))?;
+                let _ = conn.disconnect().await;
+                tables
             }
-            DatabaseType::MySQL => {
+            DatabaseType::MySQL | DatabaseType::MariaDB => {
                 use crate::database::mysql::MySqlConnection;
-                Box::new(MySqlConnection::new(connection.clone()))
-            }
-            DatabaseType::MariaDB => {
-                // MariaDB uses MySQL driver
-                use crate::database::mysql::MySqlConnection;
-                Box::new(MySqlConnection::new(connection.clone()))
+                let mut conn = MySqlConnection::new(connection.clone());
+                conn.connect()
+                    .await
+                    .map_err(|e| format!("Connection failed: {e}"))?;
+                let tables = conn
+                    .list_tables()
+                    .await
+                    .map_err(|e| format!("Failed to retrieve tables: {e}"))?;
+                let _ = conn.disconnect().await;
+                tables
             }
             DatabaseType::SQLite => {
                 use crate::database::sqlite::SqliteConnection;
-                Box::new(SqliteConnection::new(connection.clone()))
+                let mut conn = SqliteConnection::new(connection.clone());
+                conn.connect()
+                    .await
+                    .map_err(|e| format!("Connection failed: {e}"))?;
+                let tables = conn
+                    .list_tables()
+                    .await
+                    .map_err(|e| format!("Failed to retrieve tables: {e}"))?;
+                let _ = conn.disconnect().await;
+                tables
             }
             _ => {
                 return Err(format!(
@@ -456,21 +478,6 @@ impl DatabaseState {
                 ))
             }
         };
-
-        // Try to connect
-        db_connection
-            .connect()
-            .await
-            .map_err(|e| format!("Connection failed: {e}"))?;
-
-        // Query actual tables from the database
-        let tables = db_connection
-            .list_tables()
-            .await
-            .map_err(|e| format!("Failed to retrieve tables: {e}"))?;
-
-        // Clean up connection
-        let _ = db_connection.disconnect().await;
 
         Ok(tables)
     }

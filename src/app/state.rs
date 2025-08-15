@@ -367,6 +367,17 @@ impl AppState {
         }
     }
 
+    /// Disconnect all connections except the one at the given index
+    pub fn disconnect_all_except(&mut self, except_index: usize) {
+        for (index, connection) in self.db.connections.connections.iter_mut().enumerate() {
+            if index != except_index && connection.is_connected() {
+                connection.status = ConnectionStatus::Disconnected;
+            }
+        }
+        // Save updated connection statuses
+        let _ = self.db.connections.save();
+    }
+
     /// Attempt to connect to the selected database
     pub async fn connect_to_selected_database(&mut self) {
         if let Some(connection) = self
@@ -376,6 +387,9 @@ impl AppState {
             .get(self.ui.selected_connection)
             .cloned()
         {
+            // Disconnect all other connections first
+            self.disconnect_all_except(self.ui.selected_connection);
+            
             // Set connection status to connecting
             if let Some(conn) = self
                 .db
@@ -434,51 +448,7 @@ impl AppState {
         &self,
         connection: &ConnectionConfig,
     ) -> Result<Vec<String>, String> {
-        use crate::database::Connection;
-
-        // Create appropriate connection based on database type
-        let mut db_connection: Box<dyn Connection> = match connection.database_type {
-            DatabaseType::PostgreSQL => {
-                use crate::database::postgres::PostgresConnection;
-                Box::new(PostgresConnection::new(connection.clone()))
-            }
-            DatabaseType::MySQL => {
-                use crate::database::mysql::MySqlConnection;
-                Box::new(MySqlConnection::new(connection.clone()))
-            }
-            DatabaseType::MariaDB => {
-                // MariaDB uses MySQL driver
-                use crate::database::mysql::MySqlConnection;
-                Box::new(MySqlConnection::new(connection.clone()))
-            }
-            DatabaseType::SQLite => {
-                use crate::database::sqlite::SqliteConnection;
-                Box::new(SqliteConnection::new(connection.clone()))
-            }
-            _ => {
-                return Err(format!(
-                    "Database type {} not yet supported",
-                    connection.database_type.display_name()
-                ))
-            }
-        };
-
-        // Try to connect
-        db_connection
-            .connect()
-            .await
-            .map_err(|e| format!("Connection failed: {e}"))?;
-
-        // Query actual tables from the database
-        let tables = db_connection
-            .list_tables()
-            .await
-            .map_err(|e| format!("Failed to retrieve tables: {e}"))?;
-
-        // Clean up connection
-        let _ = db_connection.disconnect().await;
-
-        Ok(tables)
+        self.db.try_connect_to_database(connection).await
     }
 
     /// Disconnect from current database
@@ -587,7 +557,20 @@ impl AppState {
         use crate::config::Config;
         use std::fs;
 
-        let sql_dir = Config::sql_files_dir();
+        // Get connection-specific directory
+        let connection_name = if let Some(connection) = self
+            .db
+            .connections
+            .connections
+            .get(self.ui.selected_connection)
+        {
+            connection.name.clone()
+        } else {
+            "default".to_string()
+        };
+
+        // Save to connection-specific directory
+        let sql_dir = Config::sql_files_dir().join(&connection_name);
         fs::create_dir_all(&sql_dir)?;
 
         let file_path = sql_dir.join(format!("{filename}.sql"));

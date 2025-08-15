@@ -10,47 +10,8 @@ pub use connection::{
     ConnectionConfig, ConnectionStatus, ConnectionStorage, DatabaseType, SslMode,
 };
 
-use crate::core::error::Result;
-use async_trait::async_trait;
-
-/// Database connection trait that all database implementations must implement
-#[async_trait]
-pub trait Connection: Send + Sync {
-    /// Connect to the database
-    async fn connect(&mut self) -> Result<()>;
-
-    /// Disconnect from the database
-    async fn disconnect(&mut self) -> Result<()>;
-
-    /// Check if connected
-    async fn is_connected(&self) -> bool;
-
-    /// Test the connection
-    async fn test_connection(&self) -> Result<()>;
-
-    /// List available databases
-    async fn list_databases(&self) -> Result<Vec<String>>;
-
-    /// List tables in the current database
-    async fn list_tables(&self) -> Result<Vec<String>>;
-
-    /// Get metadata for a specific table
-    async fn get_table_metadata(&self, table_name: &str) -> Result<TableMetadata>;
-
-    /// Get columns for a specific table
-    async fn get_table_columns(&self, table_name: &str) -> Result<Vec<TableColumn>>;
-
-    /// Get row count for a table
-    async fn get_table_row_count(&self, table_name: &str) -> Result<usize>;
-
-    /// Get table data with pagination
-    async fn get_table_data(
-        &self,
-        table_name: &str,
-        limit: usize,
-        offset: usize,
-    ) -> Result<Vec<Vec<String>>>;
-}
+// Re-export the Connection trait from connection module
+pub use connection::Connection;
 
 /// Represents a table column
 #[derive(Debug, Clone)]

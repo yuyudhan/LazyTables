@@ -150,8 +150,8 @@ impl HelpSystem {
         match mode {
             HelpMode::Connections => {
                 Self::add_overview_command(lines, "Enter", "Connect", key_style, desc_style);
-                Self::add_overview_command(lines, "a", "Add", key_style, desc_style);
-                Self::add_overview_command(lines, "e", "Edit", key_style, desc_style);
+                Self::add_overview_command(lines, "x", "Disconnect", key_style, desc_style);
+                Self::add_overview_command(lines, "a/e/d", "Add/Edit/Delete", key_style, desc_style);
             }
             HelpMode::Tables => {
                 Self::add_overview_command(lines, "Enter", "Open", key_style, desc_style);
@@ -173,7 +173,7 @@ impl HelpSystem {
             }
             HelpMode::QueryWindow => {
                 Self::add_overview_command(lines, "i", "Edit mode", key_style, desc_style);
-                Self::add_overview_command(lines, "C-Enter", "Execute", key_style, desc_style);
+                Self::add_overview_command(lines, "C-Enter", "Execute at cursor", key_style, desc_style);
                 Self::add_overview_command(lines, "C-s", "Save", key_style, desc_style);
             }
             _ => {}
@@ -214,7 +214,8 @@ impl HelpSystem {
 
     fn add_connections_commands(lines: &mut Vec<Line<'static>>) {
         Self::add_command(lines, "j/k", "Navigate up/down");
-        Self::add_command(lines, "Enter", "Connect/disconnect");
+        Self::add_command(lines, "Enter/Space", "Connect to database");
+        Self::add_command(lines, "x", "Disconnect connection");
         Self::add_command(lines, "a", "Add connection");
         Self::add_command(lines, "e", "Edit connection");
         Self::add_command(lines, "d", "Delete connection");
@@ -271,9 +272,9 @@ impl HelpSystem {
     fn add_query_window_commands(lines: &mut Vec<Line<'static>>) {
         Self::add_command(lines, "i", "Insert mode");
         Self::add_command(lines, "ESC", "Exit insert");
-        Self::add_command(lines, "C-Enter", "Execute SQL");
+        Self::add_command(lines, "C-Enter", "Execute query at cursor");
         Self::add_command(lines, "C-s", "Save query");
-        Self::add_command(lines, "C-o", "Open file");
+        Self::add_command(lines, "C-o", "Refresh file list");
         Self::add_command(lines, "C-n", "New query");
     }
 
