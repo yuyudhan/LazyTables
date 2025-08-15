@@ -20,10 +20,9 @@ Stop wrestling with clunky GUI database tools. LazyTables brings the power and e
 
 ### macOS
 
-#### Using Homebrew
+#### Using Homebrew (Recommended)
 ```bash
-brew tap yuyudhan/lazytables
-brew install lazytables
+brew install yuyudhan/lazytables/lazytables
 ```
 
 #### Build from source
@@ -36,16 +35,9 @@ sudo cp target/release/lazytables /usr/local/bin/
 
 ### Linux
 
-#### Ubuntu/Debian (package repository coming soon)
-```bash
-curl -fsSL https://repo.lazytables.dev/setup.sh | sudo bash
-sudo apt install lazytables
-```
+🚧 **Support for Linux coming soon!**
 
-#### Arch Linux (AUR)
-```bash
-yay -S lazytables-git
-```
+For now, Linux users can build from source:
 
 #### Build from source
 ```bash
