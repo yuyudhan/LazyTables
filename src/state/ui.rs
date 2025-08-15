@@ -126,7 +126,7 @@ pub struct UIState {
     pub show_table_creator: bool,
     /// Show table editor view
     pub show_table_editor: bool,
-    
+
     /// Confirmation modal state
     #[serde(skip)]
     pub confirmation_modal: Option<crate::ui::ConfirmationModal>,
