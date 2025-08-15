@@ -8,9 +8,9 @@ pub struct StartInsertModeCommand;
 
 impl Command for StartInsertModeCommand {
     fn execute(&self, context: &mut CommandContext) -> Result<CommandResult> {
-        match context.state.focused_pane {
+        match context.state.ui.focused_pane {
             crate::app::FocusedPane::QueryWindow => {
-                context.state.query_edit_mode = crate::app::state::QueryEditMode::Insert;
+                context.state.ui.query_edit_mode = crate::app::state::QueryEditMode::Insert;
                 Ok(CommandResult::SuccessWithMessage("Insert mode".to_string()))
             }
             _ => {
@@ -41,7 +41,7 @@ pub struct ExitInsertModeCommand;
 
 impl Command for ExitInsertModeCommand {
     fn execute(&self, context: &mut CommandContext) -> Result<CommandResult> {
-        context.state.query_edit_mode = crate::app::state::QueryEditMode::Normal;
+        context.state.ui.query_edit_mode = crate::app::state::QueryEditMode::Normal;
         Ok(CommandResult::SuccessWithMessage("Normal mode".to_string()))
     }
     

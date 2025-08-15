@@ -148,16 +148,16 @@ impl App {
                         self.execute_command(CommandId::Help)?;
                     },
                     ModalType::Connection => {
-                        self.state.show_add_connection_modal = true;
+                        self.state.ui.show_add_connection_modal = true;
                     },
                     _ => {}
                 }
             },
             CommandAction::CloseModal => {
-                self.state.show_add_connection_modal = false;
-                self.state.show_edit_connection_modal = false;
-                self.state.show_table_creator = false;
-                self.state.show_table_editor = false;
+                self.state.ui.show_add_connection_modal = false;
+                self.state.ui.show_edit_connection_modal = false;
+                self.state.ui.show_table_creator = false;
+                self.state.ui.show_table_editor = false;
             },
             CommandAction::ExecuteQuery(query) => {
                 // TODO: Execute query through database connection
@@ -175,7 +175,7 @@ impl App {
                 use crate::commands::NavigationTarget;
                 match target {
                     NavigationTarget::Pane(pane) => {
-                        self.state.focused_pane = pane;
+                        self.state.ui.focused_pane = pane;
                     },
                     _ => {}
                 }
@@ -187,8 +187,8 @@ impl App {
     /// Handle keyboard events
     async fn handle_key_event(&mut self, key: KeyEvent) -> Result<()> {
         // Handle ESC key globally to close help overlay
-        if key.code == KeyCode::Esc && self.state.help_mode != crate::app::state::HelpMode::None {
-            self.state.help_mode = crate::app::state::HelpMode::None;
+        if key.code == KeyCode::Esc && self.state.ui.help_mode != crate::app::state::HelpMode::None {
+            self.state.ui.help_mode = crate::app::state::HelpMode::None;
             return Ok(());
         }
 
@@ -231,13 +231,13 @@ impl App {
         // Handle 'q' key globally to quit (except when in modals or editing)
         if key.code == KeyCode::Char('q') && key.modifiers == KeyModifiers::NONE {
             // Don't quit if we're in a modal or editing
-            if !self.state.show_add_connection_modal
-                && !self.state.show_edit_connection_modal
-                && !self.state.show_table_creator
-                && !self.state.show_table_editor
+            if !self.state.ui.show_add_connection_modal
+                && !self.state.ui.show_edit_connection_modal
+                && !self.state.ui.show_table_creator
+                && !self.state.ui.show_table_editor
             {
                 // Check if we're editing in table viewer
-                if self.state.focused_pane == FocusedPane::TabularOutput {
+                if self.state.ui.focused_pane == FocusedPane::TabularOutput {
                     if let Some(tab) = self.state.table_viewer_state.current_tab() {
                         if !tab.in_edit_mode && !tab.in_search_mode {
                             self.execute_command(CommandId::Quit)?;
@@ -256,7 +256,7 @@ impl App {
 
         // Handle ESC or Enter in table viewer edit mode to save
         if (key.code == KeyCode::Esc || key.code == KeyCode::Enter)
-            && self.state.focused_pane == FocusedPane::TabularOutput
+            && self.state.ui.focused_pane == FocusedPane::TabularOutput
         {
             if let Some(tab) = self.state.table_viewer_state.current_tab_mut() {
                 if tab.in_edit_mode {
@@ -280,7 +280,7 @@ impl App {
         // Handle Ctrl+C in table viewer edit mode
         if key.code == KeyCode::Char('c')
             && key.modifiers == KeyModifiers::CONTROL
-            && self.state.focused_pane == FocusedPane::TabularOutput
+            && self.state.ui.focused_pane == FocusedPane::TabularOutput
         {
             if let Some(tab) = self.state.table_viewer_state.current_tab_mut() {
                 if tab.in_edit_mode {
@@ -292,7 +292,7 @@ impl App {
         }
 
         // Handle typing in table viewer edit mode or search mode
-        if self.state.focused_pane == FocusedPane::TabularOutput {
+        if self.state.ui.focused_pane == FocusedPane::TabularOutput {
             if let Some(tab) = self.state.table_viewer_state.current_tab_mut() {
                 if tab.in_edit_mode {
                     match key.code {
@@ -341,17 +341,17 @@ impl App {
         }
 
         // Handle connection modal if active
-        if self.state.show_add_connection_modal || self.state.show_edit_connection_modal {
+        if self.state.ui.show_add_connection_modal || self.state.ui.show_edit_connection_modal {
             return self.handle_connection_modal_key_event(key).await;
         }
 
         // Handle table creator if active
-        if self.state.show_table_creator {
+        if self.state.ui.show_table_creator {
             return self.handle_table_creator_key_event(key).await;
         }
 
         // Handle table editor if active
-        if self.state.show_table_editor {
+        if self.state.ui.show_table_editor {
             return self.handle_table_editor_key_event(key).await;
         }
 
@@ -398,13 +398,13 @@ impl App {
                     }
                     // Enter insert mode (or Query mode for query window, or edit cell in table viewer)
                     (KeyModifiers::NONE, KeyCode::Char('i')) => {
-                        if self.state.focused_pane == FocusedPane::TabularOutput {
+                        if self.state.ui.focused_pane == FocusedPane::TabularOutput {
                             // Start editing cell in table viewer
                             if let Some(tab) = self.state.table_viewer_state.current_tab_mut() {
                                 tab.start_edit();
                             }
-                        } else if self.state.focused_pane == FocusedPane::QueryWindow
-                            || self.state.focused_pane == FocusedPane::SqlFiles
+                        } else if self.state.ui.focused_pane == FocusedPane::QueryWindow
+                            || self.state.ui.focused_pane == FocusedPane::SqlFiles
                         {
                             self.mode = Mode::Query;
                         } else {
@@ -422,13 +422,13 @@ impl App {
                     }
                     // Add connection (only in connections pane)
                     (KeyModifiers::NONE, KeyCode::Char('a')) => {
-                        if self.state.focused_pane == crate::app::state::FocusedPane::Connections {
+                        if self.state.ui.focused_pane == crate::app::state::FocusedPane::Connections {
                             self.state.open_add_connection_modal();
                         }
                     }
                     // Edit table/connection based on focused pane
                     (KeyModifiers::NONE, KeyCode::Char('e')) => {
-                        if self.state.focused_pane == crate::app::state::FocusedPane::Tables
+                        if self.state.ui.focused_pane == crate::app::state::FocusedPane::Tables
                             && !self.state.tables.is_empty()
                         {
                             // Check if we have an active connection
@@ -436,7 +436,7 @@ impl App {
                                 .state
                                 .connections
                                 .connections
-                                .get(self.state.selected_connection)
+                                .get(self.state.ui.selected_connection)
                             {
                                 if matches!(
                                     connection.status,
@@ -445,7 +445,7 @@ impl App {
                                     self.state.open_table_editor().await;
                                 }
                             }
-                        } else if self.state.focused_pane
+                        } else if self.state.ui.focused_pane
                             == crate::app::state::FocusedPane::Connections
                             && !self.state.connections.connections.is_empty()
                         {
@@ -454,13 +454,13 @@ impl App {
                     }
                     // Create new table (only in tables pane when connected) or next search result
                     (KeyModifiers::NONE, KeyCode::Char('n')) => {
-                        if self.state.focused_pane == crate::app::state::FocusedPane::Tables {
+                        if self.state.ui.focused_pane == crate::app::state::FocusedPane::Tables {
                             // Check if we have an active connection
                             if let Some(connection) = self
                                 .state
                                 .connections
                                 .connections
-                                .get(self.state.selected_connection)
+                                .get(self.state.ui.selected_connection)
                             {
                                 if matches!(
                                     connection.status,
@@ -469,7 +469,7 @@ impl App {
                                     self.state.open_table_creator();
                                 }
                             }
-                        } else if self.state.focused_pane == FocusedPane::TabularOutput {
+                        } else if self.state.ui.focused_pane == FocusedPane::TabularOutput {
                             // Next search result (when not in search mode)
                             if let Some(tab) = self.state.table_viewer_state.current_tab_mut() {
                                 if !tab.in_edit_mode
@@ -483,7 +483,7 @@ impl App {
                     }
                     // Previous search result
                     (KeyModifiers::NONE, KeyCode::Char('N')) => {
-                        if self.state.focused_pane == FocusedPane::TabularOutput {
+                        if self.state.ui.focused_pane == FocusedPane::TabularOutput {
                             // Previous search result (when not in search mode)
                             if let Some(tab) = self.state.table_viewer_state.current_tab_mut() {
                                 if !tab.in_edit_mode
@@ -497,13 +497,13 @@ impl App {
                     }
                     // Connect/select action
                     (KeyModifiers::NONE, KeyCode::Enter) => {
-                        if self.state.focused_pane == crate::app::state::FocusedPane::Connections {
+                        if self.state.ui.focused_pane == crate::app::state::FocusedPane::Connections {
                             // Handle database connection
                             if let Some(connection) = self
                                 .state
                                 .connections
                                 .connections
-                                .get(self.state.selected_connection)
+                                .get(self.state.ui.selected_connection)
                             {
                                 match &connection.status {
                                     crate::database::ConnectionStatus::Connected => {
@@ -516,15 +516,15 @@ impl App {
                                     }
                                 }
                             }
-                        } else if self.state.focused_pane == crate::app::state::FocusedPane::Tables
+                        } else if self.state.ui.focused_pane == crate::app::state::FocusedPane::Tables
                         {
                             // Open table for viewing
                             self.state.open_table_for_viewing().await;
-                        } else if self.state.focused_pane == FocusedPane::Details {
+                        } else if self.state.ui.focused_pane == FocusedPane::Details {
                             // Load metadata for current table if not already loaded
                             if self.state.current_table_metadata.is_none() {
                                 if let Some(table_name) =
-                                    self.state.tables.get(self.state.selected_table).cloned()
+                                    self.state.tables.get(self.state.ui.selected_table).cloned()
                                 {
                                     if let Err(e) =
                                         self.state.load_table_metadata(&table_name).await
@@ -535,7 +535,7 @@ impl App {
                                     }
                                 }
                             }
-                        } else if self.state.focused_pane == FocusedPane::SqlFiles {
+                        } else if self.state.ui.focused_pane == FocusedPane::SqlFiles {
                             // Load selected SQL file
                             if let Err(e) = self.state.load_selected_sql_file() {
                                 self.state
@@ -548,8 +548,8 @@ impl App {
                     }
                     // SQL Query operations - when query window or SQL files pane is focused
                     (KeyModifiers::CONTROL, KeyCode::Char('s')) => {
-                        if self.state.focused_pane == FocusedPane::QueryWindow
-                            || self.state.focused_pane == FocusedPane::SqlFiles
+                        if self.state.ui.focused_pane == FocusedPane::QueryWindow
+                            || self.state.ui.focused_pane == FocusedPane::SqlFiles
                         {
                             // Save current query
                             if let Err(e) = self.state.save_query() {
@@ -562,8 +562,8 @@ impl App {
                         }
                     }
                     (KeyModifiers::CONTROL, KeyCode::Char('o')) => {
-                        if self.state.focused_pane == FocusedPane::QueryWindow
-                            || self.state.focused_pane == FocusedPane::SqlFiles
+                        if self.state.ui.focused_pane == FocusedPane::QueryWindow
+                            || self.state.ui.focused_pane == FocusedPane::SqlFiles
                         {
                             // Refresh SQL file list
                             self.state.refresh_sql_files();
@@ -571,8 +571,8 @@ impl App {
                         }
                     }
                     (KeyModifiers::CONTROL, KeyCode::Char('n')) => {
-                        if self.state.focused_pane == FocusedPane::QueryWindow
-                            || self.state.focused_pane == FocusedPane::SqlFiles
+                        if self.state.ui.focused_pane == FocusedPane::QueryWindow
+                            || self.state.ui.focused_pane == FocusedPane::SqlFiles
                         {
                             // Create new query file
                             let filename = format!(
@@ -592,7 +592,7 @@ impl App {
                         }
                     }
                     (KeyModifiers::CONTROL, KeyCode::Enter) => {
-                        if self.state.focused_pane == FocusedPane::QueryWindow {
+                        if self.state.ui.focused_pane == FocusedPane::QueryWindow {
                             // Execute SQL query under cursor
                             if let Some(statement) = self.state.get_statement_under_cursor() {
                                 // TODO: Execute the SQL statement
@@ -602,7 +602,7 @@ impl App {
                     }
                     // Table viewer specific commands
                     (KeyModifiers::NONE, KeyCode::Char('/')) => {
-                        if self.state.focused_pane == FocusedPane::TabularOutput {
+                        if self.state.ui.focused_pane == FocusedPane::TabularOutput {
                             // Start search mode
                             if let Some(tab) = self.state.table_viewer_state.current_tab_mut() {
                                 if !tab.in_edit_mode {
@@ -612,27 +612,27 @@ impl App {
                         }
                     }
                     (KeyModifiers::NONE, KeyCode::Char('x')) => {
-                        if self.state.focused_pane == FocusedPane::TabularOutput {
+                        if self.state.ui.focused_pane == FocusedPane::TabularOutput {
                             // Close current tab
                             self.state.table_viewer_state.close_current_tab();
                         }
                     }
                     // Handle uppercase S for previous tab (both with and without SHIFT modifier)
                     (KeyModifiers::SHIFT, KeyCode::Char('S')) | (KeyModifiers::SHIFT, KeyCode::Char('s')) | (KeyModifiers::NONE, KeyCode::Char('S')) => {
-                        if self.state.focused_pane == FocusedPane::TabularOutput {
+                        if self.state.ui.focused_pane == FocusedPane::TabularOutput {
                             // Previous tab
                             self.state.table_viewer_state.prev_tab();
                         }
                     }
                     // Handle uppercase D for next tab (with SHIFT modifier)
                     (KeyModifiers::SHIFT, KeyCode::Char('D')) | (KeyModifiers::SHIFT, KeyCode::Char('d')) | (KeyModifiers::NONE, KeyCode::Char('D')) => {
-                        if self.state.focused_pane == FocusedPane::TabularOutput {
+                        if self.state.ui.focused_pane == FocusedPane::TabularOutput {
                             // Next tab
                             self.state.table_viewer_state.next_tab();
                         }
                     }
                     (KeyModifiers::NONE, KeyCode::Char('r')) => {
-                        if self.state.focused_pane == FocusedPane::TabularOutput {
+                        if self.state.ui.focused_pane == FocusedPane::TabularOutput {
                             // Reload current table
                             if let Err(e) = self.state.reload_current_table_tab().await {
                                 self.state
@@ -645,7 +645,7 @@ impl App {
                     }
                     // Pagination
                     (KeyModifiers::CONTROL, KeyCode::Char('d')) => {
-                        if self.state.focused_pane == FocusedPane::TabularOutput {
+                        if self.state.ui.focused_pane == FocusedPane::TabularOutput {
                             if let Some(tab) = self.state.table_viewer_state.current_tab_mut() {
                                 if tab.page_down() {
                                     // Need to reload data
@@ -660,7 +660,7 @@ impl App {
                         }
                     }
                     (KeyModifiers::CONTROL, KeyCode::Char('u')) => {
-                        if self.state.focused_pane == FocusedPane::TabularOutput {
+                        if self.state.ui.focused_pane == FocusedPane::TabularOutput {
                             if let Some(tab) = self.state.table_viewer_state.current_tab_mut() {
                                 if tab.page_up() {
                                     // Need to reload data
@@ -676,7 +676,7 @@ impl App {
                     }
                     // Jump navigation in table viewer
                     (KeyModifiers::NONE, KeyCode::Char('g')) => {
-                        if self.state.focused_pane == FocusedPane::TabularOutput {
+                        if self.state.ui.focused_pane == FocusedPane::TabularOutput {
                             if self.leader_pressed {
                                 // gg - jump to first row
                                 if let Some(tab) = self.state.table_viewer_state.current_tab_mut() {
@@ -689,7 +689,7 @@ impl App {
                         }
                     }
                     (KeyModifiers::NONE, KeyCode::Char('G')) => {
-                        if self.state.focused_pane == FocusedPane::TabularOutput {
+                        if self.state.ui.focused_pane == FocusedPane::TabularOutput {
                             // Jump to last row
                             if let Some(tab) = self.state.table_viewer_state.current_tab_mut() {
                                 tab.jump_to_last();
@@ -697,7 +697,7 @@ impl App {
                         }
                     }
                     (KeyModifiers::NONE, KeyCode::Char('0')) => {
-                        if self.state.focused_pane == FocusedPane::TabularOutput {
+                        if self.state.ui.focused_pane == FocusedPane::TabularOutput {
                             // Jump to first column
                             if let Some(tab) = self.state.table_viewer_state.current_tab_mut() {
                                 tab.jump_to_first_col();
@@ -705,7 +705,7 @@ impl App {
                         }
                     }
                     (KeyModifiers::NONE, KeyCode::Char('$')) => {
-                        if self.state.focused_pane == FocusedPane::TabularOutput {
+                        if self.state.ui.focused_pane == FocusedPane::TabularOutput {
                             // Jump to last column
                             if let Some(tab) = self.state.table_viewer_state.current_tab_mut() {
                                 tab.jump_to_last_col();
@@ -714,7 +714,7 @@ impl App {
                     }
                     // Handle 'd' for delete row (dd vim command)
                     (KeyModifiers::NONE, KeyCode::Char('d')) => {
-                        if self.state.focused_pane == FocusedPane::TabularOutput {
+                        if self.state.ui.focused_pane == FocusedPane::TabularOutput {
                             // Check if there's a delete confirmation dialog
                             if self.state.table_viewer_state.delete_confirmation.is_some() {
                                 // This is handled elsewhere (Enter/Esc for confirm/cancel)
@@ -741,7 +741,7 @@ impl App {
                     }
                     // Handle 'y' for yank/copy row (yy vim command)
                     (KeyModifiers::NONE, KeyCode::Char('y')) => {
-                        if self.state.focused_pane == FocusedPane::TabularOutput {
+                        if self.state.ui.focused_pane == FocusedPane::TabularOutput {
                             // Check for double 'y' press (yy command)
                             let now = std::time::Instant::now();
                             if let Some(last_press) = self.state.table_viewer_state.last_y_press {
@@ -766,13 +766,13 @@ impl App {
                     }
                     // Leader key (Space) commands OR Connect in Connections pane
                     (KeyModifiers::NONE, KeyCode::Char(' ')) => {
-                        if self.state.focused_pane == crate::app::state::FocusedPane::Connections {
+                        if self.state.ui.focused_pane == crate::app::state::FocusedPane::Connections {
                             // Handle database connection (same as Enter)
                             if let Some(connection) = self
                                 .state
                                 .connections
                                 .connections
-                                .get(self.state.selected_connection)
+                                .get(self.state.ui.selected_connection)
                             {
                                 match &connection.status {
                                     crate::database::ConnectionStatus::Connected => {
@@ -848,14 +848,14 @@ impl App {
                 use crate::app::state::QueryEditMode;
                 
                 // Handle vim command mode
-                if self.state.in_vim_command {
+                if self.state.ui.in_vim_command {
                     match key.code {
                         KeyCode::Esc => {
-                            self.state.in_vim_command = false;
-                            self.state.vim_command_buffer.clear();
+                            self.state.ui.in_vim_command = false;
+                            self.state.ui.vim_command_buffer.clear();
                         }
                         KeyCode::Enter => {
-                            let command = self.state.vim_command_buffer.trim();
+                            let command = self.state.ui.vim_command_buffer.trim();
                             if command == "w" {
                                 // Save file
                                 if let Err(e) = self.state.save_sql_file_with_connection() {
@@ -865,7 +865,7 @@ impl App {
                                 }
                             } else if command == "q" {
                                 // Quit query mode
-                                if self.state.query_modified {
+                                if self.state.ui.query_modified {
                                     self.state.toast_manager.warning("Unsaved changes! Use :w to save or :q! to force quit");
                                 } else {
                                     self.mode = Mode::Normal;
@@ -882,22 +882,22 @@ impl App {
                                     self.mode = Mode::Normal;
                                 }
                             }
-                            self.state.in_vim_command = false;
-                            self.state.vim_command_buffer.clear();
+                            self.state.ui.in_vim_command = false;
+                            self.state.ui.vim_command_buffer.clear();
                         }
                         KeyCode::Char(c) => {
-                            self.state.vim_command_buffer.push(c);
+                            self.state.ui.vim_command_buffer.push(c);
                         }
                         KeyCode::Backspace => {
-                            self.state.vim_command_buffer.pop();
+                            self.state.ui.vim_command_buffer.pop();
                         }
                         _ => {}
                     }
-                } else if self.state.query_edit_mode == QueryEditMode::Insert {
+                } else if self.state.ui.query_edit_mode == QueryEditMode::Insert {
                     // Insert mode - handle text input
                     match key.code {
                         KeyCode::Esc => {
-                            self.state.query_edit_mode = QueryEditMode::Normal;
+                            self.state.ui.query_edit_mode = QueryEditMode::Normal;
                         }
                         KeyCode::Enter => {
                             self.state.insert_char_at_cursor('\n');
@@ -929,11 +929,11 @@ impl App {
                             self.mode = Mode::Normal;
                         }
                         KeyCode::Char('i') => {
-                            self.state.query_edit_mode = QueryEditMode::Insert;
+                            self.state.ui.query_edit_mode = QueryEditMode::Insert;
                         }
                         KeyCode::Char(':') => {
-                            self.state.in_vim_command = true;
-                            self.state.vim_command_buffer.clear();
+                            self.state.ui.in_vim_command = true;
+                            self.state.ui.vim_command_buffer.clear();
                         }
                         // Vim navigation
                         KeyCode::Char('h') => {
@@ -989,11 +989,11 @@ impl App {
                                     .unwrap()
                                     .as_secs()
                             );
-                            self.state.current_sql_file = Some(filename);
+                            self.state.ui.current_sql_file = Some(filename);
                             self.state.query_content = String::new();
-                            self.state.query_modified = false;
-                            self.state.query_cursor_line = 0;
-                            self.state.query_cursor_column = 0;
+                            self.state.ui.query_modified = false;
+                            self.state.ui.query_cursor_line = 0;
+                            self.state.ui.query_cursor_column = 0;
                             self.state.toast_manager.success("New query file created");
                         }
                         _ => {}
@@ -1040,7 +1040,7 @@ impl App {
                     self.state.connection_modal_state.go_back();
                 } else {
                     // Close the appropriate modal
-                    if self.state.show_add_connection_modal {
+                    if self.state.ui.show_add_connection_modal {
                         self.state.close_add_connection_modal();
                     } else {
                         self.state.close_edit_connection_modal();
@@ -1142,7 +1142,7 @@ impl App {
                     }
                     ConnectionField::Cancel => {
                         // Close the appropriate modal
-                        if self.state.show_add_connection_modal {
+                        if self.state.ui.show_add_connection_modal {
                             self.state.close_add_connection_modal();
                         } else {
                             self.state.close_edit_connection_modal();
@@ -1179,7 +1179,7 @@ impl App {
             }
             KeyCode::Char('c') => {
                 // Cancel shortcut - works from any field
-                if self.state.show_add_connection_modal {
+                if self.state.ui.show_add_connection_modal {
                     self.state.close_add_connection_modal();
                 } else {
                     self.state.close_edit_connection_modal();
