@@ -389,7 +389,7 @@ impl AppState {
         {
             // Disconnect all other connections first
             self.disconnect_all_except(self.ui.selected_connection);
-            
+
             // Set connection status to connecting
             if let Some(conn) = self
                 .db

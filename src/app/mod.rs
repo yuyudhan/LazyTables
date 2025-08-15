@@ -205,15 +205,25 @@ impl App {
                         crate::ui::ConfirmationAction::DeleteConnection(index) => {
                             let index = *index;
                             // Delete the connection
-                            if let Some(connection) = self.state.db.connections.connections.get(index) {
+                            if let Some(connection) =
+                                self.state.db.connections.connections.get(index)
+                            {
                                 let conn_id = connection.id.clone();
-                                if let Err(e) = self.state.db.connections.remove_connection(&conn_id) {
-                                    self.state.toast_manager.error(format!("Failed to delete connection: {}", e));
+                                if let Err(e) =
+                                    self.state.db.connections.remove_connection(&conn_id)
+                                {
+                                    self.state
+                                        .toast_manager
+                                        .error(format!("Failed to delete connection: {e}"));
                                 } else {
-                                    self.state.toast_manager.success("Connection deleted successfully");
+                                    self.state
+                                        .toast_manager
+                                        .success("Connection deleted successfully");
                                     // Adjust selection if needed
-                                    if self.state.ui.selected_connection >= self.state.db.connections.connections.len() 
-                                        && self.state.ui.selected_connection > 0 {
+                                    if self.state.ui.selected_connection
+                                        >= self.state.db.connections.connections.len()
+                                        && self.state.ui.selected_connection > 0
+                                    {
                                         self.state.ui.selected_connection -= 1;
                                     }
                                 }
@@ -536,16 +546,26 @@ impl App {
                             }
                         }
                     }
-                    // Disconnect current connection
+                    // Handle 'x' key for different panes
                     (KeyModifiers::NONE, KeyCode::Char('x')) => {
-                        if self.state.ui.focused_pane == crate::app::state::FocusedPane::Connections {
-                            self.state.disconnect_from_database();
-                            self.state.toast_manager.info("Connection disconnected");
+                        match self.state.ui.focused_pane {
+                            FocusedPane::Connections => {
+                                // Disconnect current connection
+                                self.state.disconnect_from_database();
+                                self.state.toast_manager.info("Connection disconnected");
+                            }
+                            FocusedPane::TabularOutput => {
+                                // Close current tab
+                                self.state.table_viewer_state.close_current_tab();
+                            }
+                            _ => {}
                         }
                     }
                     // Delete connection with confirmation (only in Connections pane)
-                    (KeyModifiers::NONE, KeyCode::Char('d')) 
-                        if self.state.ui.focused_pane == crate::app::state::FocusedPane::Connections => {
+                    (KeyModifiers::NONE, KeyCode::Char('d'))
+                        if self.state.ui.focused_pane
+                            == crate::app::state::FocusedPane::Connections =>
+                    {
                         if let Some(connection) = self
                             .state
                             .db
@@ -556,15 +576,18 @@ impl App {
                             let conn_name = connection.name.clone();
                             self.state.ui.confirmation_modal = Some(crate::ui::ConfirmationModal {
                                 title: "Delete Connection".to_string(),
-                                message: format!("Are you sure you want to delete the connection '{}'?", conn_name),
+                                message: format!(
+                                    "Are you sure you want to delete the connection '{conn_name}'?"
+                                ),
                                 action: crate::ui::ConfirmationAction::DeleteConnection(
-                                    self.state.ui.selected_connection
+                                    self.state.ui.selected_connection,
                                 ),
                             });
                         }
                     }
                     // Connect/select action
-                    (KeyModifiers::NONE, KeyCode::Enter) | (KeyModifiers::NONE, KeyCode::Char(' ')) => {
+                    (KeyModifiers::NONE, KeyCode::Enter)
+                    | (KeyModifiers::NONE, KeyCode::Char(' ')) => {
                         if self.state.ui.focused_pane == crate::app::state::FocusedPane::Connections
                         {
                             // Always connect to selected database (disconnecting others)
@@ -654,7 +677,12 @@ impl App {
                             // Execute SQL query under cursor
                             if let Some(statement) = self.state.get_statement_under_cursor() {
                                 // Execute the SQL statement
-                                match self.state.db.execute_query(&statement, self.state.ui.selected_connection).await {
+                                match self
+                                    .state
+                                    .db
+                                    .execute_query(&statement, self.state.ui.selected_connection)
+                                    .await
+                                {
                                     Ok((columns, rows)) => {
                                         // Create a new tab for query results
                                         let query_preview = if statement.len() > 30 {
@@ -662,11 +690,14 @@ impl App {
                                         } else {
                                             statement.clone()
                                         };
-                                        let tab_name = format!("Query: {}", query_preview);
-                                        
+                                        let tab_name = format!("Query: {query_preview}");
+
                                         // Add tab and populate with results
-                                        let tab_idx = self.state.table_viewer_state.add_tab(tab_name);
-                                        if let Some(tab) = self.state.table_viewer_state.tabs.get_mut(tab_idx) {
+                                        let tab_idx =
+                                            self.state.table_viewer_state.add_tab(tab_name);
+                                        if let Some(tab) =
+                                            self.state.table_viewer_state.tabs.get_mut(tab_idx)
+                                        {
                                             // Convert column names to ColumnInfo
                                             tab.columns = columns.iter().map(|name| {
                                                 crate::ui::components::table_viewer::ColumnInfo {
@@ -682,18 +713,24 @@ impl App {
                                             tab.loading = false;
                                             tab.error = None;
                                         }
-                                        
-                                        self.state.toast_manager.success(format!("Query executed: {} rows returned", 
-                                            self.state.table_viewer_state.tabs[tab_idx].rows.len()));
+
+                                        self.state.toast_manager.success(format!(
+                                            "Query executed: {} rows returned",
+                                            self.state.table_viewer_state.tabs[tab_idx].rows.len()
+                                        ));
                                         // Focus on tabular output to see results
                                         self.state.ui.focused_pane = FocusedPane::TabularOutput;
                                     }
                                     Err(e) => {
-                                        self.state.toast_manager.error(format!("Query failed: {}", e));
+                                        self.state
+                                            .toast_manager
+                                            .error(format!("Query failed: {e}"));
                                     }
                                 }
                             } else {
-                                self.state.toast_manager.warning("No SQL statement under cursor");
+                                self.state
+                                    .toast_manager
+                                    .warning("No SQL statement under cursor");
                             }
                         }
                     }
@@ -706,12 +743,6 @@ impl App {
                                     tab.start_search();
                                 }
                             }
-                        }
-                    }
-                    (KeyModifiers::NONE, KeyCode::Char('x')) => {
-                        if self.state.ui.focused_pane == FocusedPane::TabularOutput {
-                            // Close current tab
-                            self.state.table_viewer_state.close_current_tab();
                         }
                     }
                     // Handle uppercase S for previous tab (both with and without SHIFT modifier)
@@ -1129,18 +1160,20 @@ impl App {
             }
             KeyCode::Tab => {
                 // Use smart navigation that skips irrelevant fields
-                self.state.connection_modal_state.focused_field = 
+                self.state.connection_modal_state.focused_field =
                     self.state.connection_modal_state.get_smart_next_field();
             }
             KeyCode::BackTab => {
                 // Use smart navigation that skips irrelevant fields
-                self.state.connection_modal_state.focused_field = 
+                self.state.connection_modal_state.focused_field =
                     self.state.connection_modal_state.get_smart_previous_field();
             }
             KeyCode::Down
                 if matches!(
                     self.state.connection_modal_state.focused_field,
-                    ConnectionField::DatabaseType | ConnectionField::SslMode | ConnectionField::PasswordStorageType
+                    ConnectionField::DatabaseType
+                        | ConnectionField::SslMode
+                        | ConnectionField::PasswordStorageType
                 ) =>
             {
                 // Handle dropdown navigation
@@ -1168,7 +1201,9 @@ impl App {
                         self.state.connection_modal_state.select_ssl_mode(new_index);
                     }
                     ConnectionField::PasswordStorageType => {
-                        self.state.connection_modal_state.cycle_password_storage_type();
+                        self.state
+                            .connection_modal_state
+                            .cycle_password_storage_type();
                     }
                     _ => {}
                 }
@@ -1176,7 +1211,9 @@ impl App {
             KeyCode::Up
                 if matches!(
                     self.state.connection_modal_state.focused_field,
-                    ConnectionField::DatabaseType | ConnectionField::SslMode | ConnectionField::PasswordStorageType
+                    ConnectionField::DatabaseType
+                        | ConnectionField::SslMode
+                        | ConnectionField::PasswordStorageType
                 ) =>
             {
                 // Handle dropdown navigation
@@ -1205,11 +1242,12 @@ impl App {
                     }
                     ConnectionField::PasswordStorageType => {
                         // Cycle backwards through password storage types
-                        self.state.connection_modal_state.password_storage_type = match self.state.connection_modal_state.password_storage_type {
-                            PasswordStorageType::PlainText => PasswordStorageType::Encrypted,
-                            PasswordStorageType::Environment => PasswordStorageType::PlainText,
-                            PasswordStorageType::Encrypted => PasswordStorageType::Environment,
-                        };
+                        self.state.connection_modal_state.password_storage_type =
+                            match self.state.connection_modal_state.password_storage_type {
+                                PasswordStorageType::PlainText => PasswordStorageType::Encrypted,
+                                PasswordStorageType::Environment => PasswordStorageType::PlainText,
+                                PasswordStorageType::Encrypted => PasswordStorageType::Environment,
+                            };
                     }
                     _ => {}
                 }
