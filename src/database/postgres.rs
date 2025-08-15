@@ -12,7 +12,7 @@ use sqlx::Row;
 /// PostgreSQL database connection implementation
 pub struct PostgresConnection {
     config: ConnectionConfig,
-    pool: Option<PgPool>,
+    pub pool: Option<PgPool>,
 }
 
 impl PostgresConnection {
