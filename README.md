@@ -4,7 +4,7 @@
 
 A fast, terminal-based SQL database viewer and editor designed for developers who value keyboard-driven workflows. Built with Rust and featuring vim motions throughout, LazyTables provides an intuitive interface for database management without ever leaving your terminal.
 
-⚠️ **This project is in active development** - core features are being actively implemented. Follow our progress and contribute to make it better!
+🚀 **Active Development** - LazyTables is continuously evolving with new features and improvements to enhance your database management experience. We welcome contributions and feedback from the community!
 
 ## Why LazyTables?
 
@@ -20,7 +20,7 @@ Stop wrestling with clunky GUI database tools. LazyTables brings the power and e
 
 ### macOS
 
-#### Using Homebrew (coming soon)
+#### Using Homebrew
 ```bash
 brew tap yuyudhan/lazytables
 brew install lazytables
