@@ -71,10 +71,26 @@ impl Toast {
     /// Get the style for this toast type
     fn get_style(&self, theme: &Theme) -> (Color, &str, Color) {
         match self.toast_type {
-            ToastType::Success => (theme.get_color("success"), "✓", theme.get_color("toast_success_bg")),
-            ToastType::Error => (theme.get_color("error"), "✗", theme.get_color("toast_error_bg")),
-            ToastType::Warning => (theme.get_color("warning"), "⚠", theme.get_color("toast_warning_bg")),
-            ToastType::Info => (theme.get_color("info"), "ℹ", theme.get_color("toast_info_bg")),
+            ToastType::Success => (
+                theme.get_color("success"),
+                "✓",
+                theme.get_color("toast_success_bg"),
+            ),
+            ToastType::Error => (
+                theme.get_color("error"),
+                "✗",
+                theme.get_color("toast_error_bg"),
+            ),
+            ToastType::Warning => (
+                theme.get_color("warning"),
+                "⚠",
+                theme.get_color("toast_warning_bg"),
+            ),
+            ToastType::Info => (
+                theme.get_color("info"),
+                "ℹ",
+                theme.get_color("toast_info_bg"),
+            ),
         }
     }
 }
@@ -200,20 +216,15 @@ fn render_single_toast(f: &mut Frame, toast: &Toast, area: Rect, theme: &Theme) 
     };
 
     // Format the message with prefix on the same line
-    let content = vec![
-        Line::from(vec![
-            Span::styled(
-                format!("{prefix} "),
-                Style::default()
-                    .fg(border_color)
-                    .add_modifier(Modifier::BOLD),
-            ),
-            Span::styled(
-                &toast.message,
-                Style::default().fg(theme.get_color("text")),
-            ),
-        ]),
-    ];
+    let content = vec![Line::from(vec![
+        Span::styled(
+            format!("{prefix} "),
+            Style::default()
+                .fg(border_color)
+                .add_modifier(Modifier::BOLD),
+        ),
+        Span::styled(&toast.message, Style::default().fg(theme.get_color("text"))),
+    ])];
 
     let block = Block::default()
         .borders(Borders::ALL)

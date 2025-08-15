@@ -128,7 +128,10 @@ impl HelpSystem {
 
         lines.push(Line::from(vec![
             Span::styled(if is_current { "▶ " } else { "  " }, header_style),
-            Span::styled(name.to_string(), header_style.add_modifier(Modifier::UNDERLINED)),
+            Span::styled(
+                name.to_string(),
+                header_style.add_modifier(Modifier::UNDERLINED),
+            ),
         ]));
 
         let key_style = if is_current {
@@ -136,7 +139,7 @@ impl HelpSystem {
         } else {
             Style::default().fg(Color::Rgb(100, 100, 100))
         };
-        
+
         let desc_style = if is_current {
             Style::default().fg(Color::Rgb(200, 200, 200))
         } else {
@@ -177,7 +180,7 @@ impl HelpSystem {
         }
         lines.push(Line::from(""));
     }
-    
+
     /// Helper to add a command line in the overview section
     fn add_overview_command(
         lines: &mut Vec<Line<'static>>,
@@ -295,8 +298,7 @@ impl HelpSystem {
         };
 
         // Create an elegant dark overlay without completely clearing the background
-        let overlay_block = Block::default()
-            .style(Style::default().bg(Color::Rgb(20, 20, 20)));
+        let overlay_block = Block::default().style(Style::default().bg(Color::Rgb(20, 20, 20)));
         f.render_widget(overlay_block, area);
 
         let main_block = Block::default()
