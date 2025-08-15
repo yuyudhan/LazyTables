@@ -2,17 +2,19 @@
 
 ## 🍺 Homebrew Installation (Recommended for macOS)
 
-LazyTables can be installed directly from the main repository using Homebrew.
+LazyTables can be installed via Homebrew with precompiled binaries for fast installation.
 
 ### Quick Install
 
 ```bash
-# Option 1: Direct install (simplest)
+# Option 1: Direct install with binary (fastest - no compilation needed)
 brew install yuyudhan/lazytables/lazytables
 
-# Option 2: Add tap first, then install
-brew tap yuyudhan/lazytables https://github.com/yuyudhan/LazyTables.git
-brew install lazytables
+# Option 2: Build from source
+brew install yuyudhan/lazytables/lazytables --build-from-source
+
+# Option 3: Install latest development version
+brew install yuyudhan/lazytables/lazytables --HEAD
 ```
 
 ### Verify Installation
@@ -22,9 +24,18 @@ lazytables --version
 # Should output: lazytables 0.1.3
 ```
 
-## 📦 Build from Source
+## 📦 Direct Installation
 
-If you prefer to build from source:
+### Using Make (Easiest)
+
+```bash
+# Clone and install
+git clone https://github.com/yuyudhan/LazyTables.git
+cd LazyTables
+make install
+```
+
+### Manual Build from Source
 
 ```bash
 # Clone the repository
@@ -36,6 +47,20 @@ cargo build --release
 
 # Install to system
 sudo cp target/release/lazytables /usr/local/bin/
+```
+
+### Download Prebuilt Binary
+
+Download the latest release from [GitHub Releases](https://github.com/yuyudhan/LazyTables/releases):
+
+```bash
+# For macOS ARM64 (M1/M2)
+curl -L https://github.com/yuyudhan/LazyTables/releases/download/v0.1.3/lazytables-v0.1.3-aarch64-apple-darwin.tar.gz | tar xz
+sudo mv lazytables /usr/local/bin/
+
+# For macOS Intel
+curl -L https://github.com/yuyudhan/LazyTables/releases/download/v0.1.3/lazytables-v0.1.3-x86_64-apple-darwin.tar.gz | tar xz
+sudo mv lazytables /usr/local/bin/
 ```
 
 ## 🔧 Troubleshooting
@@ -88,9 +113,10 @@ This will launch the TUI application. Press `?` for help on keyboard shortcuts.
 ## 📝 Notes
 
 - The formula is maintained in the main LazyTables repository under `Formula/lazytables.rb`
-- No separate tap repository is needed
-- The formula builds from source using Rust, which will be installed automatically if not present
-- First installation may take several minutes as it downloads and installs Rust dependencies
+- Binary releases are available for immediate installation (no compilation needed)
+- When binaries are available, Homebrew installs them directly (fast installation)
+- Building from source requires Rust, which will be installed automatically if not present
+- First source build may take several minutes to download and compile dependencies
 
 ## 🔗 Repository Structure
 
