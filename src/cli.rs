@@ -1,7 +1,10 @@
 // FilePath: src/cli.rs
 
-use clap::{Parser, ValueEnum};
+mod theme_commands;
+
+use clap::{Parser, Subcommand, ValueEnum};
 use std::path::PathBuf;
+pub use theme_commands::ThemeCommand;
 
 /// LazyTables - Terminal-based SQL database viewer and editor
 #[derive(Parser, Debug)]
@@ -31,6 +34,19 @@ pub struct Cli {
     /// Start in read-only mode
     #[arg(short = 'r', long)]
     pub read_only: bool,
+    
+    /// Theme management commands
+    #[command(subcommand)]
+    pub theme: Option<Commands>,
+}
+
+#[derive(Debug, Subcommand)]
+pub enum Commands {
+    /// Theme management commands
+    Theme {
+        #[command(subcommand)]
+        command: ThemeCommand,
+    },
 }
 
 #[derive(Debug, Clone, Copy, ValueEnum)]
@@ -53,4 +69,3 @@ impl From<LogLevel> for tracing::Level {
         }
     }
 }
-

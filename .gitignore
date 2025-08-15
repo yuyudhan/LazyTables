@@ -6,19 +6,6 @@ target/
 *.pdb
 Cargo.lock
 
-# Go specific
-/bin/
-/*.exe
-/*.exe~
-/*.dll
-/*.so
-/*.dylib
-*.test
-*.out
-coverage.txt
-profile.out
-/vendor/
-
 # IDE and Editor files
 .vscode/
 .idea/

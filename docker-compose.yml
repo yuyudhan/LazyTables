@@ -1,7 +1,5 @@
 # FilePath: docker-compose.yml
 
-version: '3.8'
-
 services:
   lazytables:
     build:
@@ -19,31 +17,8 @@ services:
       - lazytables-network
     stdin_open: true
     tty: true
-    depends_on:
-      - postgres
-
-  postgres:
-    image: postgres:16-alpine
-    container_name: lazytables-postgres
-    environment:
-      - POSTGRES_USER=lazytables
-      - POSTGRES_PASSWORD=lazytables
-      - POSTGRES_DB=test_db
-    ports:
-      - "5432:5432"
-    volumes:
-      - postgres-data:/var/lib/postgresql/data
-    networks:
-      - lazytables-network
-    healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U lazytables"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
 
 volumes:
-  postgres-data:
-    driver: local
   lazytables-cache:
     driver: local
 

@@ -11,6 +11,13 @@ async fn main() -> color_eyre::Result<()> {
     // Parse command line arguments
     let cli = Cli::parse();
 
+    // Handle theme commands if present
+    if let Some(lazytables::cli::Commands::Theme { command }) = &cli.theme {
+        return command
+            .execute()
+            .map_err(|e| color_eyre::eyre::eyre!("Theme command failed: {}", e));
+    }
+
     // Initialize logging
     lazytables::logging::init(cli.log_level)
         .map_err(|e| color_eyre::eyre::eyre!("Failed to init logging: {}", e))?;
@@ -37,5 +44,3 @@ async fn main() -> color_eyre::Result<()> {
 
     result
 }
-
-

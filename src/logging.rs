@@ -1,7 +1,7 @@
 // FilePath: src/logging.rs
 
-use crate::{cli::LogLevel, core::error::Result};
-use directories::ProjectDirs;
+use crate::{cli::LogLevel, config::Config, core::error::Result};
+// Removed directories crate, using config module for data directory
 use std::{fs, path::PathBuf};
 use tracing_subscriber::{prelude::*, EnvFilter};
 
@@ -34,8 +34,5 @@ pub fn init(level: LogLevel) -> Result<()> {
 
 /// Get the log directory path
 fn get_log_dir() -> Result<PathBuf> {
-    Ok(ProjectDirs::from("com", "lazytables", "LazyTables")
-        .map(|dirs| dirs.cache_dir().join("logs"))
-        .unwrap_or_else(|| PathBuf::from(".cache/lazytables/logs")))
+    Ok(Config::data_dir().join("logs"))
 }
-
