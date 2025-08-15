@@ -44,3 +44,9 @@ tmp/
 
 # Docker volumes
 postgres-data/
+
+# Build and distribution artifacts
+dist/
+releases/
+*.tar.gz
+*.zip
