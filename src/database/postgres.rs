@@ -26,12 +26,17 @@ impl PostgresConnection {
         let port = self.config.port;
         let database = self.config.database.as_deref().unwrap_or("postgres");
         let username = &self.config.username;
-        
+
         // Try to resolve password from various sources
-        let password = self.config.resolve_password(encryption_key).unwrap_or_default();
+        let password = self
+            .config
+            .resolve_password(encryption_key)
+            .unwrap_or_default();
 
         if !password.is_empty() {
-            Ok(format!("postgresql://{username}:{password}@{host}:{port}/{database}"))
+            Ok(format!(
+                "postgresql://{username}:{password}@{host}:{port}/{database}"
+            ))
         } else {
             Ok(format!("postgresql://{username}@{host}:{port}/{database}"))
         }

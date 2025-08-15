@@ -26,12 +26,17 @@ impl MySqlConnection {
         let port = self.config.port;
         let database = self.config.database.as_deref().unwrap_or("mysql");
         let username = &self.config.username;
-        
+
         // Try to resolve password from various sources
-        let password = self.config.resolve_password(encryption_key).unwrap_or_default();
+        let password = self
+            .config
+            .resolve_password(encryption_key)
+            .unwrap_or_default();
 
         if !password.is_empty() {
-            Ok(format!("mysql://{username}:{password}@{host}:{port}/{database}"))
+            Ok(format!(
+                "mysql://{username}:{password}@{host}:{port}/{database}"
+            ))
         } else {
             Ok(format!("mysql://{username}@{host}:{port}/{database}"))
         }

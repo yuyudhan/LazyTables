@@ -233,11 +233,13 @@ impl ConnectionModalState {
     pub fn new() -> Self {
         Self::default()
     }
-    
+
     /// Get the next field considering conditional fields
     pub fn get_smart_next_field(&self) -> ConnectionField {
-        let base_next = self.focused_field.next(self.current_step, self.using_connection_string);
-        
+        let base_next = self
+            .focused_field
+            .next(self.current_step, self.using_connection_string);
+
         // Skip fields based on password storage type
         match base_next {
             ConnectionField::PasswordEnvVar => {
@@ -254,14 +256,16 @@ impl ConnectionModalState {
             }
             _ => {}
         }
-        
+
         base_next
     }
-    
+
     /// Get the previous field considering conditional fields  
     pub fn get_smart_previous_field(&self) -> ConnectionField {
-        let base_prev = self.focused_field.previous(self.current_step, self.using_connection_string);
-        
+        let base_prev = self
+            .focused_field
+            .previous(self.current_step, self.using_connection_string);
+
         // Skip fields based on password storage type
         match base_prev {
             ConnectionField::EncryptionHint | ConnectionField::EncryptionKey => {
@@ -278,7 +282,7 @@ impl ConnectionModalState {
             }
             _ => {}
         }
-        
+
         base_prev
     }
 
@@ -344,7 +348,6 @@ impl ConnectionModalState {
 
     /// Handle character input for the current field
     pub fn handle_char_input(&mut self, c: char) {
-
         match self.focused_field {
             ConnectionField::Name => {
                 self.name.push(c);
@@ -404,7 +407,6 @@ impl ConnectionModalState {
 
     /// Handle backspace for the current field
     pub fn handle_backspace(&mut self) {
-
         match self.focused_field {
             ConnectionField::Name => {
                 self.name.pop();
@@ -711,13 +713,14 @@ impl ConnectionModalState {
                         } else {
                             Some(self.encryption_hint.trim().to_string())
                         };
-                        
+
                         let source = PasswordManager::create_encrypted(
                             self.password.trim(),
                             self.encryption_key.trim(),
                             hint,
-                        ).map_err(|e| format!("Failed to encrypt password: {}", e))?;
-                        
+                        )
+                        .map_err(|e| format!("Failed to encrypt password: {e}"))?;
+
                         connection.set_password_source(source);
                     }
                 }
@@ -1083,7 +1086,7 @@ fn render_individual_fields(f: &mut Frame, modal_state: &ConnectionModalState, a
             Constraint::Length(3), // SSL Mode
         ],
     };
-    
+
     let right_chunks = Layout::default()
         .direction(Direction::Vertical)
         .constraints(constraints)
@@ -1120,7 +1123,7 @@ fn render_individual_fields(f: &mut Frame, modal_state: &ConnectionModalState, a
         modal_state.focused_field == ConnectionField::Username,
         right_chunks[1],
     );
-    
+
     // Render password fields based on storage type
     match modal_state.password_storage_type {
         PasswordStorageType::PlainText => {
@@ -1131,11 +1134,7 @@ fn render_individual_fields(f: &mut Frame, modal_state: &ConnectionModalState, a
                 modal_state.focused_field == ConnectionField::Password,
                 right_chunks[2],
             );
-            render_password_storage_selector(
-                f,
-                modal_state,
-                right_chunks[3],
-            );
+            render_password_storage_selector(f, modal_state, right_chunks[3]);
             render_dropdown_field(
                 f,
                 "SSL Mode",
@@ -1146,11 +1145,7 @@ fn render_individual_fields(f: &mut Frame, modal_state: &ConnectionModalState, a
             );
         }
         PasswordStorageType::Environment => {
-            render_password_storage_selector(
-                f,
-                modal_state,
-                right_chunks[2],
-            );
+            render_password_storage_selector(f, modal_state, right_chunks[2]);
             render_text_field(
                 f,
                 "Environment Variable (e.g., DB_PASSWORD)",
@@ -1175,11 +1170,7 @@ fn render_individual_fields(f: &mut Frame, modal_state: &ConnectionModalState, a
                 modal_state.focused_field == ConnectionField::Password,
                 right_chunks[2],
             );
-            render_password_storage_selector(
-                f,
-                modal_state,
-                right_chunks[3],
-            );
+            render_password_storage_selector(f, modal_state, right_chunks[3]);
             render_password_field(
                 f,
                 "Encryption Key",
@@ -1315,7 +1306,7 @@ fn render_text_field(f: &mut Frame, label: &str, value: &str, focused: bool, are
 /// Render password storage type selector
 fn render_password_storage_selector(f: &mut Frame, modal_state: &ConnectionModalState, area: Rect) {
     let focused = modal_state.focused_field == ConnectionField::PasswordStorageType;
-    
+
     let (border_style, title_style) = if focused {
         (
             Style::default()
@@ -1331,21 +1322,17 @@ fn render_password_storage_selector(f: &mut Frame, modal_state: &ConnectionModal
             Style::default().fg(Color::Gray),
         )
     };
-    
+
     let storage_type_text = match modal_state.password_storage_type {
         PasswordStorageType::PlainText => "Plain Text",
         PasswordStorageType::Environment => "Environment Variable",
         PasswordStorageType::Encrypted => "Encrypted (AES)",
     };
-    
-    let help_text = if focused {
-        " [↑↓ to change]"
-    } else {
-        ""
-    };
-    
-    let content = format!("{}{}", storage_type_text, help_text);
-    
+
+    let help_text = if focused { " [↑↓ to change]" } else { "" };
+
+    let content = format!("{storage_type_text}{help_text}");
+
     let block = Block::default()
         .borders(Borders::ALL)
         .border_style(border_style)
@@ -1354,15 +1341,13 @@ fn render_password_storage_selector(f: &mut Frame, modal_state: &ConnectionModal
             Span::styled("Password Storage Type", title_style),
             Span::raw(" "),
         ]));
-    
-    let paragraph = Paragraph::new(content)
-        .block(block)
-        .style(if focused {
-            Style::default().fg(Color::White)
-        } else {
-            Style::default().fg(Color::DarkGray)
-        });
-    
+
+    let paragraph = Paragraph::new(content).block(block).style(if focused {
+        Style::default().fg(Color::White)
+    } else {
+        Style::default().fg(Color::DarkGray)
+    });
+
     f.render_widget(paragraph, area);
 }
 
