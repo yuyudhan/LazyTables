@@ -1203,7 +1203,7 @@ impl App {
                     ConnectionField::PasswordStorageType => {
                         self.state
                             .connection_modal_state
-                            .cycle_password_storage_type();
+                            .handle_password_storage_change();
                     }
                     _ => {}
                 }
@@ -1242,12 +1242,18 @@ impl App {
                     }
                     ConnectionField::PasswordStorageType => {
                         // Cycle backwards through password storage types
-                        self.state.connection_modal_state.password_storage_type =
-                            match self.state.connection_modal_state.password_storage_type {
-                                PasswordStorageType::PlainText => PasswordStorageType::Encrypted,
-                                PasswordStorageType::Environment => PasswordStorageType::PlainText,
-                                PasswordStorageType::Encrypted => PasswordStorageType::Environment,
-                            };
+                        let new_type = match self.state.connection_modal_state.password_storage_type {
+                            PasswordStorageType::PlainText => PasswordStorageType::Encrypted,
+                            PasswordStorageType::Environment => PasswordStorageType::PlainText,
+                            PasswordStorageType::Encrypted => PasswordStorageType::Environment,
+                        };
+                        self.state.connection_modal_state.password_storage_type = new_type;
+                        // Move to appropriate field
+                        self.state.connection_modal_state.focused_field = match new_type {
+                            PasswordStorageType::PlainText => ConnectionField::SslMode,
+                            PasswordStorageType::Environment => ConnectionField::PasswordEnvVar,
+                            PasswordStorageType::Encrypted => ConnectionField::Password,
+                        };
                     }
                     _ => {}
                 }
@@ -1290,6 +1296,15 @@ impl App {
                         } else {
                             self.state.connection_modal_state.next_field();
                         }
+                    }
+                    ConnectionField::PasswordStorageType => {
+                        // For password storage type, Enter should move to the appropriate field
+                        let next_field = match self.state.connection_modal_state.password_storage_type {
+                            PasswordStorageType::PlainText => ConnectionField::SslMode,
+                            PasswordStorageType::Environment => ConnectionField::PasswordEnvVar,
+                            PasswordStorageType::Encrypted => ConnectionField::Password,
+                        };
+                        self.state.connection_modal_state.focused_field = next_field;
                     }
                     _ => {
                         // For regular fields, Enter moves to next field
