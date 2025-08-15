@@ -17,6 +17,7 @@ impl Command for ExecuteQueryCommand {
         
         // Check if connected
         let has_active_connection = context.state
+            .db
             .connections
             .connections
             .iter()
@@ -55,6 +56,7 @@ impl Command for ExecuteQueryCommand {
         let has_query = !context.state.query_content.is_empty();
         
         let has_connection = context.state
+            .db
             .connections
             .connections
             .iter()
