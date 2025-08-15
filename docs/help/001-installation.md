@@ -14,119 +14,62 @@ This guide covers installing LazyTables on macOS and Linux systems.
 - UTF-8 encoding support
 - Minimum 80x24 characters (120x40 recommended)
 
-### Supported Terminals
-- **macOS**: iTerm2, Terminal.app, Alacritty, Wezterm
-- **Linux**: GNOME Terminal, Konsole, xfce4-terminal, Alacritty, Wezterm
+### Prerequisites
+- **Rust 1.70+** with cargo (install from https://rustup.rs)
 
-## macOS Installation
+## Installation Methods
 
-### Option 1: Homebrew (Recommended)
+### Option 1: Install from crates.io (Recommended)
 
 ```bash
-# Add the LazyTables tap (coming soon)
-brew tap yuyudhan/lazytables
-brew install lazytables
+cargo install lazytables
 ```
 
-### Option 2: Direct Download
+### Option 2: Install with cargo-binstall (Pre-built binaries)
+
+For faster installation without compilation:
 
 ```bash
-# Download latest release
-curl -L https://github.com/yuyudhan/LazyTables/releases/latest/download/lazytables-macos.tar.gz -o lazytables.tar.gz
+# Install cargo-binstall if not already installed
+cargo install cargo-binstall
 
-# Extract and install
-tar -xzf lazytables.tar.gz
-sudo mv lazytables /usr/local/bin/
-chmod +x /usr/local/bin/lazytables
+# Install lazytables using pre-built binaries
+cargo binstall lazytables
 ```
 
-### Option 3: Build from Source
+### Option 3: Install from Git Repository
 
 ```bash
-# Install Rust if not already installed
-curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
-source ~/.cargo/env
+cargo install --git https://github.com/yuyudhan/LazyTables.git
+```
 
-# Clone and build
+### Option 4: Build from Source
+
+```bash
+# Clone the repository
 git clone https://github.com/yuyudhan/LazyTables.git
 cd LazyTables
-cargo build --release
 
-# Install binary
-sudo cp target/release/lazytables /usr/local/bin/
+# Install using cargo
+cargo install --path .
 ```
 
-## Linux Installation
+## Installing Rust
 
-### Option 1: Package Repository (Ubuntu/Debian)
+If you don't have Rust installed:
 
-```bash
-# Add LazyTables repository (coming soon)
-curl -fsSL https://repo.lazytables.dev/gpg.key | sudo gpg --dearmor -o /usr/share/keyrings/lazytables.gpg
-echo "deb [signed-by=/usr/share/keyrings/lazytables.gpg] https://repo.lazytables.dev/deb stable main" | sudo tee /etc/apt/sources.list.d/lazytables.list
-
-# Update and install
-sudo apt update
-sudo apt install lazytables
-```
-
-### Option 2: Arch Linux (AUR)
+### macOS and Linux
 
 ```bash
-# Using yay
-yay -S lazytables-git
-
-# Using paru
-paru -S lazytables-git
-
-# Manual AUR installation
-git clone https://aur.archlinux.org/lazytables-git.git
-cd lazytables-git
-makepkg -si
-```
-
-### Option 3: RPM-based Distributions (CentOS, RHEL, Fedora)
-
-```bash
-# Add LazyTables repository (coming soon)
-sudo dnf config-manager --add-repo https://repo.lazytables.dev/rpm/lazytables.repo
-
-# Install
-sudo dnf install lazytables
-```
-
-### Option 4: Direct Download
-
-```bash
-# Download latest release for your architecture
-curl -L https://github.com/yuyudhan/LazyTables/releases/latest/download/lazytables-linux-x86_64.tar.gz -o lazytables.tar.gz
-
-# Extract and install
-tar -xzf lazytables.tar.gz
-sudo mv lazytables /usr/local/bin/
-chmod +x /usr/local/bin/lazytables
-```
-
-### Option 5: Build from Source
-
-```bash
-# Install Rust
+# Install Rust using rustup
 curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
+
+# Follow the on-screen instructions, then reload your shell
 source ~/.cargo/env
 
-# Install system dependencies (Ubuntu/Debian)
-sudo apt install build-essential pkg-config libssl-dev
-
-# Install system dependencies (CentOS/RHEL/Fedora)
-sudo dnf install gcc pkg-config openssl-devel
-
-# Clone and build
-git clone https://github.com/yuyudhan/LazyTables.git
-cd LazyTables
-cargo build --release
-
-# Install binary
-sudo cp target/release/lazytables /usr/local/bin/
+# Verify installation
+rustc --version
+cargo --version
 ```
 
 ## Verification
@@ -140,213 +83,101 @@ lazytables --version
 # Show help
 lazytables --help
 
-# Test launch (will show connection setup)
+# Launch the application
 lazytables
 ```
 
 ## Configuration
 
-### Default Configuration Location
-
 LazyTables stores its configuration in:
-- **macOS**: `~/Library/Application Support/LazyTables/`
-- **Linux**: `~/.config/lazytables/`
-
-### Initial Setup
+- **macOS**: `~/.lazytables/`
+- **Linux**: `~/.lazytables/`
 
 On first launch, LazyTables will create:
 - Configuration directory
 - Default configuration file
 - Connections storage file (encrypted)
+- SQL files directory
 
-## Troubleshooting Installation
+## Troubleshooting
 
-### Common Issues
+### "Command not found: lazytables"
 
-#### "Command not found: lazytables"
+The cargo bin directory might not be in your PATH:
 
-**Cause**: Binary not in PATH or not executable
-
-**Solutions**:
 ```bash
-# Check if binary exists
-which lazytables
+# Add to your shell profile (~/.bashrc, ~/.zshrc, etc.)
+export PATH="$HOME/.cargo/bin:$PATH"
 
-# Check PATH includes /usr/local/bin
-echo $PATH
-
-# Make binary executable
-chmod +x /usr/local/bin/lazytables
-
-# Add to PATH if needed (add to ~/.bashrc or ~/.zshrc)
-export PATH="/usr/local/bin:$PATH"
+# Reload your shell
+source ~/.bashrc  # or ~/.zshrc
 ```
 
-#### "Permission denied"
+### "Error: failed to compile lazytables"
 
-**Cause**: Binary doesn't have execute permissions
+Update Rust to the latest version:
 
-**Solution**:
 ```bash
-chmod +x /usr/local/bin/lazytables
+rustup update
 ```
 
-#### "Library not found" (Linux)
+### Terminal Compatibility Issues
 
-**Cause**: Missing system libraries
+If you see garbled output or missing characters:
 
-**Solutions**:
 ```bash
-# Ubuntu/Debian
-sudo apt install libc6 libssl3
+# Set terminal to support 256 colors
+export TERM=xterm-256color
 
-# CentOS/RHEL/Fedora
-sudo dnf install glibc openssl-libs
-
-# Check required libraries
-ldd /usr/local/bin/lazytables
+# Verify UTF-8 encoding
+echo $LANG  # Should show something like: en_US.UTF-8
 ```
 
-#### Terminal Compatibility Issues
+### macOS Gatekeeper Issues
 
-**Symptoms**: Garbled output, missing characters, incorrect colors
+If macOS blocks the binary:
 
-**Solutions**:
-1. **Check terminal capabilities**:
-   ```bash
-   echo $TERM
-   tput colors
-   ```
-
-2. **Set terminal to support 256 colors**:
-   ```bash
-   export TERM=xterm-256color
-   ```
-
-3. **Verify UTF-8 encoding**:
-   ```bash
-   echo $LANG
-   # Should include UTF-8, like: en_US.UTF-8
-   ```
-
-#### macOS Gatekeeper Issues
-
-**Symptoms**: "cannot be opened because the developer cannot be verified"
-
-**Solution**:
 ```bash
 # Remove quarantine attribute
-xattr -d com.apple.quarantine /usr/local/bin/lazytables
-
-# Or allow in System Preferences > Security & Privacy
-```
-
-### Build from Source Issues
-
-#### Rust Not Installed
-
-```bash
-# Install Rust
-curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
-source ~/.cargo/env
-rustc --version
-```
-
-#### Compilation Errors
-
-```bash
-# Update Rust toolchain
-rustup update
-
-# Clean build artifacts
-cargo clean
-
-# Build with verbose output
-cargo build --release --verbose
-```
-
-#### Missing System Dependencies
-
-**Linux (Ubuntu/Debian)**:
-```bash
-sudo apt install build-essential pkg-config libssl-dev
-```
-
-**Linux (CentOS/RHEL/Fedora)**:
-```bash
-sudo dnf install gcc pkg-config openssl-devel
-```
-
-**macOS**:
-```bash
-xcode-select --install
+xattr -d com.apple.quarantine ~/.cargo/bin/lazytables
 ```
 
 ## Updating LazyTables
 
-### Package Manager Updates
+To update to the latest version:
 
 ```bash
-# Homebrew (macOS)
-brew update && brew upgrade lazytables
+# If installed from crates.io
+cargo install lazytables --force
 
-# APT (Ubuntu/Debian)
-sudo apt update && sudo apt upgrade lazytables
+# If installed from git
+cargo install --git https://github.com/yuyudhan/LazyTables.git --force
 
-# DNF (Fedora/CentOS)
-sudo dnf update lazytables
-
-# AUR (Arch Linux)
-yay -Syu lazytables-git
+# If using cargo-binstall
+cargo binstall lazytables --force
 ```
-
-### Manual Updates
-
-1. Download the latest release
-2. Replace the existing binary
-3. Restart any running instances
 
 ## Uninstallation
 
-### Package Manager Removal
+To remove LazyTables:
 
 ```bash
-# Homebrew (macOS)
-brew uninstall lazytables
-
-# APT (Ubuntu/Debian)
-sudo apt remove lazytables
-
-# DNF (Fedora/CentOS)
-sudo dnf remove lazytables
-
-# AUR (Arch Linux)
-yay -R lazytables-git
-```
-
-### Manual Removal
-
-```bash
-# Remove binary
-sudo rm /usr/local/bin/lazytables
+# Uninstall the binary
+cargo uninstall lazytables
 
 # Remove configuration (optional)
-# macOS
-rm -rf ~/Library/Application\ Support/LazyTables
-
-# Linux
-rm -rf ~/.config/lazytables
+rm -rf ~/.lazytables
 ```
 
 ## Getting Help
 
-If you encounter installation issues:
+If you encounter issues:
 
-1. **Check system requirements** - Ensure your system is supported
-2. **Review error messages** - Look for specific error details
-3. **Search existing issues** - Check [GitHub Issues](https://github.com/yuyudhan/LazyTables/issues)
-4. **Create a new issue** - Include system details and error messages
-5. **Join discussions** - Ask for help in [GitHub Discussions](https://github.com/yuyudhan/LazyTables/discussions)
+1. **Check requirements** - Ensure Rust 1.70+ is installed
+2. **Update Rust** - Run `rustup update`
+3. **Search issues** - Check [GitHub Issues](https://github.com/yuyudhan/LazyTables/issues)
+4. **Create an issue** - Include your system details and error messages
+5. **Join discussions** - Ask in [GitHub Discussions](https://github.com/yuyudhan/LazyTables/discussions)
 
 ## Next Steps
 
