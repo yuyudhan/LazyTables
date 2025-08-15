@@ -151,7 +151,13 @@ impl HelpSystem {
             HelpMode::Connections => {
                 Self::add_overview_command(lines, "Enter", "Connect", key_style, desc_style);
                 Self::add_overview_command(lines, "x", "Disconnect", key_style, desc_style);
-                Self::add_overview_command(lines, "a/e/d", "Add/Edit/Delete", key_style, desc_style);
+                Self::add_overview_command(
+                    lines,
+                    "a/e/d",
+                    "Add/Edit/Delete",
+                    key_style,
+                    desc_style,
+                );
             }
             HelpMode::Tables => {
                 Self::add_overview_command(lines, "Enter", "Open", key_style, desc_style);
@@ -173,7 +179,13 @@ impl HelpSystem {
             }
             HelpMode::QueryWindow => {
                 Self::add_overview_command(lines, "i", "Edit mode", key_style, desc_style);
-                Self::add_overview_command(lines, "C-Enter", "Execute at cursor", key_style, desc_style);
+                Self::add_overview_command(
+                    lines,
+                    "C-Enter",
+                    "Execute at cursor",
+                    key_style,
+                    desc_style,
+                );
                 Self::add_overview_command(lines, "C-s", "Save", key_style, desc_style);
             }
             _ => {}
