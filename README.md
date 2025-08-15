@@ -4,28 +4,36 @@
 
 A fast, terminal-based SQL database viewer and editor designed for developers who value keyboard-driven workflows. Built with Rust and featuring vim motions throughout, LazyTables provides an intuitive interface for database management without ever leaving your terminal.
 
-🚀 **Active Development** - LazyTables is continuously evolving with new features and improvements to enhance your database management experience. We welcome contributions and feedback from the community!
-
 ## Why LazyTables?
 
 Stop wrestling with clunky GUI database tools. LazyTables brings the power and efficiency of terminal-based workflows to database management:
 
 - **Lightning Fast**: Built with Rust for maximum performance
 - **Vim-Style Navigation**: Navigate databases like you navigate code
-- **Four-Pane Layout**: Efficient workspace designed for productivity
 - **Keyboard-First**: Never reach for your mouse again
-- **Cross-Platform**: Works seamlessly on macOS and Linux
+- **Cross-Platform**: Works on macOS and Linux
 
 ## Installation
 
-### Using Cargo (All Platforms)
+### Prerequisites
+- **Rust 1.70+** (cargo will be installed with Rust)
+- Terminal with 256 color support
+- macOS or Linux (Windows not supported)
 
-#### Install from crates.io
+### Install from crates.io
 ```bash
 cargo install lazytables
 ```
 
-#### Install pre-built binary with cargo-binstall
+### Install from source
+```bash
+git clone https://github.com/yuyudhan/LazyTables.git
+cd LazyTables
+cargo install --path .
+```
+
+### Install pre-built binary with cargo-binstall
+For faster installation without compilation:
 ```bash
 # Install cargo-binstall if you haven't already
 cargo install cargo-binstall
@@ -34,109 +42,82 @@ cargo install cargo-binstall
 cargo binstall lazytables
 ```
 
-#### Install from Git repository
-```bash
-cargo install --git https://github.com/yuyudhan/LazyTables.git
-```
-
-### macOS
-
-#### Using Homebrew (Recommended for macOS)
-```bash
-brew install yuyudhan/lazytables/lazytables
-```
-
-### Linux
-
-#### Download pre-built binary
-```bash
-# For x86_64
-wget https://github.com/yuyudhan/LazyTables/releases/latest/download/lazytables-v0.1.3-x86_64-unknown-linux-gnu.tar.gz
-tar xzf lazytables-*.tar.gz
-sudo mv lazytables /usr/local/bin/
-
-# For ARM64/aarch64
-wget https://github.com/yuyudhan/LazyTables/releases/latest/download/lazytables-v0.1.3-aarch64-unknown-linux-gnu.tar.gz
-tar xzf lazytables-*.tar.gz
-sudo mv lazytables /usr/local/bin/
-```
-
-### Build from source (All Platforms)
-```bash
-git clone https://github.com/yuyudhan/LazyTables.git
-cd LazyTables
-cargo build --release
-sudo cp target/release/lazytables /usr/local/bin/
-```
-
-### Prerequisites
-
-- **Rust 1.70+** (for building from source)
-- **Terminal** with 256 color support
-- Supported on **macOS** and **Linux** (Windows not supported)
-
 ## Quick Start
 
-1. **Install LazyTables** using one of the methods above
-2. **Launch the application**:
+1. **Launch LazyTables**:
    ```bash
    lazytables
    ```
-3. **Add your first connection** by pressing `a` in the connections pane
-4. **Navigate** using vim-style keys (`h/j/k/l`) and switch panes with `Ctrl+h/j/k/l`
-5. **Quit** anytime with `q`
+
+2. **Add a database connection** by pressing `a` in the connections pane
+
+3. **Navigate** using vim-style keys:
+   - `h/j/k/l` - Move within panes
+   - `Ctrl+h/j/k/l` - Switch between panes
+   - `Tab/Shift+Tab` - Cycle through panes
+
+4. **Execute queries** with `Space z q` to enter query mode
+
+5. **Quit** with `q`
 
 ## Key Features
 
-### Four-Pane Workspace
-- **Connections** (top-left): Manage database connections
-- **Tables/Views** (middle-left): Browse database objects
-- **Table Details** (bottom-left): View metadata and schema
-- **Content Area** (right): Query editor and results viewer
+### Six-Pane Layout
+- **Connections** - Manage database connections
+- **Tables/Views** - Browse database objects  
+- **Table Details** - View metadata and schema
+- **Query Results** - Display query output
+- **SQL Editor** - Write and execute queries
+- **SQL Files** - Browse saved queries
 
 ### Vim-Style Navigation
-- `h/j/k/l` - Move within active pane
-- `Ctrl+h/j/k/l` - Switch between panes  
-- `Tab/Shift+Tab` - Cycle through panes
-- `gg/G` - Jump to top/bottom of lists
+- `h/j/k/l` - Move cursor
+- `gg/G` - Jump to top/bottom
+- `Ctrl+h/j/k/l` - Switch panes
+- `i` - Enter insert mode for editing
+- `v` - Visual selection mode
+- `:` - Command mode
 - `q` - Quit application
-
-### Multiple Modes
-- **Normal Mode** (default) - Navigate and execute commands
-- **Insert Mode** (`i`) - Edit data directly in cells
-- **Visual Mode** (`v`) - Select rows and columns
-- **Command Mode** (`:`) - Execute complex operations
-- **Query Mode** (`Space z q`) - Write and execute SQL
 
 ### Database Support
 - **PostgreSQL** (full support)
-- **MySQL, MariaDB, SQLite** (planned)
-- **Oracle, DB2, ClickHouse** (planned)
-- **Redis, MongoDB** (future releases)
+- **MySQL, MariaDB, SQLite** (coming soon)
+- More databases planned
 
-## Development & Contribution
+## Development
 
-Interested in contributing? We'd love your help! See our [development guide](docs/dev/README.md) for:
-
-- Development setup and commands
-- Architecture overview
-- Coding standards and guidelines
-- Testing procedures
-- Contribution workflow
-
-### Quick Development Setup
-
+### Build and run locally
 ```bash
 git clone https://github.com/yuyudhan/LazyTables.git
 cd LazyTables
-make dev  # Start development mode with auto-reload
+make dev  # Run in development mode with auto-reload
 ```
 
-## Support & Community
+### Run tests
+```bash
+make test
+```
 
-- **Issues**: Report bugs and request features on [GitHub Issues](https://github.com/yuyudhan/LazyTables/issues)
-- **Discussions**: Join conversations on [GitHub Discussions](https://github.com/yuyudhan/LazyTables/discussions)
-- **Contributions**: See [docs/dev/README.md](docs/dev/README.md) for contribution guidelines
+### Other commands
+```bash
+make build   # Build release binary
+make lint    # Run clippy linter
+make format  # Format code with rustfmt
+make clean   # Clean build artifacts
+```
+
+## Contributing
+
+We welcome contributions! Please see our [development guide](docs/dev/README.md) for details on:
+- Architecture overview
+- Coding standards
+- Testing procedures
+- How to submit pull requests
+
+## Support
+
+- **Issues**: [GitHub Issues](https://github.com/yuyudhan/LazyTables/issues)
+- **Discussions**: [GitHub Discussions](https://github.com/yuyudhan/LazyTables/discussions)
 
 ## License
 
