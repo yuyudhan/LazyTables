@@ -1,7 +1,7 @@
 // FilePath: src/app/mod.rs
 
 use crate::{
-    commands::{CommandRegistry, CommandContext, CommandResult, CommandAction, CommandId},
+    commands::{CommandAction, CommandContext, CommandId, CommandRegistry, CommandResult},
     config::Config,
     core::error::Result,
     event::{Event, EventHandler},
@@ -114,72 +114,76 @@ impl App {
             state: &mut self.state,
             config: &self.config,
         };
-        
+
         match self.command_registry.execute(command_id, &mut context)? {
-            CommandResult::Success => {},
+            CommandResult::Success => {}
             CommandResult::SuccessWithMessage(msg) => {
                 self.state.toast_manager.success(&msg);
-            },
+            }
             CommandResult::Error(msg) => {
                 self.state.toast_manager.error(&msg);
-            },
+            }
             CommandResult::RequiresConfirmation(msg) => {
-                self.state.toast_manager.warning(&format!("Confirm: {}", msg));
-            },
-            CommandResult::Cancelled => {},
+                self.state
+                    .toast_manager
+                    .warning(&format!("Confirm: {}", msg));
+            }
+            CommandResult::Cancelled => {}
             CommandResult::Action(action) => {
                 self.handle_command_action(action)?;
-            },
+            }
         }
-        
+
         Ok(())
     }
-    
+
     /// Handle command actions
     fn handle_command_action(&mut self, action: CommandAction) -> Result<()> {
         match action {
             CommandAction::Quit => {
                 self.should_quit = true;
-            },
+            }
             CommandAction::OpenModal(modal_type) => {
                 use crate::commands::ModalType;
                 match modal_type {
                     ModalType::Help => {
                         self.execute_command(CommandId::Help)?;
-                    },
+                    }
                     ModalType::Connection => {
                         self.state.ui.show_add_connection_modal = true;
-                    },
+                    }
                     _ => {}
                 }
-            },
+            }
             CommandAction::CloseModal => {
                 self.state.ui.show_add_connection_modal = false;
                 self.state.ui.show_edit_connection_modal = false;
                 self.state.ui.show_table_creator = false;
                 self.state.ui.show_table_editor = false;
-            },
+            }
             CommandAction::ExecuteQuery(query) => {
                 // TODO: Execute query through database connection
-                self.state.toast_manager.info(&format!("Executing: {}", query));
-            },
+                self.state
+                    .toast_manager
+                    .info(&format!("Executing: {}", query));
+            }
             CommandAction::LoadFile(path) => {
                 // TODO: Load file
                 self.state.toast_manager.info(&format!("Loading: {}", path));
-            },
+            }
             CommandAction::SaveFile(path) => {
                 // TODO: Save file
                 self.state.toast_manager.info(&format!("Saving: {}", path));
-            },
+            }
             CommandAction::Navigate(target) => {
                 use crate::commands::NavigationTarget;
                 match target {
                     NavigationTarget::Pane(pane) => {
                         self.state.ui.focused_pane = pane;
-                    },
+                    }
                     _ => {}
                 }
-            },
+            }
         }
         Ok(())
     }
@@ -187,7 +191,8 @@ impl App {
     /// Handle keyboard events
     async fn handle_key_event(&mut self, key: KeyEvent) -> Result<()> {
         // Handle ESC key globally to close help overlay
-        if key.code == KeyCode::Esc && self.state.ui.help_mode != crate::app::state::HelpMode::None {
+        if key.code == KeyCode::Esc && self.state.ui.help_mode != crate::app::state::HelpMode::None
+        {
             self.state.ui.help_mode = crate::app::state::HelpMode::None;
             return Ok(());
         }
@@ -205,7 +210,9 @@ impl App {
                     // Confirm delete
                     let confirmation = confirmation.clone();
                     if let Err(e) = self.state.delete_table_row(confirmation).await {
-                        self.state.toast_manager.error(format!("Failed to delete row: {e}"));
+                        self.state
+                            .toast_manager
+                            .error(format!("Failed to delete row: {e}"));
                     } else {
                         self.state.toast_manager.success("Row deleted successfully");
                         // Reload table data
@@ -422,18 +429,20 @@ impl App {
                     }
                     // Add connection (only in connections pane)
                     (KeyModifiers::NONE, KeyCode::Char('a')) => {
-                        if self.state.ui.focused_pane == crate::app::state::FocusedPane::Connections {
+                        if self.state.ui.focused_pane == crate::app::state::FocusedPane::Connections
+                        {
                             self.state.open_add_connection_modal();
                         }
                     }
                     // Edit table/connection based on focused pane
                     (KeyModifiers::NONE, KeyCode::Char('e')) => {
                         if self.state.ui.focused_pane == crate::app::state::FocusedPane::Tables
-                            && !self.state.tables.is_empty()
+                            && !self.state.db.tables.is_empty()
                         {
                             // Check if we have an active connection
                             if let Some(connection) = self
                                 .state
+                                .db
                                 .connections
                                 .connections
                                 .get(self.state.ui.selected_connection)
@@ -447,7 +456,7 @@ impl App {
                             }
                         } else if self.state.ui.focused_pane
                             == crate::app::state::FocusedPane::Connections
-                            && !self.state.connections.connections.is_empty()
+                            && !self.state.db.connections.connections.is_empty()
                         {
                             self.state.open_edit_connection_modal();
                         }
@@ -458,6 +467,7 @@ impl App {
                             // Check if we have an active connection
                             if let Some(connection) = self
                                 .state
+                                .db
                                 .connections
                                 .connections
                                 .get(self.state.ui.selected_connection)
@@ -497,10 +507,12 @@ impl App {
                     }
                     // Connect/select action
                     (KeyModifiers::NONE, KeyCode::Enter) => {
-                        if self.state.ui.focused_pane == crate::app::state::FocusedPane::Connections {
+                        if self.state.ui.focused_pane == crate::app::state::FocusedPane::Connections
+                        {
                             // Handle database connection
                             if let Some(connection) = self
                                 .state
+                                .db
                                 .connections
                                 .connections
                                 .get(self.state.ui.selected_connection)
@@ -516,15 +528,16 @@ impl App {
                                     }
                                 }
                             }
-                        } else if self.state.ui.focused_pane == crate::app::state::FocusedPane::Tables
+                        } else if self.state.ui.focused_pane
+                            == crate::app::state::FocusedPane::Tables
                         {
                             // Open table for viewing
                             self.state.open_table_for_viewing().await;
                         } else if self.state.ui.focused_pane == FocusedPane::Details {
                             // Load metadata for current table if not already loaded
-                            if self.state.current_table_metadata.is_none() {
+                            if self.state.db.current_table_metadata.is_none() {
                                 if let Some(table_name) =
-                                    self.state.tables.get(self.state.ui.selected_table).cloned()
+                                    self.state.db.tables.get(self.state.ui.selected_table).cloned()
                                 {
                                     if let Err(e) =
                                         self.state.load_table_metadata(&table_name).await
@@ -618,14 +631,18 @@ impl App {
                         }
                     }
                     // Handle uppercase S for previous tab (both with and without SHIFT modifier)
-                    (KeyModifiers::SHIFT, KeyCode::Char('S')) | (KeyModifiers::SHIFT, KeyCode::Char('s')) | (KeyModifiers::NONE, KeyCode::Char('S')) => {
+                    (KeyModifiers::SHIFT, KeyCode::Char('S'))
+                    | (KeyModifiers::SHIFT, KeyCode::Char('s'))
+                    | (KeyModifiers::NONE, KeyCode::Char('S')) => {
                         if self.state.ui.focused_pane == FocusedPane::TabularOutput {
                             // Previous tab
                             self.state.table_viewer_state.prev_tab();
                         }
                     }
                     // Handle uppercase D for next tab (with SHIFT modifier)
-                    (KeyModifiers::SHIFT, KeyCode::Char('D')) | (KeyModifiers::SHIFT, KeyCode::Char('d')) | (KeyModifiers::NONE, KeyCode::Char('D')) => {
+                    (KeyModifiers::SHIFT, KeyCode::Char('D'))
+                    | (KeyModifiers::SHIFT, KeyCode::Char('d'))
+                    | (KeyModifiers::NONE, KeyCode::Char('D')) => {
                         if self.state.ui.focused_pane == FocusedPane::TabularOutput {
                             // Next tab
                             self.state.table_viewer_state.next_tab();
@@ -721,13 +738,21 @@ impl App {
                             } else {
                                 // Check for double 'd' press (dd command)
                                 let now = std::time::Instant::now();
-                                if let Some(last_press) = self.state.table_viewer_state.last_d_press {
+                                if let Some(last_press) = self.state.table_viewer_state.last_d_press
+                                {
                                     if now.duration_since(last_press).as_millis() < 500 {
                                         // Double 'd' detected - prepare delete confirmation
-                                        if let Some(confirmation) = self.state.table_viewer_state.prepare_delete_confirmation() {
-                                            self.state.table_viewer_state.delete_confirmation = Some(confirmation);
+                                        if let Some(confirmation) = self
+                                            .state
+                                            .table_viewer_state
+                                            .prepare_delete_confirmation()
+                                        {
+                                            self.state.table_viewer_state.delete_confirmation =
+                                                Some(confirmation);
                                         } else {
-                                            self.state.toast_manager.error("Cannot delete row without primary key");
+                                            self.state
+                                                .toast_manager
+                                                .error("Cannot delete row without primary key");
                                         }
                                         self.state.table_viewer_state.last_d_press = None;
                                     } else {
@@ -749,10 +774,14 @@ impl App {
                                     // Double 'y' detected - copy row to clipboard
                                     match self.state.table_viewer_state.copy_row_csv() {
                                         Ok(()) => {
-                                            self.state.toast_manager.info("Row copied to clipboard");
+                                            self.state
+                                                .toast_manager
+                                                .info("Row copied to clipboard");
                                         }
                                         Err(e) => {
-                                            self.state.toast_manager.error(format!("Failed to copy row: {e}"));
+                                            self.state
+                                                .toast_manager
+                                                .error(format!("Failed to copy row: {e}"));
                                         }
                                     }
                                     self.state.table_viewer_state.last_y_press = None;
@@ -766,10 +795,12 @@ impl App {
                     }
                     // Leader key (Space) commands OR Connect in Connections pane
                     (KeyModifiers::NONE, KeyCode::Char(' ')) => {
-                        if self.state.ui.focused_pane == crate::app::state::FocusedPane::Connections {
+                        if self.state.ui.focused_pane == crate::app::state::FocusedPane::Connections
+                        {
                             // Handle database connection (same as Enter)
                             if let Some(connection) = self
                                 .state
+                                .db
                                 .connections
                                 .connections
                                 .get(self.state.ui.selected_connection)
@@ -846,7 +877,7 @@ impl App {
             }
             Mode::Query => {
                 use crate::app::state::QueryEditMode;
-                
+
                 // Handle vim command mode
                 if self.state.ui.in_vim_command {
                     match key.code {
@@ -859,14 +890,18 @@ impl App {
                             if command == "w" {
                                 // Save file
                                 if let Err(e) = self.state.save_sql_file_with_connection() {
-                                    self.state.toast_manager.error(format!("Failed to save: {e}"));
+                                    self.state
+                                        .toast_manager
+                                        .error(format!("Failed to save: {e}"));
                                 } else {
                                     self.state.toast_manager.success("File saved");
                                 }
                             } else if command == "q" {
                                 // Quit query mode
                                 if self.state.ui.query_modified {
-                                    self.state.toast_manager.warning("Unsaved changes! Use :w to save or :q! to force quit");
+                                    self.state.toast_manager.warning(
+                                        "Unsaved changes! Use :w to save or :q! to force quit",
+                                    );
                                 } else {
                                     self.mode = Mode::Normal;
                                 }
@@ -876,7 +911,9 @@ impl App {
                             } else if command == "wq" {
                                 // Save and quit
                                 if let Err(e) = self.state.save_sql_file_with_connection() {
-                                    self.state.toast_manager.error(format!("Failed to save: {e}"));
+                                    self.state
+                                        .toast_manager
+                                        .error(format!("Failed to save: {e}"));
                                 } else {
                                     self.state.toast_manager.success("File saved");
                                     self.mode = Mode::Normal;
@@ -975,7 +1012,9 @@ impl App {
                         // Legacy shortcuts still work in normal mode
                         KeyCode::Char('s') if key.modifiers.contains(KeyModifiers::CONTROL) => {
                             if let Err(e) = self.state.save_sql_file_with_connection() {
-                                self.state.toast_manager.error(format!("Failed to save: {e}"));
+                                self.state
+                                    .toast_manager
+                                    .error(format!("Failed to save: {e}"));
                             } else {
                                 self.state.toast_manager.success("File saved");
                             }
@@ -1553,3 +1592,4 @@ impl App {
         Ok(())
     }
 }
+

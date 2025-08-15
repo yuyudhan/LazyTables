@@ -69,14 +69,14 @@ impl Command for NavigateDownCommand {
     fn execute(&self, context: &mut CommandContext) -> Result<CommandResult> {
         match context.state.ui.focused_pane {
             FocusedPane::Connections => {
-                let max = context.state.connections.connections.len();
+                let max = context.state.db.connections.connections.len();
                 if context.state.ui.selected_connection < max.saturating_sub(1) {
                     context.state.ui.selected_connection += 1;
                     context.state.ui.connections_list_state.select(Some(context.state.ui.selected_connection));
                 }
             }
             FocusedPane::Tables => {
-                let max = context.state.tables.len();
+                let max = context.state.db.tables.len();
                 if context.state.ui.selected_table < max.saturating_sub(1) {
                     context.state.ui.selected_table += 1;
                     context.state.ui.tables_list_state.select(Some(context.state.ui.selected_table));
