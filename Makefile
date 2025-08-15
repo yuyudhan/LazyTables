@@ -57,9 +57,14 @@ install-homebrew:
 	@echo "Installing LazyTables via Homebrew..."
 	@./scripts/install-homebrew.sh
 
+install-cargo:
+	@echo "Installing LazyTables via cargo..."
+	cargo install --path .
+
 uninstall:
 	@echo "Uninstalling LazyTables..."
 	@sudo rm -f /usr/local/bin/lazytables
+	@cargo uninstall lazytables 2>/dev/null || true
 	@brew uninstall lazytables 2>/dev/null || true
 	@echo "LazyTables has been uninstalled"
 
