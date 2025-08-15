@@ -18,28 +18,50 @@ Stop wrestling with clunky GUI database tools. LazyTables brings the power and e
 
 ## Installation
 
+### Using Cargo (All Platforms)
+
+#### Install from crates.io
+```bash
+cargo install lazytables
+```
+
+#### Install pre-built binary with cargo-binstall
+```bash
+# Install cargo-binstall if you haven't already
+cargo install cargo-binstall
+
+# Install lazytables using pre-built binaries
+cargo binstall lazytables
+```
+
+#### Install from Git repository
+```bash
+cargo install --git https://github.com/yuyudhan/LazyTables.git
+```
+
 ### macOS
 
-#### Using Homebrew (Recommended)
+#### Using Homebrew (Recommended for macOS)
 ```bash
 brew install yuyudhan/lazytables/lazytables
 ```
 
-#### Build from source
-```bash
-git clone https://github.com/yuyudhan/LazyTables.git
-cd LazyTables
-cargo build --release
-sudo cp target/release/lazytables /usr/local/bin/
-```
-
 ### Linux
 
-🚧 **Support for Linux coming soon!**
+#### Download pre-built binary
+```bash
+# For x86_64
+wget https://github.com/yuyudhan/LazyTables/releases/latest/download/lazytables-v0.1.3-x86_64-unknown-linux-gnu.tar.gz
+tar xzf lazytables-*.tar.gz
+sudo mv lazytables /usr/local/bin/
 
-For now, Linux users can build from source:
+# For ARM64/aarch64
+wget https://github.com/yuyudhan/LazyTables/releases/latest/download/lazytables-v0.1.3-aarch64-unknown-linux-gnu.tar.gz
+tar xzf lazytables-*.tar.gz
+sudo mv lazytables /usr/local/bin/
+```
 
-#### Build from source
+### Build from source (All Platforms)
 ```bash
 git clone https://github.com/yuyudhan/LazyTables.git
 cd LazyTables
