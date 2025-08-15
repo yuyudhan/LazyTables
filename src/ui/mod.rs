@@ -233,7 +233,7 @@ impl UI {
                 ),
                 Span::styled(" to connect/disconnect", Style::default().fg(Color::Gray)),
             ])));
-            if !state.connections.connections.is_empty() {
+            if !state.db.connections.connections.is_empty() {
                 items.push(ListItem::new(Line::from(vec![
                     Span::styled("Press ", Style::default().fg(Color::Gray)),
                     Span::styled(
@@ -247,7 +247,7 @@ impl UI {
 
                 // Show error message if the selected connection has failed
                 if let Some(connection) =
-                    state.connections.connections.get(state.ui.selected_connection)
+                    state.db.connections.connections.get(state.ui.selected_connection)
                 {
                     if let Some(error) = connection.get_error() {
                         items.push(ListItem::new(""));
@@ -264,7 +264,7 @@ impl UI {
         }
 
         // Add legend for status symbols at the bottom if there are connections
-        if !state.connections.connections.is_empty() && !is_focused {
+        if !state.db.connections.connections.is_empty() && !is_focused {
             items.push(ListItem::new(""));
             items.push(ListItem::new(Line::from(vec![
                 Span::styled("✓ ", Style::default().fg(Color::Green)),
@@ -360,7 +360,7 @@ impl UI {
                     ListItem::new("")
                 },
             ]
-        } else if state.tables.is_empty() {
+        } else if state.db.tables.is_empty() {
             // Show loading or no tables message
             vec![ListItem::new(Line::from(vec![Span::styled(
                 "Loading tables...",
@@ -375,7 +375,7 @@ impl UI {
                     .add_modifier(Modifier::BOLD),
             )]))];
 
-            for table in &state.tables {
+            for table in &state.db.tables {
                 table_items.push(ListItem::new(Line::from(vec![
                     Span::styled("  📋 ", Style::default().fg(Color::Blue)),
                     Span::styled(table, Style::default().fg(Color::White)),
@@ -383,7 +383,7 @@ impl UI {
             }
 
             // Add navigation help if focused
-            if is_focused && !state.tables.is_empty() {
+            if is_focused && !state.db.tables.is_empty() {
                 table_items.push(ListItem::new(""));
                 table_items.push(ListItem::new(Line::from(vec![
                     Span::styled("Press ", Style::default().fg(Color::Gray)),
@@ -435,7 +435,7 @@ impl UI {
 
         // Use stateful widget to show selection
         // Adjust selection index if we have tables (account for header)
-        if !state.tables.is_empty() && has_active_connection {
+        if !state.db.tables.is_empty() && has_active_connection {
             // Add 1 to account for the "▼ Tables" header
             state
                 .ui.tables_list_state
@@ -473,7 +473,7 @@ impl UI {
                     Style::default().fg(Color::Gray),
                 )]),
             ]
-        } else if let Some(metadata) = &state.current_table_metadata {
+        } else if let Some(metadata) = &state.db.current_table_metadata {
             // Show actual table metadata
             let mut lines = vec![
                 Line::from(vec![
@@ -1030,7 +1030,7 @@ impl UI {
 
         // Get real connection info
         let connection_text = if let Some(connection) =
-            state.connections.connections.get(state.ui.selected_connection)
+            state.db.connections.connections.get(state.ui.selected_connection)
         {
             match &connection.status {
                 ConnectionStatus::Connected => format!(
@@ -1050,13 +1050,13 @@ impl UI {
             FocusedPane::Connections => format!(
                 "Connection {}/{}",
                 state.ui.selected_connection + 1,
-                state.connections.connections.len()
+                state.db.connections.connections.len()
             ),
             FocusedPane::Tables => {
-                if state.tables.is_empty() {
+                if state.db.tables.is_empty() {
                     "No tables".to_string()
                 } else {
-                    format!("Table {}/{}", state.ui.selected_table + 1, state.tables.len())
+                    format!("Table {}/{}", state.ui.selected_table + 1, state.db.tables.len())
                 }
             }
             FocusedPane::TabularOutput => {

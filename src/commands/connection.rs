@@ -16,7 +16,7 @@ impl Command for ConnectCommand {
         }
         
         // Check if a connection is selected
-        if !context.state.connections.connections.is_empty() {
+        if !context.state.db.connections.connections.is_empty() {
             let selected = context.state.ui.selected_connection;
             // TODO: Implement actual connection logic
             context.state.toast_manager.info(
@@ -49,7 +49,7 @@ impl Command for ConnectCommand {
     
     fn can_execute(&self, context: &CommandContext) -> bool {
         context.state.ui.focused_pane == crate::app::FocusedPane::Connections
-            && !context.state.connections.connections.is_empty()
+            && !context.state.db.connections.connections.is_empty()
     }
 }
 
@@ -95,7 +95,7 @@ pub struct EditConnectionCommand;
 
 impl Command for EditConnectionCommand {
     fn execute(&self, context: &mut CommandContext) -> Result<CommandResult> {
-        if !context.state.connections.connections.is_empty() {
+        if !context.state.db.connections.connections.is_empty() {
             let selected = context.state.ui.selected_connection;
             // TODO: Load existing connection data into modal
             context.state.ui.show_edit_connection_modal = true;
@@ -126,7 +126,7 @@ impl Command for EditConnectionCommand {
     
     fn can_execute(&self, context: &CommandContext) -> bool {
         context.state.ui.focused_pane == crate::app::FocusedPane::Connections
-            && !context.state.connections.connections.is_empty()
+            && !context.state.db.connections.connections.is_empty()
     }
 }
 
@@ -135,7 +135,7 @@ pub struct DeleteConnectionCommand;
 
 impl Command for DeleteConnectionCommand {
     fn execute(&self, context: &mut CommandContext) -> Result<CommandResult> {
-        if !context.state.connections.connections.is_empty() {
+        if !context.state.db.connections.connections.is_empty() {
             let selected = context.state.ui.selected_connection;
             Ok(CommandResult::RequiresConfirmation(
                 format!("Delete connection #{}? This cannot be undone.", selected)
@@ -163,7 +163,7 @@ impl Command for DeleteConnectionCommand {
     
     fn can_execute(&self, context: &CommandContext) -> bool {
         context.state.ui.focused_pane == crate::app::FocusedPane::Connections
-            && !context.state.connections.connections.is_empty()
+            && !context.state.db.connections.connections.is_empty()
     }
 }
 
@@ -224,7 +224,7 @@ pub struct TestConnectionCommand;
 
 impl Command for TestConnectionCommand {
     fn execute(&self, context: &mut CommandContext) -> Result<CommandResult> {
-        if !context.state.connections.connections.is_empty() {
+        if !context.state.db.connections.connections.is_empty() {
             let selected = context.state.ui.selected_connection;
             // TODO: Implement connection testing
             context.state.toast_manager.info(
@@ -257,6 +257,6 @@ impl Command for TestConnectionCommand {
     
     fn can_execute(&self, context: &CommandContext) -> bool {
         context.state.ui.focused_pane == crate::app::FocusedPane::Connections
-            && !context.state.connections.connections.is_empty()
+            && !context.state.db.connections.connections.is_empty()
     }
 }
