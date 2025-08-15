@@ -13,13 +13,21 @@ impl Command for NavigateUpCommand {
             FocusedPane::Connections => {
                 if context.state.ui.selected_connection > 0 {
                     context.state.ui.selected_connection -= 1;
-                    context.state.ui.connections_list_state.select(Some(context.state.ui.selected_connection));
+                    context
+                        .state
+                        .ui
+                        .connections_list_state
+                        .select(Some(context.state.ui.selected_connection));
                 }
             }
             FocusedPane::Tables => {
                 if context.state.ui.selected_table > 0 {
                     context.state.ui.selected_table -= 1;
-                    context.state.ui.tables_list_state.select(Some(context.state.ui.selected_table));
+                    context
+                        .state
+                        .ui
+                        .tables_list_state
+                        .select(Some(context.state.ui.selected_table));
                 }
             }
             FocusedPane::SqlFiles => {
@@ -31,12 +39,14 @@ impl Command for NavigateUpCommand {
                 if context.state.ui.query_cursor_line > 0 {
                     context.state.ui.query_cursor_line -= 1;
                     // Adjust column if line is shorter
-                    let line_len = context.state.query_content
+                    let line_len = context
+                        .state
+                        .query_content
                         .lines()
                         .nth(context.state.ui.query_cursor_line)
                         .map(|l| l.len())
                         .unwrap_or(0);
-                    context.state.ui.query_cursor_column = 
+                    context.state.ui.query_cursor_column =
                         context.state.ui.query_cursor_column.min(line_len);
                 }
             }
@@ -44,19 +54,19 @@ impl Command for NavigateUpCommand {
         }
         Ok(CommandResult::Success)
     }
-    
+
     fn description(&self) -> &str {
         "Navigate up"
     }
-    
+
     fn id(&self) -> CommandId {
         CommandId::NavigateUp
     }
-    
+
     fn shortcut(&self) -> Option<String> {
         Some("k".to_string())
     }
-    
+
     fn category(&self) -> CommandCategory {
         CommandCategory::Navigation
     }
@@ -72,14 +82,22 @@ impl Command for NavigateDownCommand {
                 let max = context.state.db.connections.connections.len();
                 if context.state.ui.selected_connection < max.saturating_sub(1) {
                     context.state.ui.selected_connection += 1;
-                    context.state.ui.connections_list_state.select(Some(context.state.ui.selected_connection));
+                    context
+                        .state
+                        .ui
+                        .connections_list_state
+                        .select(Some(context.state.ui.selected_connection));
                 }
             }
             FocusedPane::Tables => {
                 let max = context.state.db.tables.len();
                 if context.state.ui.selected_table < max.saturating_sub(1) {
                     context.state.ui.selected_table += 1;
-                    context.state.ui.tables_list_state.select(Some(context.state.ui.selected_table));
+                    context
+                        .state
+                        .ui
+                        .tables_list_state
+                        .select(Some(context.state.ui.selected_table));
                 }
             }
             FocusedPane::SqlFiles => {
@@ -93,12 +111,14 @@ impl Command for NavigateDownCommand {
                 if context.state.ui.query_cursor_line < line_count.saturating_sub(1) {
                     context.state.ui.query_cursor_line += 1;
                     // Adjust column if line is shorter
-                    let line_len = context.state.query_content
+                    let line_len = context
+                        .state
+                        .query_content
                         .lines()
                         .nth(context.state.ui.query_cursor_line)
                         .map(|l| l.len())
                         .unwrap_or(0);
-                    context.state.ui.query_cursor_column = 
+                    context.state.ui.query_cursor_column =
                         context.state.ui.query_cursor_column.min(line_len);
                 }
             }
@@ -106,19 +126,19 @@ impl Command for NavigateDownCommand {
         }
         Ok(CommandResult::Success)
     }
-    
+
     fn description(&self) -> &str {
         "Navigate down"
     }
-    
+
     fn id(&self) -> CommandId {
         CommandId::NavigateDown
     }
-    
+
     fn shortcut(&self) -> Option<String> {
         Some("j".to_string())
     }
-    
+
     fn category(&self) -> CommandCategory {
         CommandCategory::Navigation
     }
@@ -142,19 +162,19 @@ impl Command for NavigateLeftCommand {
         }
         Ok(CommandResult::Success)
     }
-    
+
     fn description(&self) -> &str {
         "Navigate left"
     }
-    
+
     fn id(&self) -> CommandId {
         CommandId::NavigateLeft
     }
-    
+
     fn shortcut(&self) -> Option<String> {
         Some("h".to_string())
     }
-    
+
     fn category(&self) -> CommandCategory {
         CommandCategory::Navigation
     }
@@ -167,7 +187,9 @@ impl Command for NavigateRightCommand {
     fn execute(&self, context: &mut CommandContext) -> Result<CommandResult> {
         match context.state.ui.focused_pane {
             FocusedPane::QueryWindow => {
-                let line_len = context.state.query_content
+                let line_len = context
+                    .state
+                    .query_content
                     .lines()
                     .nth(context.state.ui.query_cursor_line)
                     .map(|l| l.len())
@@ -183,19 +205,19 @@ impl Command for NavigateRightCommand {
         }
         Ok(CommandResult::Success)
     }
-    
+
     fn description(&self) -> &str {
         "Navigate right"
     }
-    
+
     fn id(&self) -> CommandId {
         CommandId::NavigateRight
     }
-    
+
     fn shortcut(&self) -> Option<String> {
         Some("l".to_string())
     }
-    
+
     fn category(&self) -> CommandCategory {
         CommandCategory::Navigation
     }
@@ -207,7 +229,7 @@ pub struct NextPaneCommand;
 impl Command for NextPaneCommand {
     fn execute(&self, context: &mut CommandContext) -> Result<CommandResult> {
         use FocusedPane::*;
-        
+
         context.state.ui.focused_pane = match context.state.ui.focused_pane {
             Connections => Tables,
             Tables => Details,
@@ -216,22 +238,22 @@ impl Command for NextPaneCommand {
             SqlFiles => QueryWindow,
             QueryWindow => Connections,
         };
-        
+
         Ok(CommandResult::Success)
     }
-    
+
     fn description(&self) -> &str {
         "Switch to next pane"
     }
-    
+
     fn id(&self) -> CommandId {
         CommandId::NextPane
     }
-    
+
     fn shortcut(&self) -> Option<String> {
         Some("Tab".to_string())
     }
-    
+
     fn category(&self) -> CommandCategory {
         CommandCategory::Navigation
     }
@@ -243,7 +265,7 @@ pub struct PreviousPaneCommand;
 impl Command for PreviousPaneCommand {
     fn execute(&self, context: &mut CommandContext) -> Result<CommandResult> {
         use FocusedPane::*;
-        
+
         context.state.ui.focused_pane = match context.state.ui.focused_pane {
             Connections => QueryWindow,
             Tables => Connections,
@@ -252,22 +274,22 @@ impl Command for PreviousPaneCommand {
             SqlFiles => TabularOutput,
             QueryWindow => SqlFiles,
         };
-        
+
         Ok(CommandResult::Success)
     }
-    
+
     fn description(&self) -> &str {
         "Switch to previous pane"
     }
-    
+
     fn id(&self) -> CommandId {
         CommandId::PreviousPane
     }
-    
+
     fn shortcut(&self) -> Option<String> {
         Some("Shift+Tab".to_string())
     }
-    
+
     fn category(&self) -> CommandCategory {
         CommandCategory::Navigation
     }
@@ -281,19 +303,19 @@ impl Command for FocusConnectionsPaneCommand {
         context.state.ui.focused_pane = FocusedPane::Connections;
         Ok(CommandResult::Success)
     }
-    
+
     fn description(&self) -> &str {
         "Focus Connections pane"
     }
-    
+
     fn id(&self) -> CommandId {
         CommandId::FocusConnectionsPane
     }
-    
+
     fn shortcut(&self) -> Option<String> {
         Some("c".to_string())
     }
-    
+
     fn category(&self) -> CommandCategory {
         CommandCategory::Navigation
     }

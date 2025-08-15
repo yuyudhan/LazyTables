@@ -1,6 +1,8 @@
 // FilePath: src/commands/connection.rs
 
-use super::{Command, CommandCategory, CommandContext, CommandId, CommandResult, CommandAction, ModalType};
+use super::{
+    Command, CommandAction, CommandCategory, CommandContext, CommandId, CommandResult, ModalType,
+};
 use crate::core::error::Result;
 
 /// Connect command - establishes database connection
@@ -11,42 +13,43 @@ impl Command for ConnectCommand {
         // Check if we're in the connections pane
         if context.state.ui.focused_pane != crate::app::FocusedPane::Connections {
             return Ok(CommandResult::Error(
-                "Navigate to Connections pane to connect".to_string()
+                "Navigate to Connections pane to connect".to_string(),
             ));
         }
-        
+
         // Check if a connection is selected
         if !context.state.db.connections.connections.is_empty() {
             let selected = context.state.ui.selected_connection;
             // TODO: Implement actual connection logic
-            context.state.toast_manager.info(
-                &format!("Connecting to database #{}", selected)
-            );
-            
-            Ok(CommandResult::SuccessWithMessage(
-                format!("Initiated connection to database #{}", selected)
-            ))
+            context
+                .state
+                .toast_manager
+                .info(format!("Connecting to database #{selected}"));
+
+            Ok(CommandResult::SuccessWithMessage(format!(
+                "Initiated connection to database #{selected}"
+            )))
         } else {
             Ok(CommandResult::Error("No connections available".to_string()))
         }
     }
-    
+
     fn description(&self) -> &str {
         "Connect to selected database"
     }
-    
+
     fn id(&self) -> CommandId {
         CommandId::Connect
     }
-    
+
     fn shortcut(&self) -> Option<String> {
         Some("Enter".to_string())
     }
-    
+
     fn category(&self) -> CommandCategory {
         CommandCategory::Connection
     }
-    
+
     fn can_execute(&self, context: &CommandContext) -> bool {
         context.state.ui.focused_pane == crate::app::FocusedPane::Connections
             && !context.state.db.connections.connections.is_empty()
@@ -60,30 +63,32 @@ impl Command for AddConnectionCommand {
     fn execute(&self, context: &mut CommandContext) -> Result<CommandResult> {
         // Initialize connection modal state
         use crate::ui::components::connection_modal::{ConnectionModalState, ModalStep};
-        
+
         context.state.connection_modal_state = ConnectionModalState::new();
         context.state.connection_modal_state.current_step = ModalStep::DatabaseTypeSelection;
         context.state.ui.show_add_connection_modal = true;
-        
-        Ok(CommandResult::Action(CommandAction::OpenModal(ModalType::Connection)))
+
+        Ok(CommandResult::Action(CommandAction::OpenModal(
+            ModalType::Connection,
+        )))
     }
-    
+
     fn description(&self) -> &str {
         "Add a new database connection"
     }
-    
+
     fn id(&self) -> CommandId {
         CommandId::AddConnection
     }
-    
+
     fn shortcut(&self) -> Option<String> {
         Some("a".to_string())
     }
-    
+
     fn category(&self) -> CommandCategory {
         CommandCategory::Connection
     }
-    
+
     fn can_execute(&self, context: &CommandContext) -> bool {
         // Can add connection from connections pane
         context.state.ui.focused_pane == crate::app::FocusedPane::Connections
@@ -99,31 +104,31 @@ impl Command for EditConnectionCommand {
             let selected = context.state.ui.selected_connection;
             // TODO: Load existing connection data into modal
             context.state.ui.show_edit_connection_modal = true;
-            
-            Ok(CommandResult::SuccessWithMessage(
-                format!("Editing connection #{}", selected)
-            ))
+
+            Ok(CommandResult::SuccessWithMessage(format!(
+                "Editing connection #{selected}"
+            )))
         } else {
             Ok(CommandResult::Error("No connections available".to_string()))
         }
     }
-    
+
     fn description(&self) -> &str {
         "Edit selected database connection"
     }
-    
+
     fn id(&self) -> CommandId {
         CommandId::EditConnection
     }
-    
+
     fn shortcut(&self) -> Option<String> {
         Some("e".to_string())
     }
-    
+
     fn category(&self) -> CommandCategory {
         CommandCategory::Connection
     }
-    
+
     fn can_execute(&self, context: &CommandContext) -> bool {
         context.state.ui.focused_pane == crate::app::FocusedPane::Connections
             && !context.state.db.connections.connections.is_empty()
@@ -137,30 +142,30 @@ impl Command for DeleteConnectionCommand {
     fn execute(&self, context: &mut CommandContext) -> Result<CommandResult> {
         if !context.state.db.connections.connections.is_empty() {
             let selected = context.state.ui.selected_connection;
-            Ok(CommandResult::RequiresConfirmation(
-                format!("Delete connection #{}? This cannot be undone.", selected)
-            ))
+            Ok(CommandResult::RequiresConfirmation(format!(
+                "Delete connection #{selected}? This cannot be undone."
+            )))
         } else {
             Ok(CommandResult::Error("No connections available".to_string()))
         }
     }
-    
+
     fn description(&self) -> &str {
         "Delete selected database connection"
     }
-    
+
     fn id(&self) -> CommandId {
         CommandId::DeleteConnection
     }
-    
+
     fn shortcut(&self) -> Option<String> {
         Some("d".to_string())
     }
-    
+
     fn category(&self) -> CommandCategory {
         CommandCategory::Connection
     }
-    
+
     fn can_execute(&self, context: &CommandContext) -> bool {
         context.state.ui.focused_pane == crate::app::FocusedPane::Connections
             && !context.state.db.connections.connections.is_empty()
@@ -173,19 +178,22 @@ pub struct DisconnectCommand;
 impl Command for DisconnectCommand {
     fn execute(&self, context: &mut CommandContext) -> Result<CommandResult> {
         // TODO: Implement actual disconnection logic
-        context.state.toast_manager.info("Disconnected from database");
-        
+        context
+            .state
+            .toast_manager
+            .info("Disconnected from database");
+
         Ok(CommandResult::Success)
     }
-    
+
     fn description(&self) -> &str {
         "Disconnect from current database"
     }
-    
+
     fn id(&self) -> CommandId {
         CommandId::Disconnect
     }
-    
+
     fn category(&self) -> CommandCategory {
         CommandCategory::Connection
     }
@@ -198,22 +206,22 @@ impl Command for RefreshConnectionsCommand {
     fn execute(&self, context: &mut CommandContext) -> Result<CommandResult> {
         // TODO: Reload connections from storage
         context.state.toast_manager.success("Connections refreshed");
-        
+
         Ok(CommandResult::Success)
     }
-    
+
     fn description(&self) -> &str {
         "Refresh connection list"
     }
-    
+
     fn id(&self) -> CommandId {
         CommandId::RefreshConnections
     }
-    
+
     fn shortcut(&self) -> Option<String> {
         Some("r".to_string())
     }
-    
+
     fn category(&self) -> CommandCategory {
         CommandCategory::Connection
     }
@@ -227,34 +235,35 @@ impl Command for TestConnectionCommand {
         if !context.state.db.connections.connections.is_empty() {
             let selected = context.state.ui.selected_connection;
             // TODO: Implement connection testing
-            context.state.toast_manager.info(
-                &format!("Testing connection #{}", selected)
-            );
-            
+            context
+                .state
+                .toast_manager
+                .info(format!("Testing connection #{selected}"));
+
             Ok(CommandResult::SuccessWithMessage(
-                "Connection test initiated".to_string()
+                "Connection test initiated".to_string(),
             ))
         } else {
             Ok(CommandResult::Error("No connections available".to_string()))
         }
     }
-    
+
     fn description(&self) -> &str {
         "Test selected database connection"
     }
-    
+
     fn id(&self) -> CommandId {
         CommandId::TestConnection
     }
-    
+
     fn shortcut(&self) -> Option<String> {
         Some("t".to_string())
     }
-    
+
     fn category(&self) -> CommandCategory {
         CommandCategory::Connection
     }
-    
+
     fn can_execute(&self, context: &CommandContext) -> bool {
         context.state.ui.focused_pane == crate::app::FocusedPane::Connections
             && !context.state.db.connections.connections.is_empty()
