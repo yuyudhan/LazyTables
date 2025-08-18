@@ -2,7 +2,7 @@
 
 use crate::{
     commands::{CommandAction, CommandContext, CommandId, CommandRegistry, CommandResult},
-    config::Config,
+    config::{Config, HotkeyManager, NavigationAction},
     core::error::Result,
     event::{Event, EventHandler},
     ui::UI,
@@ -45,6 +45,8 @@ pub struct App {
     command_buffer: String,
     /// Leader key state for compound commands
     leader_pressed: bool,
+    /// Hotkey manager for configurable hotkeys
+    hotkey_manager: HotkeyManager,
 }
 
 impl App {
@@ -54,6 +56,7 @@ impl App {
         let event_handler = EventHandler::new(Duration::from_millis(250));
         let ui = UI::new(&config)?;
         let command_registry = CommandRegistry::new();
+        let hotkey_manager = HotkeyManager::new(&config.keybindings)?;
 
         Ok(Self {
             state,
@@ -65,6 +68,7 @@ impl App {
             mode: Mode::Normal,
             command_buffer: String::new(),
             leader_pressed: false,
+            hotkey_manager,
         })
     }
 
@@ -405,31 +409,31 @@ impl App {
 
         match self.mode {
             Mode::Normal => {
+                // Check for configurable hotkeys first
+                if let Some(pane) = self.hotkey_manager.get_pane_for_key(key.modifiers, key.code) {
+                    // Switch to the specified pane
+                    self.state.ui.focused_pane = pane;
+                    return Ok(());
+                }
+
+                if let Some(nav_action) = self.hotkey_manager.get_navigation_action(key.modifiers, key.code) {
+                    // Handle navigation action
+                    match nav_action {
+                        NavigationAction::FocusLeft => self.state.move_focus_left(),
+                        NavigationAction::FocusDown => self.state.move_focus_down(),
+                        NavigationAction::FocusUp => self.state.move_focus_up(),
+                        NavigationAction::FocusRight => self.state.move_focus_right(),
+                        NavigationAction::CycleForward => self.state.cycle_focus_forward(),
+                        NavigationAction::CycleBackward => self.state.cycle_focus_backward(),
+                    }
+                    return Ok(());
+                }
+
                 match (key.modifiers, key.code) {
                     // Enter command mode with ':'
                     (KeyModifiers::NONE, KeyCode::Char(':')) => {
                         self.mode = Mode::Command;
                         self.command_buffer.clear();
-                    }
-                    // Pane navigation with Ctrl+h/j/k/l (directional movement)
-                    (KeyModifiers::CONTROL, KeyCode::Char('h')) => {
-                        self.state.move_focus_left();
-                    }
-                    (KeyModifiers::CONTROL, KeyCode::Char('j')) => {
-                        self.state.move_focus_down();
-                    }
-                    (KeyModifiers::CONTROL, KeyCode::Char('k')) => {
-                        self.state.move_focus_up();
-                    }
-                    (KeyModifiers::CONTROL, KeyCode::Char('l')) => {
-                        self.state.move_focus_right();
-                    }
-                    // Tab to cycle through panes
-                    (KeyModifiers::NONE, KeyCode::Tab) => {
-                        self.state.cycle_focus_forward();
-                    }
-                    (KeyModifiers::SHIFT, KeyCode::BackTab) => {
-                        self.state.cycle_focus_backward();
                     }
                     // Vim-style navigation within panes
                     (KeyModifiers::NONE, KeyCode::Char('j')) => {

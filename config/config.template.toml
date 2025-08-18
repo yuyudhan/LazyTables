@@ -1,0 +1,81 @@
+# LazyTables Configuration Template
+# 
+# LazyTables automatically creates a default config on first run at ~/.lazytables/config.toml
+# 
+# To customize your settings, copy this template to:
+#   ~/.lazytables/config.toml (primary, recommended)
+#   ~/.config/lazytables/config.toml (alternative, XDG standard)
+# 
+# This template contains all available configuration options with explanations.
+
+[theme]
+name = "LazyDark"
+dark_mode = true
+
+[editor]
+tab_size = 4
+show_line_numbers = true
+highlight_current_line = true
+auto_complete = true
+
+[connections]
+auto_reconnect = true
+connection_timeout = 5000
+max_connections = 10
+
+[keybindings]
+leader_key = " "
+
+# Pane switching hotkeys - Use these to jump directly to specific panes
+[keybindings.pane_hotkeys]
+connections = "F1"        # Jump to Connections pane
+tables = "F2"            # Jump to Tables pane  
+details = "F3"           # Jump to Table Details pane
+tabular_output = "F4"    # Jump to Tabular Output pane
+sql_files = "F5"         # Jump to SQL Files pane
+query_window = "F6"      # Jump to Query Window pane
+
+# Navigation hotkeys - Use these for pane-to-pane movement
+[keybindings.navigation]
+focus_left = "Ctrl+h"     # Move focus left
+focus_down = "Ctrl+j"     # Move focus down
+focus_up = "Ctrl+k"       # Move focus up
+focus_right = "Ctrl+l"    # Move focus right
+cycle_forward = "Tab"     # Cycle focus forward
+cycle_backward = "Shift+Tab"  # Cycle focus backward
+
+# Alternative hotkey examples (uncomment and modify as needed):
+#
+# Use number keys for pane switching:
+# connections = "1"
+# tables = "2" 
+# details = "3"
+# tabular_output = "4"
+# sql_files = "5"
+# query_window = "6"
+#
+# Use Alt+direction for navigation:
+# focus_left = "Alt+h"
+# focus_down = "Alt+j"
+# focus_up = "Alt+k"
+# focus_right = "Alt+l"
+#
+# Use Ctrl+arrow keys for navigation:
+# focus_left = "Ctrl+Left"
+# focus_down = "Ctrl+Down"
+# focus_up = "Ctrl+Up"
+# focus_right = "Ctrl+Right"
+
+# Supported key formats:
+# - Single characters: "a", "1", "!"
+# - Function keys: "F1" through "F12"
+# - Special keys: "Enter", "Esc", "Space", "Tab", "Backspace", "Delete"
+# - Arrow keys: "Up", "Down", "Left", "Right"
+# - With modifiers: "Ctrl+a", "Alt+F1", "Shift+Tab", "Ctrl+Shift+a"
+# - Multiple modifiers: "Ctrl+Alt+a", "Ctrl+Shift+F1"
+#
+# Available modifiers:
+# - Ctrl (or Control)
+# - Alt
+# - Shift
+# - Super (or Cmd, Meta) - platform dependent

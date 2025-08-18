@@ -16,8 +16,8 @@ LazyTables uses TOML configuration files for easy customization. Configuration i
 
 ### User Configuration
 
-**macOS**: `~/.lazytables/config.toml`
-**Linux**: `~/.lazytables/config.toml`
+**Primary**: `~/.lazytables/config.toml` (recommended for cargo install)
+**Alternative**: `~/.config/lazytables/config.toml` (XDG standard)
 
 ### System Configuration
 
@@ -40,29 +40,41 @@ LazyTables creates a default configuration on first run:
 ```toml
 # ~/.lazytables/config.toml
 
-[display]
-theme = "default"
-show_line_numbers = true
-page_size = 100
-wrap_text = false
-column_separator = " │ "
-
-[behavior]
-auto_connect = true
-confirm_exit = false
-save_query_history = true
-auto_save_interval = 300  # seconds
+[theme]
+name = "LazyDark"
+dark_mode = true
 
 [editor]
-tab_width = 4
-insert_final_newline = true
-trim_trailing_whitespace = true
-syntax_highlighting = true
+tab_size = 4
+show_line_numbers = true
+highlight_current_line = true
+auto_complete = true
 
-[keys]
-command_quit = ":q"
-help = "?"
-search = "/"
+[connections]
+auto_reconnect = true
+connection_timeout = 5000
+max_connections = 10
+
+[keybindings]
+leader_key = " "
+
+# Pane switching hotkeys
+[keybindings.pane_hotkeys]
+connections = "F1"
+tables = "F2" 
+details = "F3"
+tabular_output = "F4"
+sql_files = "F5"
+query_window = "F6"
+
+# Navigation hotkeys
+[keybindings.navigation]
+focus_left = "Ctrl+h"
+focus_down = "Ctrl+j"
+focus_up = "Ctrl+k"
+focus_right = "Ctrl+l"
+cycle_forward = "Tab"
+cycle_backward = "Shift+Tab"
 ```
 
 ### Basic Customization
@@ -232,56 +244,103 @@ functions = true
 trigger_length = 2          # Characters before showing completions
 ```
 
-## Key Bindings
+## Configurable Hotkeys
 
-### Default Key Mapping
+LazyTables supports fully configurable hotkeys for pane switching and navigation. You can customize all hotkeys in the `[keybindings]` section of your configuration.
 
-```toml
-[keys]
-# Application
-command_quit = ":q"
-help = "?"
-command_mode = ":"
+### Pane Switching Hotkeys
 
-# Navigation
-pane_left = ["h", "Ctrl+h"]
-pane_right = ["l", "Ctrl+l"]
-pane_up = ["k", "Ctrl+k"]
-pane_down = ["j", "Ctrl+j"]
-next_pane = "Tab"
-prev_pane = "Shift+Tab"
-
-# Pane focus
-focus_connections = "c"
-focus_tables = "t"
-focus_details = "d"
-focus_main = "m"
-
-# Actions
-search = "/"
-add_connection = "a"
-edit_connection = "e"
-delete_connection = "d"
-refresh = "r"
-execute_query = "Ctrl+Enter"
-```
-
-### Custom Key Bindings
+Configure direct hotkeys to jump to specific panes:
 
 ```toml
-[keys.custom]
-# Custom shortcuts
-quick_select = "Space s"    # Quick SELECT * FROM table
-show_create = "Space c"     # SHOW CREATE TABLE
-explain_query = "Space e"   # EXPLAIN query
-format_query = "Space f"    # Format SQL query
-
-# Leader key sequences (Space as leader)
-[keys.leader]
-query_history = "h"         # Space+h for query history
-export_csv = "x c"          # Space+x+c for CSV export
-export_json = "x j"         # Space+x+j for JSON export
+[keybindings.pane_hotkeys]
+connections = "F1"        # Jump to Connections pane
+tables = "F2"            # Jump to Tables pane  
+details = "F3"           # Jump to Table Details pane
+tabular_output = "F4"    # Jump to Tabular Output pane
+sql_files = "F5"         # Jump to SQL Files pane
+query_window = "F6"      # Jump to Query Window pane
 ```
+
+### Navigation Hotkeys
+
+Configure pane-to-pane navigation hotkeys:
+
+```toml
+[keybindings.navigation]
+focus_left = "Ctrl+h"     # Move focus left
+focus_down = "Ctrl+j"     # Move focus down
+focus_up = "Ctrl+k"       # Move focus up
+focus_right = "Ctrl+l"    # Move focus right
+cycle_forward = "Tab"     # Cycle focus forward
+cycle_backward = "Shift+Tab"  # Cycle focus backward
+```
+
+### Hotkey Format
+
+Hotkeys are specified as strings with the following format:
+
+**Single Keys**:
+- Letters: `"a"`, `"b"`, `"z"`
+- Numbers: `"1"`, `"2"`, `"0"`  
+- Symbols: `"!"`, `"@"`, `"#"`
+- Function keys: `"F1"`, `"F2"`, ... `"F12"`
+- Special keys: `"Enter"`, `"Esc"`, `"Space"`, `"Tab"`, `"Backspace"`
+- Arrow keys: `"Up"`, `"Down"`, `"Left"`, `"Right"`
+
+**With Modifiers**:
+- `"Ctrl+a"` - Control + A
+- `"Alt+F1"` - Alt + F1  
+- `"Shift+Tab"` - Shift + Tab
+- `"Ctrl+Shift+a"` - Control + Shift + A
+- `"Ctrl+Alt+F5"` - Control + Alt + F5
+
+**Available Modifiers**:
+- `Ctrl` (or `Control`)
+- `Alt`
+- `Shift` 
+- `Super` (or `Cmd`, `Meta`) - platform dependent
+
+### Example Alternative Configurations
+
+**Number Keys for Pane Switching**:
+```toml
+[keybindings.pane_hotkeys]
+connections = "1"
+tables = "2" 
+details = "3"
+tabular_output = "4"
+sql_files = "5"
+query_window = "6"
+```
+
+**Alt+Direction for Navigation**:
+```toml
+[keybindings.navigation]
+focus_left = "Alt+h"
+focus_down = "Alt+j"
+focus_up = "Alt+k"
+focus_right = "Alt+l"
+```
+
+**Arrow Keys with Ctrl**:
+```toml
+[keybindings.navigation]
+focus_left = "Ctrl+Left"
+focus_down = "Ctrl+Down"
+focus_up = "Ctrl+Up"
+focus_right = "Ctrl+Right"
+```
+
+### Within-Pane Navigation
+
+Note that within-pane navigation (moving through lists, tables, etc.) uses separate vim-style keys:
+- `j` / `k` - Move up/down within a pane
+- `h` / `l` - Move left/right within a pane
+- `g` / `G` - Jump to first/last item
+- `0` / `$` - Jump to first/last column (in tables)
+
+These are separate from the configurable pane-to-pane hotkeys.
 
 ## Database Configuration
 
@@ -351,7 +410,7 @@ batch_updates = true            # Batch UI updates for performance
 ```toml
 [logging]
 level = "info"                  # Options: debug, info, warn, error
-file = "~/.config/lazytables/lazytables.log"
+file = "~/.lazytables/logs/lazytables.log"
 max_size = "10MB"
 max_files = 5
 console_output = false          # Also log to console
@@ -480,11 +539,11 @@ lazytables --config-sources
 ### Backup and Sync
 
 ```bash
-# Backup configuration
-cp ~/.config/lazytables/config.toml ~/backups/
+# Backup configuration  
+cp ~/.lazytables/config.toml ~/backups/
 
 # Version control configuration
-cd ~/.config/lazytables
+cd ~/.lazytables
 git init
 git add config.toml
 git commit -m "Initial LazyTables configuration"
@@ -498,13 +557,13 @@ git commit -m "Initial LazyTables configuration"
 **Multiple profiles for different environments**:
 ```bash
 # Work profile
-lazytables --config ~/.config/lazytables/work.toml
+lazytables --config ~/.lazytables/work.toml
 
-# Personal profile
-lazytables --config ~/.config/lazytables/personal.toml
+# Personal profile  
+lazytables --config ~/.lazytables/personal.toml
 
 # Demo profile (read-only, safe settings)
-lazytables --config ~/.config/lazytables/demo.toml
+lazytables --config ~/.lazytables/demo.toml
 ```
 
 ## Advanced Configuration
@@ -515,7 +574,7 @@ lazytables --config ~/.config/lazytables/demo.toml
 [plugins]
 enabled = true
 auto_update = false
-directory = "~/.config/lazytables/plugins"
+directory = "~/.lazytables/plugins"
 
 [plugins.installed]
 csv_export = { version = "1.0.0", enabled = true }
@@ -611,7 +670,7 @@ result_cache_size = "500MB"
 
 [logging]
 level = "debug"
-file = "~/.local/share/lazytables/debug.log"
+file = "~/.lazytables/logs/debug.log"
 ```
 
 ### Read-Only/Demo Configuration

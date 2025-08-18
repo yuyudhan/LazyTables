@@ -22,9 +22,13 @@ async fn main() -> color_eyre::Result<()> {
     lazytables::logging::init(cli.log_level)
         .map_err(|e| color_eyre::eyre::eyre!("Failed to init logging: {}", e))?;
 
-    // Load configuration
-    let config = Config::load(cli.config)
-        .map_err(|e| color_eyre::eyre::eyre!("Failed to load config: {}", e))?;
+    // Load configuration - use install-friendly loading if no specific config path provided
+    let config = if cli.config.is_some() {
+        Config::load(cli.config)
+    } else {
+        Config::load_for_install()
+    }
+    .map_err(|e| color_eyre::eyre::eyre!("Failed to load config: {}", e))?;
 
     // Initialize terminal
     let terminal = lazytables::terminal::init()
