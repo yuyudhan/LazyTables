@@ -110,6 +110,10 @@ pub struct UIState {
     pub query_modified: bool,
     /// Currently loaded SQL file path
     pub current_sql_file: Option<String>,
+    /// Viewport offset - the first visible line in the query editor
+    pub query_viewport_offset: usize,
+    /// Number of visible lines in the query editor (updated on render)
+    pub query_viewport_height: usize,
 
     // Vim command state
     /// Vim command buffer for :w, :q, etc
@@ -158,6 +162,8 @@ impl UIState {
             query_edit_mode: QueryEditMode::Normal,
             query_modified: false,
             current_sql_file: None,
+            query_viewport_offset: 0,
+            query_viewport_height: 0,
             vim_command_buffer: String::new(),
             in_vim_command: false,
             show_add_connection_modal: false,
