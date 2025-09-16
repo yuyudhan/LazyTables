@@ -3,6 +3,7 @@
 // Database adapter modules
 pub mod connection;
 pub mod mysql;
+pub mod objects;
 pub mod postgres;
 pub mod sqlite;
 
@@ -12,6 +13,9 @@ pub use connection::{
 
 // Re-export the Connection trait from connection module
 pub use connection::Connection;
+
+// Re-export database object types
+pub use objects::{DatabaseObject, DatabaseObjectList, DatabaseObjectType};
 
 /// Represents a table column
 #[derive(Debug, Clone)]

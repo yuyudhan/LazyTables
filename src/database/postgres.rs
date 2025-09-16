@@ -125,9 +125,9 @@ impl PostgresConnection {
     pub async fn list_tables(&self) -> Result<Vec<String>> {
         if let Some(pool) = &self.pool {
             let query = "
-                SELECT table_name 
-                FROM information_schema.tables 
-                WHERE table_schema = 'public' 
+                SELECT table_name
+                FROM information_schema.tables
+                WHERE table_schema = 'public'
                 AND table_type = 'BASE TABLE'
                 ORDER BY table_name
             ";
@@ -150,24 +150,288 @@ impl PostgresConnection {
         }
     }
 
+    /// List all database objects (tables, views, etc.)
+    pub async fn list_database_objects(&self) -> Result<crate::database::DatabaseObjectList> {
+        use crate::database::{DatabaseObject, DatabaseObjectList, DatabaseObjectType};
+
+        if let Some(pool) = &self.pool {
+            let mut result = DatabaseObjectList::default();
+
+            // Query for all objects with proper error handling for permissions
+            let query = "
+                WITH object_info AS (
+                    SELECT
+                        n.nspname AS schema_name,
+                        c.relname AS object_name,
+                        CASE
+                            WHEN c.relkind = 'r' THEN 'table'
+                            WHEN c.relkind = 'v' THEN 'view'
+                            WHEN c.relkind = 'm' THEN 'matview'
+                            WHEN c.relkind = 'f' THEN 'foreign'
+                        END AS object_type,
+                        pg_catalog.obj_description(c.oid, 'pg_class') AS comment,
+                        CASE
+                            WHEN c.relkind IN ('r', 'm') THEN c.reltuples::BIGINT
+                            ELSE NULL
+                        END AS row_count,
+                        CASE
+                            WHEN c.relkind IN ('r', 'm') THEN pg_total_relation_size(c.oid)
+                            ELSE NULL
+                        END AS size_bytes
+                    FROM pg_catalog.pg_class c
+                    LEFT JOIN pg_catalog.pg_namespace n ON n.oid = c.relnamespace
+                    WHERE c.relkind IN ('r', 'v', 'm', 'f')
+                        AND n.nspname NOT IN ('pg_catalog', 'information_schema')
+                        AND n.nspname NOT LIKE 'pg_toast%'
+                        AND n.nspname NOT LIKE 'pg_temp%'
+                )
+                SELECT * FROM object_info
+                ORDER BY schema_name, object_type, object_name
+            ";
+
+            match sqlx::query(query).fetch_all(pool).await {
+                Ok(rows) => {
+                    for row in rows {
+                        let schema: String = row.get("schema_name");
+                        let name: String = row.get("object_name");
+                        let obj_type: String = row.get("object_type");
+                        let comment: Option<String> = row.get("comment");
+                        let row_count: Option<i64> = row.get("row_count");
+                        let size_bytes: Option<i64> = row.get("size_bytes");
+
+                        let object_type = match obj_type.as_str() {
+                            "table" => DatabaseObjectType::Table,
+                            "view" => DatabaseObjectType::View,
+                            "matview" => DatabaseObjectType::MaterializedView,
+                            "foreign" => DatabaseObjectType::ForeignTable,
+                            _ => continue,
+                        };
+
+                        let obj = DatabaseObject {
+                            name,
+                            schema: Some(schema),
+                            object_type: object_type.clone(),
+                            row_count,
+                            size_bytes,
+                            comment,
+                        };
+
+                        // Sort into appropriate lists
+                        match object_type {
+                            DatabaseObjectType::Table => result.tables.push(obj),
+                            DatabaseObjectType::View => result.views.push(obj),
+                            DatabaseObjectType::MaterializedView => result.materialized_views.push(obj),
+                            DatabaseObjectType::ForeignTable => result.foreign_tables.push(obj),
+                            _ => {},
+                        }
+                    }
+
+                    result.total_count = result.tables.len()
+                        + result.views.len()
+                        + result.materialized_views.len()
+                        + result.foreign_tables.len();
+                }
+                Err(e) => {
+                    // Check for permission errors
+                    let error_msg = e.to_string();
+                    if error_msg.contains("permission denied") || error_msg.contains("insufficient privilege") {
+                        result.error = Some("Insufficient permissions to list database objects".to_string());
+                    } else {
+                        result.error = Some(format!("Failed to list objects: {}", e));
+                    }
+                }
+            }
+
+            Ok(result)
+        } else {
+            Err(LazyTablesError::Connection(
+                "No active connection".to_string(),
+            ))
+        }
+    }
+
+    /// List all schemas in the database
+    pub async fn list_schemas(&self) -> Result<Vec<String>> {
+        if let Some(pool) = &self.pool {
+            let query = "
+                SELECT nspname AS schema_name
+                FROM pg_catalog.pg_namespace
+                WHERE nspname NOT IN ('pg_catalog', 'information_schema')
+                    AND nspname NOT LIKE 'pg_toast%'
+                    AND nspname NOT LIKE 'pg_temp%'
+                ORDER BY nspname
+            ";
+
+            let rows = sqlx::query(query).fetch_all(pool).await
+                .map_err(|e| LazyTablesError::Connection(format!("Failed to list schemas: {}", e)))?;
+
+            let schemas = rows.iter()
+                .map(|row| row.get::<String, _>("schema_name"))
+                .collect();
+
+            Ok(schemas)
+        } else {
+            Err(LazyTablesError::Connection(
+                "No active connection".to_string(),
+            ))
+        }
+    }
+
+    /// List database objects filtered by schema
+    pub async fn list_database_objects_in_schema(&self, schema_name: Option<&str>) -> Result<crate::database::DatabaseObjectList> {
+        use crate::database::{DatabaseObject, DatabaseObjectList, DatabaseObjectType};
+
+        if let Some(pool) = &self.pool {
+            let mut result = DatabaseObjectList::default();
+
+            // Build schema filter
+            let schema_filter = if let Some(schema) = schema_name {
+                format!("AND n.nspname = '{}'", schema.replace("'", "''"))
+            } else {
+                "AND n.nspname NOT IN ('pg_catalog', 'information_schema')
+                 AND n.nspname NOT LIKE 'pg_toast%'
+                 AND n.nspname NOT LIKE 'pg_temp%'".to_string()
+            };
+
+            let query = format!("
+                WITH object_info AS (
+                    SELECT
+                        n.nspname AS schema_name,
+                        c.relname AS object_name,
+                        CASE
+                            WHEN c.relkind = 'r' THEN 'table'
+                            WHEN c.relkind = 'v' THEN 'view'
+                            WHEN c.relkind = 'm' THEN 'matview'
+                            WHEN c.relkind = 'f' THEN 'foreign'
+                        END AS object_type,
+                        pg_catalog.obj_description(c.oid, 'pg_class') AS comment,
+                        CASE
+                            WHEN c.relkind IN ('r', 'm') THEN c.reltuples::BIGINT
+                            ELSE NULL
+                        END AS row_count,
+                        CASE
+                            WHEN c.relkind IN ('r', 'm') THEN pg_total_relation_size(c.oid)
+                            ELSE NULL
+                        END AS size_bytes
+                    FROM pg_catalog.pg_class c
+                    LEFT JOIN pg_catalog.pg_namespace n ON n.oid = c.relnamespace
+                    WHERE c.relkind IN ('r', 'v', 'm', 'f')
+                        {}
+                )
+                SELECT * FROM object_info
+                ORDER BY schema_name, object_type, object_name
+            ", schema_filter);
+
+            match sqlx::query(&query).fetch_all(pool).await {
+                Ok(rows) => {
+                    for row in rows {
+                        let schema: String = row.get("schema_name");
+                        let name: String = row.get("object_name");
+                        let obj_type: String = row.get("object_type");
+                        let comment: Option<String> = row.get("comment");
+                        let row_count: Option<i64> = row.get("row_count");
+                        let size_bytes: Option<i64> = row.get("size_bytes");
+
+                        let object_type = match obj_type.as_str() {
+                            "table" => DatabaseObjectType::Table,
+                            "view" => DatabaseObjectType::View,
+                            "matview" => DatabaseObjectType::MaterializedView,
+                            "foreign" => DatabaseObjectType::ForeignTable,
+                            _ => continue,
+                        };
+
+                        let obj = DatabaseObject {
+                            name,
+                            schema: Some(schema),
+                            object_type: object_type.clone(),
+                            row_count,
+                            size_bytes,
+                            comment,
+                        };
+
+                        // Sort into appropriate lists
+                        match object_type {
+                            DatabaseObjectType::Table => result.tables.push(obj),
+                            DatabaseObjectType::View => result.views.push(obj),
+                            DatabaseObjectType::MaterializedView => result.materialized_views.push(obj),
+                            DatabaseObjectType::ForeignTable => result.foreign_tables.push(obj),
+                            _ => {},
+                        }
+                    }
+
+                    result.total_count = result.tables.len()
+                        + result.views.len()
+                        + result.materialized_views.len()
+                        + result.foreign_tables.len();
+                }
+                Err(e) => {
+                    // Check for permission errors
+                    let error_msg = e.to_string();
+                    if error_msg.contains("permission denied") || error_msg.contains("insufficient privilege") {
+                        result.error = Some("Insufficient permissions to list database objects".to_string());
+                    } else {
+                        result.error = Some(format!("Failed to list objects: {}", e));
+                    }
+                }
+            }
+
+            Ok(result)
+        } else {
+            Err(LazyTablesError::Connection(
+                "No active connection".to_string(),
+            ))
+        }
+    }
+
     /// Get metadata for a specific table
     pub async fn get_table_metadata(&self, table_name: &str) -> Result<TableMetadata> {
         if let Some(pool) = &self.pool {
-            // Get row count
-            let count_query = format!("SELECT COUNT(*) FROM \"{table_name}\"");
-            let count_row = sqlx::query(&count_query)
-                .fetch_one(pool)
-                .await
-                .map_err(|e| {
-                    LazyTablesError::Connection(format!("Failed to get row count: {e}"))
-                })?;
-            let row_count: i64 = count_row.get(0);
+            // Parse schema and table name
+            let (schema, table) = if table_name.contains('.') {
+                let parts: Vec<&str> = table_name.splitn(2, '.').collect();
+                (parts[0], parts[1])
+            } else {
+                ("public", table_name)
+            };
+
+            // First, determine the object type
+            let type_query = "SELECT c.relkind
+                FROM pg_catalog.pg_class c
+                JOIN pg_catalog.pg_namespace n ON n.oid = c.relnamespace
+                WHERE n.nspname = $1 AND c.relname = $2";
+
+            let type_row = sqlx::query(type_query)
+                .bind(schema)
+                .bind(table)
+                .fetch_optional(pool)
+                .await?;
+
+            let is_view = if let Some(row) = type_row {
+                let relkind: String = row.get("relkind");
+                matches!(relkind.as_str(), "v" | "m") // v = view, m = materialized view
+            } else {
+                false
+            };
+
+            // Get row count (skip for regular views)
+            let row_count = if !is_view {
+                let count_query = format!("SELECT COUNT(*) FROM {}.{}",
+                    schema.replace("'", "''"),
+                    table.replace("'", "''"));
+                match sqlx::query(&count_query).fetch_one(pool).await {
+                    Ok(row) => row.get::<i64, _>(0),
+                    Err(_) => 0, // Default to 0 if we can't get count
+                }
+            } else {
+                0 // Views don't have direct row counts
+            };
 
             // Get column count
-            let columns_query = "SELECT COUNT(*) FROM information_schema.columns 
-                                WHERE table_schema = 'public' AND table_name = $1";
+            let columns_query = "SELECT COUNT(*) FROM information_schema.columns
+                                WHERE table_schema = $1 AND table_name = $2";
             let col_row = sqlx::query(columns_query)
-                .bind(table_name)
+                .bind(schema)
+                .bind(table)
                 .fetch_one(pool)
                 .await?;
             let column_count: i64 = col_row.get(0);
@@ -181,14 +445,27 @@ impl PostgresConnection {
                 pg_table_size($1) as table_bytes,
                 pg_indexes_size($1) as index_bytes";
 
-            let size_row = sqlx::query(size_query)
-                .bind(format!("public.{table_name}"))
-                .fetch_one(pool)
-                .await?;
+            // Get size (skip for regular views as they don't have physical storage)
+            let (total_size, table_size, indexes_size) = if !is_view {
+                let qualified_name = format!("{}.{}",
+                    schema.replace("'", "''"),
+                    table.replace("'", "''"));
 
-            let total_size: i64 = size_row.get("total_bytes");
-            let table_size: i64 = size_row.get("table_bytes");
-            let indexes_size: i64 = size_row.get("index_bytes");
+                match sqlx::query(size_query)
+                    .bind(&qualified_name)
+                    .fetch_one(pool)
+                    .await {
+                    Ok(row) => (
+                        row.get::<i64, _>("total_bytes"),
+                        row.get::<i64, _>("table_bytes"),
+                        row.get::<i64, _>("index_bytes")
+                    ),
+                    Err(_) => (0, 0, 0) // Default to 0 if size query fails
+                }
+            } else {
+                (0, 0, 0) // Views don't have physical storage
+            };
+
 
             // Get primary keys
             let pk_query = "SELECT a.attname 
@@ -198,10 +475,17 @@ impl PostgresConnection {
                            WHERE i.indrelid = $1::regclass
                            AND i.indisprimary";
 
-            let pk_rows = sqlx::query(pk_query)
-                .bind(format!("public.{table_name}"))
+            let qualified_name = format!("{}.{}",
+                schema.replace("'", "''"),
+                table.replace("'", "''"));
+
+            let pk_rows = match sqlx::query(pk_query)
+                .bind(&qualified_name)
                 .fetch_all(pool)
-                .await?;
+                .await {
+                Ok(rows) => rows,
+                Err(_) => vec![] // Return empty if query fails
+            };
 
             let primary_keys: Vec<String> = pk_rows
                 .iter()
@@ -221,12 +505,16 @@ impl PostgresConnection {
                     AND ccu.table_schema = tc.table_schema
                 WHERE tc.constraint_type = 'FOREIGN KEY' 
                     AND tc.table_name = $1
-                    AND tc.table_schema = 'public'";
+                    AND tc.table_schema = $2";
 
-            let fk_rows = sqlx::query(fk_query)
-                .bind(table_name)
+            let fk_rows = match sqlx::query(fk_query)
+                .bind(table)
+                .bind(schema)
                 .fetch_all(pool)
-                .await?;
+                .await {
+                Ok(rows) => rows,
+                Err(_) => vec![] // Return empty if query fails
+            };
 
             let foreign_keys: Vec<String> = fk_rows
                 .iter()
@@ -237,13 +525,17 @@ impl PostgresConnection {
             let index_query = "
                 SELECT indexname 
                 FROM pg_indexes 
-                WHERE tablename = $1 
-                AND schemaname = 'public'";
+                WHERE tablename = $1
+                AND schemaname = $2";
 
-            let index_rows = sqlx::query(index_query)
-                .bind(table_name)
+            let index_rows = match sqlx::query(index_query)
+                .bind(table)
+                .bind(schema)
                 .fetch_all(pool)
-                .await?;
+                .await {
+                Ok(rows) => rows,
+                Err(_) => vec![] // Return empty if query fails
+            };
 
             let indexes: Vec<String> = index_rows
                 .iter()
@@ -253,10 +545,24 @@ impl PostgresConnection {
             // Get table comment
             let comment_query = "SELECT obj_description($1::regclass, 'pg_class') as comment";
 
-            let comment_row = sqlx::query(comment_query)
-                .bind(format!("public.{table_name}"))
+            let comment_row = match sqlx::query(comment_query)
+                .bind(&qualified_name)
                 .fetch_one(pool)
-                .await?;
+                .await {
+                Ok(row) => row,
+                Err(_) => return Ok(TableMetadata {
+                    table_name: table_name.to_string(),
+                    row_count: row_count as usize,
+                    column_count: column_count as usize,
+                    total_size,
+                    table_size,
+                    indexes_size,
+                    primary_keys,
+                    foreign_keys,
+                    indexes,
+                    comment: None,
+                })
+            };
 
             let comment: Option<String> = comment_row.get("comment");
 
@@ -357,16 +663,25 @@ impl PostgresConnection {
         offset: usize,
     ) -> Result<Vec<Vec<String>>> {
         if let Some(pool) = &self.pool {
+            // Parse schema and table name
+            let (schema, table) = if table_name.contains('.') {
+                let parts: Vec<&str> = table_name.splitn(2, '.').collect();
+                (parts[0], parts[1])
+            } else {
+                ("public", table_name)
+            };
+
             // Get column names first to maintain order
             let columns_query = "
-                SELECT column_name 
-                FROM information_schema.columns 
-                WHERE table_name = $1 AND table_schema = 'public'
+                SELECT column_name
+                FROM information_schema.columns
+                WHERE table_name = $1 AND table_schema = $2
                 ORDER BY ordinal_position
             ";
 
             let column_rows = sqlx::query(columns_query)
-                .bind(table_name)
+                .bind(table)
+                .bind(schema)
                 .fetch_all(pool)
                 .await?;
 
@@ -386,8 +701,14 @@ impl PostgresConnection {
                 .collect::<Vec<_>>()
                 .join(", ");
 
+            let qualified_name = if table_name.contains('.') {
+                table_name.to_string()
+            } else {
+                format!("public.{}", table_name)
+            };
+
             let query = format!(
-                "SELECT {select_list} FROM \"{table_name}\" ORDER BY 1 LIMIT {limit} OFFSET {offset}"
+                "SELECT {select_list} FROM {qualified_name} ORDER BY 1 LIMIT {limit} OFFSET {offset}"
             );
 
             let rows = sqlx::query(&query).fetch_all(pool).await?;
