@@ -1281,6 +1281,10 @@ impl App {
                             self.state.close_edit_connection_modal();
                         }
                     }
+                    ConnectionField::Test => {
+                        // Test the connection
+                        self.test_connection_from_modal().await;
+                    }
                     ConnectionField::DatabaseType => {
                         // In database type selection step, Enter advances to next step
                         if self.state.connection_modal_state.current_step
@@ -1324,6 +1328,15 @@ impl App {
                     == crate::ui::components::ModalStep::ConnectionDetails
                 {
                     self.state.connection_modal_state.go_back();
+                }
+            }
+            KeyCode::Char('t') => {
+                // Test connection shortcut
+                if self.state.connection_modal_state.current_step
+                    == crate::ui::components::ModalStep::ConnectionDetails
+                {
+                    // Test the connection
+                    self.test_connection_from_modal().await;
                 }
             }
             _ => {}
@@ -1684,5 +1697,104 @@ impl App {
     async fn tick(&mut self) -> Result<()> {
         // Update any time-based state here
         Ok(())
+    }
+
+    /// Test connection from modal
+    async fn test_connection_from_modal(&mut self) {
+        use crate::ui::components::TestConnectionStatus;
+        use crate::database::Connection;
+
+        // Set status to testing
+        self.state.connection_modal_state.test_status = Some(TestConnectionStatus::Testing);
+
+        // Try to create a connection config
+        match self.state.connection_modal_state.try_create_connection() {
+            Ok(config) => {
+                // Create a connection instance based on database type
+                use crate::database::DatabaseType;
+
+                match config.database_type {
+                    DatabaseType::PostgreSQL => {
+                        use crate::database::postgres::PostgresConnection;
+                        let mut conn = PostgresConnection::new(config);
+
+                        // Try to connect
+                        match conn.connect().await {
+                            Ok(()) => {
+                                // Try to test the connection
+                                match conn.test_connection().await {
+                                    Ok(()) => {
+                                        self.state.connection_modal_state.test_status =
+                                            Some(TestConnectionStatus::Success("Connection successful!".to_string()));
+                                    }
+                                    Err(e) => {
+                                        self.state.connection_modal_state.test_status =
+                                            Some(TestConnectionStatus::Failed(format!("Test failed: {e}")));
+                                    }
+                                }
+                            }
+                            Err(e) => {
+                                self.state.connection_modal_state.test_status =
+                                    Some(TestConnectionStatus::Failed(format!("Connection failed: {e}")));
+                            }
+                        }
+                    }
+                    DatabaseType::MySQL | DatabaseType::MariaDB => {
+                        use crate::database::mysql::MySqlConnection;
+                        let mut conn = MySqlConnection::new(config);
+
+                        match conn.connect().await {
+                            Ok(()) => {
+                                match conn.test_connection().await {
+                                    Ok(()) => {
+                                        self.state.connection_modal_state.test_status =
+                                            Some(TestConnectionStatus::Success("Connection successful!".to_string()));
+                                    }
+                                    Err(e) => {
+                                        self.state.connection_modal_state.test_status =
+                                            Some(TestConnectionStatus::Failed(format!("Test failed: {e}")));
+                                    }
+                                }
+                            }
+                            Err(e) => {
+                                self.state.connection_modal_state.test_status =
+                                    Some(TestConnectionStatus::Failed(format!("Connection failed: {e}")));
+                            }
+                        }
+                    }
+                    DatabaseType::SQLite => {
+                        use crate::database::sqlite::SqliteConnection;
+                        let mut conn = SqliteConnection::new(config);
+
+                        match conn.connect().await {
+                            Ok(()) => {
+                                match conn.test_connection().await {
+                                    Ok(()) => {
+                                        self.state.connection_modal_state.test_status =
+                                            Some(TestConnectionStatus::Success("Connection successful!".to_string()));
+                                    }
+                                    Err(e) => {
+                                        self.state.connection_modal_state.test_status =
+                                            Some(TestConnectionStatus::Failed(format!("Test failed: {e}")));
+                                    }
+                                }
+                            }
+                            Err(e) => {
+                                self.state.connection_modal_state.test_status =
+                                    Some(TestConnectionStatus::Failed(format!("Connection failed: {e}")));
+                            }
+                        }
+                    }
+                    _ => {
+                        self.state.connection_modal_state.test_status =
+                            Some(TestConnectionStatus::Failed("Database type not yet supported".to_string()));
+                    }
+                }
+            }
+            Err(e) => {
+                self.state.connection_modal_state.test_status =
+                    Some(TestConnectionStatus::Failed(format!("Invalid configuration: {e}")));
+            }
+        }
     }
 }
