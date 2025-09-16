@@ -113,7 +113,14 @@ impl AppState {
                 self.ui.selected_sql_file = self.ui.selected_sql_file.saturating_sub(1);
             }
             FocusedPane::QueryWindow => {
-                self.ui.query_cursor_line = self.ui.query_cursor_line.saturating_sub(1);
+                if self.ui.query_cursor_line > 0 {
+                    self.ui.query_cursor_line -= 1;
+
+                    // Scroll up if cursor goes above viewport
+                    if self.ui.query_cursor_line < self.ui.query_viewport_offset {
+                        self.ui.query_viewport_offset = self.ui.query_cursor_line;
+                    }
+                }
             }
             _ => {}
         }
@@ -145,6 +152,18 @@ impl AppState {
                 let lines = self.query_content.lines().count();
                 if self.ui.query_cursor_line < lines.saturating_sub(1) {
                     self.ui.query_cursor_line += 1;
+
+                    // Scroll down if cursor goes below viewport
+                    // Note: viewport_height is updated during rendering, default to 20 if not set
+                    let effective_height = if self.ui.query_viewport_height > 0 {
+                        self.ui.query_viewport_height.saturating_sub(1) // Leave room for bottom
+                    } else {
+                        20 // Default height if not yet calculated
+                    };
+
+                    if self.ui.query_cursor_line >= self.ui.query_viewport_offset + effective_height {
+                        self.ui.query_viewport_offset = self.ui.query_cursor_line.saturating_sub(effective_height) + 1;
+                    }
                 }
             }
             _ => {}
@@ -631,6 +650,7 @@ impl AppState {
         self.ui.query_modified = false;
         self.ui.query_cursor_line = 0;
         self.ui.query_cursor_column = 0;
+        self.ui.query_viewport_offset = 0; // Reset viewport to top
         self.ui.query_edit_mode = QueryEditMode::Normal;
 
         Ok(())
@@ -650,47 +670,114 @@ impl AppState {
 
     /// Insert character at current cursor position in query editor
     pub fn insert_char_at_cursor(&mut self, c: char) {
-        let lines: Vec<&str> = self.query_content.lines().collect();
-
-        if self.ui.query_cursor_line >= lines.len() {
-            // Add new lines if needed
-            while self.query_content.lines().count() <= self.ui.query_cursor_line {
-                self.query_content.push('\n');
-            }
+        if c == '\n' {
+            // Handle newline insertion specially
+            self.insert_newline_at_cursor();
+            return;
         }
 
+        // Get all lines as a mutable vector
         let lines: Vec<&str> = self.query_content.lines().collect();
         let mut new_lines: Vec<String> = lines.iter().map(|s| s.to_string()).collect();
 
+        // Ensure we have enough lines
+        while new_lines.len() <= self.ui.query_cursor_line {
+            new_lines.push(String::new());
+        }
+
+        // Insert character at current position
         if let Some(line) = new_lines.get_mut(self.ui.query_cursor_line) {
-            let mut chars: Vec<char> = line.chars().collect();
-            chars.insert(self.ui.query_cursor_column, c);
-            *line = chars.iter().collect();
+            // Ensure cursor column is within bounds
+            if self.ui.query_cursor_column > line.len() {
+                self.ui.query_cursor_column = line.len();
+            }
+
+            line.insert(self.ui.query_cursor_column, c);
+            self.ui.query_cursor_column += 1;
         }
 
         self.query_content = new_lines.join("\n");
-        self.ui.query_cursor_column += 1;
         self.ui.query_modified = true;
     }
 
-    /// Delete character at current cursor position in query editor
-    pub fn delete_char_at_cursor(&mut self) {
-        if self.ui.query_cursor_column > 0 {
-            let lines: Vec<&str> = self.query_content.lines().collect();
-            let mut new_lines: Vec<String> = lines.iter().map(|s| s.to_string()).collect();
+    /// Insert a newline at the current cursor position
+    fn insert_newline_at_cursor(&mut self) {
+        let lines: Vec<&str> = self.query_content.lines().collect();
+        let mut new_lines: Vec<String> = lines.iter().map(|s| s.to_string()).collect();
 
+        // Ensure we have enough lines
+        while new_lines.len() <= self.ui.query_cursor_line {
+            new_lines.push(String::new());
+        }
+
+        if let Some(current_line) = new_lines.get_mut(self.ui.query_cursor_line) {
+            // Split the current line at the cursor position
+            let (before, after) = current_line.split_at(self.ui.query_cursor_column.min(current_line.len()));
+            let after = after.to_string();
+            *current_line = before.to_string();
+
+            // Insert the new line after the current one
+            new_lines.insert(self.ui.query_cursor_line + 1, after);
+        }
+
+        self.query_content = new_lines.join("\n");
+
+        // Move cursor to beginning of next line
+        self.ui.query_cursor_line += 1;
+        self.ui.query_cursor_column = 0;
+        self.ui.query_modified = true;
+
+        // Adjust viewport if necessary
+        let effective_height = if self.ui.query_viewport_height > 0 {
+            self.ui.query_viewport_height.saturating_sub(1)
+        } else {
+            20
+        };
+
+        if self.ui.query_cursor_line >= self.ui.query_viewport_offset + effective_height {
+            self.ui.query_viewport_offset = self.ui.query_cursor_line.saturating_sub(effective_height) + 1;
+        }
+    }
+
+    /// Delete character at current cursor position in query editor (backspace)
+    pub fn delete_char_at_cursor(&mut self) {
+        let lines: Vec<&str> = self.query_content.lines().collect();
+
+        if lines.is_empty() {
+            return;
+        }
+
+        let mut new_lines: Vec<String> = lines.iter().map(|s| s.to_string()).collect();
+
+        if self.ui.query_cursor_column > 0 {
+            // Delete within the current line
             if let Some(line) = new_lines.get_mut(self.ui.query_cursor_line) {
-                let mut chars: Vec<char> = line.chars().collect();
-                if self.ui.query_cursor_column <= chars.len() && self.ui.query_cursor_column > 0 {
-                    chars.remove(self.ui.query_cursor_column - 1);
-                    *line = chars.iter().collect();
+                if self.ui.query_cursor_column <= line.len() {
+                    line.remove(self.ui.query_cursor_column - 1);
                     self.ui.query_cursor_column -= 1;
                     self.ui.query_modified = true;
                 }
             }
+        } else if self.ui.query_cursor_line > 0 {
+            // At beginning of line, merge with previous line
+            let current_line = new_lines[self.ui.query_cursor_line].clone();
+            new_lines.remove(self.ui.query_cursor_line);
 
-            self.query_content = new_lines.join("\n");
+            if let Some(prev_line) = new_lines.get_mut(self.ui.query_cursor_line - 1) {
+                self.ui.query_cursor_column = prev_line.len();
+                prev_line.push_str(&current_line);
+            }
+
+            self.ui.query_cursor_line -= 1;
+            self.ui.query_modified = true;
+
+            // Adjust viewport if necessary
+            if self.ui.query_cursor_line < self.ui.query_viewport_offset {
+                self.ui.query_viewport_offset = self.ui.query_cursor_line;
+            }
         }
+
+        self.query_content = new_lines.join("\n");
     }
 
     /// Move cursor to next word (vim 'w' motion)
@@ -783,11 +870,76 @@ impl AppState {
         self.ui.query_cursor_column = 0;
     }
 
-    /// Move to end of line (vim '$' motion)  
+    /// Move to end of line (vim '$' motion)
     pub fn move_to_line_end(&mut self) {
         let lines: Vec<&str> = self.query_content.lines().collect();
         if let Some(current_line) = lines.get(self.ui.query_cursor_line) {
             self.ui.query_cursor_column = current_line.len().saturating_sub(1);
+        }
+    }
+
+    /// Move to beginning of file (vim 'gg' motion)
+    pub fn move_to_file_start(&mut self) {
+        self.ui.query_cursor_line = 0;
+        self.ui.query_cursor_column = 0;
+        self.ui.query_viewport_offset = 0;
+    }
+
+    /// Move to end of file (vim 'G' motion)
+    pub fn move_to_file_end(&mut self) {
+        let lines = self.query_content.lines().count();
+        if lines > 0 {
+            self.ui.query_cursor_line = lines - 1;
+            // Move to end of last line
+            if let Some(last_line) = self.query_content.lines().last() {
+                self.ui.query_cursor_column = last_line.len().saturating_sub(1);
+            }
+
+            // Adjust viewport to show the last line
+            let effective_height = if self.ui.query_viewport_height > 0 {
+                self.ui.query_viewport_height
+            } else {
+                20
+            };
+
+            if lines >= effective_height {
+                self.ui.query_viewport_offset = lines.saturating_sub(effective_height);
+            } else {
+                self.ui.query_viewport_offset = 0;
+            }
+        }
+    }
+
+    /// Scroll half page down (vim Ctrl+d)
+    pub fn scroll_half_page_down(&mut self) {
+        let lines = self.query_content.lines().count();
+        let half_page = self.ui.query_viewport_height.saturating_div(2).max(1);
+
+        // Move cursor down by half page
+        self.ui.query_cursor_line = (self.ui.query_cursor_line + half_page).min(lines.saturating_sub(1));
+
+        // Adjust viewport
+        let effective_height = if self.ui.query_viewport_height > 0 {
+            self.ui.query_viewport_height.saturating_sub(1)
+        } else {
+            20
+        };
+
+        if self.ui.query_cursor_line >= self.ui.query_viewport_offset + effective_height {
+            self.ui.query_viewport_offset = self.ui.query_cursor_line.saturating_sub(effective_height) + 1;
+        }
+    }
+
+    /// Scroll half page up (vim Ctrl+u)
+    pub fn scroll_half_page_up(&mut self) {
+        let half_page = self.ui.query_viewport_height.saturating_div(2).max(1);
+
+        // Move cursor up by half page
+        self.ui.query_cursor_line = self.ui.query_cursor_line.saturating_sub(half_page);
+
+        // Adjust viewport
+        if self.ui.query_cursor_line < self.ui.query_viewport_offset {
+            self.ui.query_viewport_offset = self.ui.query_cursor_line;
         }
     }
 
