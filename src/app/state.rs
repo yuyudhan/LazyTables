@@ -320,10 +320,10 @@ impl AppState {
         if !self.db.tables.is_empty() {
             let len = self.db.tables.len();
             self.ui.selected_table = (self.ui.selected_table + 1) % len;
-            // Add 1 to account for the "▼ Tables" header in the UI
+            // Direct selection without offset
             self.ui
                 .tables_list_state
-                .select(Some(self.ui.selected_table + 1));
+                .select(Some(self.ui.selected_table));
 
             // Clear metadata when selection changes (will load when Enter is pressed)
             self.db.current_table_metadata = None;
@@ -339,10 +339,10 @@ impl AppState {
             } else {
                 len - 1
             };
-            // Add 1 to account for the "▼ Tables" header in the UI
+            // Direct selection without offset
             self.ui
                 .tables_list_state
-                .select(Some(self.ui.selected_table + 1));
+                .select(Some(self.ui.selected_table));
 
             // Clear metadata when selection changes (will load when Enter is pressed)
             self.db.current_table_metadata = None;
@@ -357,10 +357,10 @@ impl AppState {
             if self.ui.selected_table > max_index {
                 self.ui.selected_table = max_index;
             }
-            // Add 1 to account for the "▼ Tables" header in the UI
+            // Direct selection without offset
             self.ui
                 .tables_list_state
-                .select(Some(self.ui.selected_table + 1));
+                .select(Some(self.ui.selected_table));
         } else {
             self.ui.selected_table = 0;
             self.ui.tables_list_state.select(None);
@@ -418,13 +418,19 @@ impl AppState {
                 .get_mut(self.ui.selected_connection)
             {
                 match result {
-                    Ok(tables) => {
+                    Ok(objects) => {
                         conn.status = ConnectionStatus::Connected;
-                        self.db.tables = tables;
+                        self.db.database_objects = Some(objects.clone());
+                        self.db.tables = objects.tables.iter().map(|t| t.name.clone()).collect();
+                        if let Some(ref error) = objects.error {
+                            self.db.table_load_error = Some(error.clone());
+                        }
                     }
                     Err(error) => {
                         let error_msg = error.clone();
                         conn.status = ConnectionStatus::Failed(error.clone());
+                        self.db.database_objects = None;
+                        self.db.tables.clear();
                         self.toast_manager
                             .error(format!("Connection failed: {error_msg}"));
                     }
@@ -443,11 +449,11 @@ impl AppState {
         }
     }
 
-    /// Try to connect to a specific database and return tables
+    /// Try to connect to a specific database and return database objects
     async fn try_connect_to_database(
-        &self,
+        &mut self,
         connection: &ConnectionConfig,
-    ) -> Result<Vec<String>, String> {
+    ) -> Result<crate::database::DatabaseObjectList, String> {
         self.db.try_connect_to_database(connection).await
     }
 
