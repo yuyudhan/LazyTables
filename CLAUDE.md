@@ -198,3 +198,5 @@ lazytables/
 - TUI testing for user interface components
 - Performance benchmarks for large datasets
 - Security testing for credential handling
+- never corrupt the view with debug outputs.
+- Don't create unnecessary extra test file clutter here and there.
