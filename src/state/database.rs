@@ -3,7 +3,7 @@
 use crate::{
     database::{
         connection::ConnectionStorage, ConnectionConfig, ConnectionStatus, DatabaseType,
-        TableMetadata,
+        DatabaseObjectList, TableMetadata,
     },
     ui::components::{
         table_viewer::{CellUpdate, ColumnInfo, DeleteConfirmation},
@@ -18,6 +18,12 @@ pub struct DatabaseState {
     pub connections: ConnectionStorage,
     /// Tables in the currently connected database
     pub tables: Vec<String>,
+    /// Database objects (tables, views, etc.)
+    pub database_objects: Option<DatabaseObjectList>,
+    /// Available schemas in the database
+    pub schemas: Vec<String>,
+    /// Currently selected schema
+    pub selected_schema: Option<String>,
     /// Error message for table loading
     pub table_load_error: Option<String>,
     /// Current table metadata (for the details pane)
@@ -32,6 +38,9 @@ impl DatabaseState {
         Self {
             connections,
             tables: Vec::new(),
+            database_objects: None,
+            schemas: Vec::new(),
+            selected_schema: None,
             table_load_error: None,
             current_table_metadata: None,
         }
@@ -423,27 +432,70 @@ impl DatabaseState {
         Ok((columns, rows))
     }
 
-    /// Try to connect to a specific database and return tables
+    /// Try to connect to a specific database and return database objects
     pub async fn try_connect_to_database(
-        &self,
+        &mut self,
         connection: &ConnectionConfig,
-    ) -> Result<Vec<String>, String> {
+    ) -> Result<DatabaseObjectList, String> {
         use crate::database::Connection;
 
-        // Query actual tables from the database based on database type
-        let tables = match connection.database_type {
+        // Query database objects based on database type
+        match connection.database_type {
             DatabaseType::PostgreSQL => {
                 use crate::database::postgres::PostgresConnection;
                 let mut conn = PostgresConnection::new(connection.clone());
                 conn.connect()
                     .await
                     .map_err(|e| format!("Connection failed: {e}"))?;
-                let tables = conn
-                    .list_tables()
+
+                // Get schemas
+                let schemas = conn
+                    .list_schemas()
                     .await
-                    .map_err(|e| format!("Failed to retrieve tables: {e}"))?;
+                    .unwrap_or_else(|_| vec!["public".to_string()]);
+                self.schemas = schemas;
+
+                // Get database objects based on selected schema
+                let objects = if let Some(ref schema) = self.selected_schema {
+                    conn.list_database_objects_in_schema(Some(schema))
+                        .await
+                        .map_err(|e| format!("Failed to retrieve database objects: {e}"))?
+                } else {
+                    conn.list_database_objects()
+                        .await
+                        .map_err(|e| format!("Failed to retrieve database objects: {e}"))?
+                };
+
                 let _ = conn.disconnect().await;
-                tables
+                self.database_objects = Some(objects.clone());
+
+                // Update legacy tables list with qualified names for non-public schemas
+                self.tables = objects.tables.iter().map(|t| {
+                    if t.schema.as_deref() == Some("public") || t.schema.is_none() {
+                        t.name.clone()
+                    } else {
+                        t.qualified_name()
+                    }
+                }).collect();
+
+                // Also add views and materialized views to the tables list
+                for view in &objects.views {
+                    if view.schema.as_deref() == Some("public") || view.schema.is_none() {
+                        self.tables.push(view.name.clone());
+                    } else {
+                        self.tables.push(view.qualified_name());
+                    }
+                }
+
+                for mat_view in &objects.materialized_views {
+                    if mat_view.schema.as_deref() == Some("public") || mat_view.schema.is_none() {
+                        self.tables.push(mat_view.name.clone());
+                    } else {
+                        self.tables.push(mat_view.qualified_name());
+                    }
+                }
+
+                Ok(objects)
             }
             DatabaseType::MySQL | DatabaseType::MariaDB => {
                 use crate::database::mysql::MySqlConnection;
@@ -451,12 +503,33 @@ impl DatabaseState {
                 conn.connect()
                     .await
                     .map_err(|e| format!("Connection failed: {e}"))?;
+
+                // For now, use legacy list_tables for MySQL
                 let tables = conn
                     .list_tables()
                     .await
                     .map_err(|e| format!("Failed to retrieve tables: {e}"))?;
+
                 let _ = conn.disconnect().await;
-                tables
+
+                // Convert to DatabaseObjectList
+                let mut objects = DatabaseObjectList::default();
+                for table in tables {
+                    objects.tables.push(crate::database::DatabaseObject {
+                        name: table.clone(),
+                        schema: None,
+                        object_type: crate::database::DatabaseObjectType::Table,
+                        row_count: None,
+                        size_bytes: None,
+                        comment: None,
+                    });
+                }
+                objects.total_count = objects.tables.len();
+
+                self.database_objects = Some(objects.clone());
+                self.tables = objects.tables.iter().map(|t| t.name.clone()).collect();
+
+                Ok(objects)
             }
             DatabaseType::SQLite => {
                 use crate::database::sqlite::SqliteConnection;
@@ -464,22 +537,41 @@ impl DatabaseState {
                 conn.connect()
                     .await
                     .map_err(|e| format!("Connection failed: {e}"))?;
+
+                // For now, use legacy list_tables for SQLite
                 let tables = conn
                     .list_tables()
                     .await
                     .map_err(|e| format!("Failed to retrieve tables: {e}"))?;
+
                 let _ = conn.disconnect().await;
-                tables
+
+                // Convert to DatabaseObjectList
+                let mut objects = DatabaseObjectList::default();
+                for table in tables {
+                    objects.tables.push(crate::database::DatabaseObject {
+                        name: table.clone(),
+                        schema: None,
+                        object_type: crate::database::DatabaseObjectType::Table,
+                        row_count: None,
+                        size_bytes: None,
+                        comment: None,
+                    });
+                }
+                objects.total_count = objects.tables.len();
+
+                self.database_objects = Some(objects.clone());
+                self.tables = objects.tables.iter().map(|t| t.name.clone()).collect();
+
+                Ok(objects)
             }
             _ => {
-                return Err(format!(
+                Err(format!(
                     "Database type {} not yet supported",
                     connection.database_type.display_name()
                 ))
             }
-        };
-
-        Ok(tables)
+        }
     }
 
     /// Load table schema into table editor
