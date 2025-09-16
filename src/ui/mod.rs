@@ -483,20 +483,36 @@ impl UI {
 
             vec![ListItem::new(Line::from(vec![Span::styled(
                 message,
-                Style::default().fg(if message.contains("failed") { Color::Red } else { Color::Yellow }),
+                Style::default().fg(if message.contains("failed") {
+                    Color::Red
+                } else {
+                    Color::Yellow
+                }),
             )]))]
         } else {
-            // Show actual tables from connected database
-            let mut table_items = vec![ListItem::new(Line::from(vec![Span::styled(
-                "▼ Tables",
-                Style::default()
-                    .fg(Color::Cyan)
-                    .add_modifier(Modifier::BOLD),
-            )]))];
+            // Build list items - only actual selectable objects
+            let mut table_items = Vec::new();
 
+            // Only add actual table/view items that can be selected
             for table in &state.db.tables {
+                // Determine icon and color based on database objects if available
+                let (icon, color) = if let Some(ref db_objects) = state.db.database_objects {
+                    // Find the object to get its type
+                    if let Some(obj) = db_objects.tables.iter().find(|o| o.name == *table) {
+                        (obj.object_type.icon(), Color::Blue)
+                    } else if let Some(obj) = db_objects.views.iter().find(|o| o.name == *table) {
+                        (obj.object_type.icon(), Color::Green)
+                    } else if let Some(obj) = db_objects.materialized_views.iter().find(|o| o.name == *table) {
+                        (obj.object_type.icon(), Color::Magenta)
+                    } else {
+                        ("📋", Color::Blue) // Default icon
+                    }
+                } else {
+                    ("📋", Color::Blue) // Default icon
+                };
+
                 table_items.push(ListItem::new(Line::from(vec![
-                    Span::styled("  📋 ", Style::default().fg(Color::Blue)),
+                    Span::styled(format!("  {} ", icon), Style::default().fg(color)),
                     Span::styled(table, Style::default().fg(Color::White)),
                 ])));
             }
@@ -539,10 +555,45 @@ impl UI {
             table_items
         };
 
+        // Build title with object counts and schema info
+        let title = if let Some(ref db_objects) = state.db.database_objects {
+            let mut title_parts = Vec::new();
+
+            // Add schema info if multiple schemas
+            if state.db.schemas.len() > 1 {
+                let schema = state.db.selected_schema.as_deref().unwrap_or("all");
+                title_parts.push(format!("Schema: {}", schema));
+            }
+
+            // Add object counts
+            let mut counts = Vec::new();
+            if db_objects.tables.len() > 0 {
+                counts.push(format!("{} tables", db_objects.tables.len()));
+            }
+            if db_objects.views.len() > 0 {
+                counts.push(format!("{} views", db_objects.views.len()));
+            }
+            if db_objects.materialized_views.len() > 0 {
+                counts.push(format!("{} mat. views", db_objects.materialized_views.len()));
+            }
+
+            if !counts.is_empty() {
+                title_parts.push(counts.join(", "));
+            }
+
+            if !title_parts.is_empty() {
+                format!(" Tables/Views ({}) ", title_parts.join(" | "))
+            } else {
+                " Tables/Views ".to_string()
+            }
+        } else {
+            " Tables/Views ".to_string()
+        };
+
         let tables = List::new(items)
             .block(
                 Block::default()
-                    .title(" Tables/Views ")
+                    .title(title)
                     .borders(Borders::ALL)
                     .border_style(border_style),
             )
@@ -553,13 +604,12 @@ impl UI {
             );
 
         // Use stateful widget to show selection
-        // Adjust selection index if we have tables (account for header)
+        // Direct selection without offset since we're only showing selectable items
         if !state.db.tables.is_empty() && has_active_connection {
-            // Add 1 to account for the "▼ Tables" header
             state
                 .ui
                 .tables_list_state
-                .select(Some(state.ui.selected_table + 1));
+                .select(Some(state.ui.selected_table));
         }
         frame.render_stateful_widget(tables, area, &mut state.ui.tables_list_state);
     }
@@ -573,7 +623,7 @@ impl UI {
             Style::default().fg(self.theme.get_color("border"))
         };
 
-        // Check if there's an active connection and table selected
+        // Check if there's an active connection
         let has_active_connection = state
             .db
             .connections
@@ -590,11 +640,56 @@ impl UI {
                 )]),
                 Line::from(""),
                 Line::from(vec![Span::styled(
-                    "Connect to view table details",
+                    "Connect to database first",
                     Style::default().fg(Color::Gray),
                 )]),
             ]
-        } else if let Some(metadata) = &state.db.current_table_metadata {
+        } else if state.db.tables.is_empty() {
+            vec![
+                Line::from(""),
+                Line::from(vec![Span::styled(
+                    "No tables in database",
+                    Style::default().fg(Color::Yellow),
+                )]),
+            ]
+        } else if state.ui.selected_table < state.db.tables.len() {
+            // Get selected table info
+            let selected_table = &state.db.tables[state.ui.selected_table];
+            let mut lines = vec![
+                Line::from(vec![
+                    Span::styled("Selected: ", Style::default().fg(Color::Cyan)),
+                    Span::styled(
+                        selected_table,
+                        Style::default()
+                            .fg(Color::White)
+                            .add_modifier(Modifier::BOLD),
+                    ),
+                ]),
+            ];
+
+            // Add object type if we have database objects
+            if let Some(ref db_objects) = state.db.database_objects {
+                // Find the object to determine its type
+                let obj_type = if db_objects.tables.iter().any(|o| o.name == *selected_table) {
+                    Some(("Table", Color::Blue))
+                } else if db_objects.views.iter().any(|o| o.name == *selected_table) {
+                    Some(("View", Color::Green))
+                } else if db_objects.materialized_views.iter().any(|o| o.name == *selected_table) {
+                    Some(("Materialized View", Color::Magenta))
+                } else {
+                    None
+                };
+
+                if let Some((type_name, color)) = obj_type {
+                    lines.push(Line::from(vec![
+                        Span::styled("Type: ", Style::default().fg(Color::Cyan)),
+                        Span::styled(type_name, Style::default().fg(color)),
+                    ]));
+                }
+            }
+
+            // Show metadata if available
+            if let Some(metadata) = &state.db.current_table_metadata {
             // Show actual table metadata
             let mut lines = vec![
                 Line::from(vec![
@@ -645,55 +740,27 @@ impl UI {
                 ]),
             ];
 
-            // Add primary keys if any
+            // Add primary keys summary
             if !metadata.primary_keys.is_empty() {
                 lines.push(Line::from(""));
-                lines.push(Line::from(vec![Span::styled(
-                    "Primary Keys:",
-                    Style::default()
-                        .fg(Color::Yellow)
-                        .add_modifier(Modifier::BOLD),
-                )]));
-                for pk in &metadata.primary_keys {
-                    lines.push(Line::from(vec![
-                        Span::raw("  • "),
-                        Span::styled(pk, Style::default().fg(Color::White)),
-                    ]));
-                }
+                lines.push(Line::from(vec![
+                    Span::styled("PKs: ", Style::default().fg(Color::Yellow)),
+                    Span::styled(
+                        metadata.primary_keys.join(", "),
+                        Style::default().fg(Color::White),
+                    ),
+                ]));
             }
 
-            // Add foreign keys if any
-            if !metadata.foreign_keys.is_empty() {
-                lines.push(Line::from(""));
-                lines.push(Line::from(vec![Span::styled(
-                    "Foreign Keys:",
-                    Style::default()
-                        .fg(Color::Yellow)
-                        .add_modifier(Modifier::BOLD),
-                )]));
-                for fk in &metadata.foreign_keys {
-                    lines.push(Line::from(vec![
-                        Span::raw("  • "),
-                        Span::styled(fk, Style::default().fg(Color::White)),
-                    ]));
-                }
-            }
-
-            // Add indexes if any
+            // Add indexes count
             if !metadata.indexes.is_empty() {
-                lines.push(Line::from(""));
-                lines.push(Line::from(vec![Span::styled(
-                    "Indexes:",
-                    Style::default()
-                        .fg(Color::Yellow)
-                        .add_modifier(Modifier::BOLD),
-                )]));
-                for idx in &metadata.indexes {
-                    lines.push(Line::from(vec![
-                        Span::raw("  • "),
-                        Span::styled(idx, Style::default().fg(Color::White)),
-                    ]));
-                }
+                lines.push(Line::from(vec![
+                    Span::styled("Indexes: ", Style::default().fg(Color::Yellow)),
+                    Span::styled(
+                        format!("{} total", metadata.indexes.len()),
+                        Style::default().fg(Color::White),
+                    ),
+                ]));
             }
 
             // Add comment if any
@@ -716,21 +783,41 @@ impl UI {
                 ]));
             }
 
+            } else {
+                // Table selected but metadata not loaded yet
+                lines.push(Line::from(""));
+                lines.push(Line::from(vec![Span::styled(
+                    "Press Enter to load details",
+                    Style::default().fg(Color::Yellow),
+                )]));
+            }
+
+            // Add keyboard shortcuts
+            lines.push(Line::from(""));
+            lines.push(Line::from(""));
+            lines.push(Line::from(vec![Span::styled(
+                "Actions:",
+                Style::default().fg(Color::DarkGray),
+            )]));
+            lines.push(Line::from(vec![
+                Span::styled("Enter: ", Style::default().fg(Color::Yellow)),
+                Span::styled("View data", Style::default().fg(Color::Gray)),
+            ]));
+            lines.push(Line::from(vec![
+                Span::styled("e: ", Style::default().fg(Color::Yellow)),
+                Span::styled("Edit structure", Style::default().fg(Color::Gray)),
+            ]));
+            lines.push(Line::from(vec![
+                Span::styled("d: ", Style::default().fg(Color::Yellow)),
+                Span::styled("Drop table", Style::default().fg(Color::Gray)),
+            ]));
+
             lines
         } else {
             vec![
                 Line::from(""),
                 Line::from(vec![Span::styled(
                     "No table selected",
-                    Style::default().fg(Color::Gray),
-                )]),
-                Line::from(""),
-                Line::from(vec![Span::styled(
-                    "Select a table to view",
-                    Style::default().fg(Color::Gray),
-                )]),
-                Line::from(vec![Span::styled(
-                    "its structure and metadata",
                     Style::default().fg(Color::Gray),
                 )]),
             ]
@@ -1296,4 +1383,3 @@ fn format_bytes(bytes: i64) -> String {
         format!("{:.2} {}", size, UNITS[i])
     }
 }
-
