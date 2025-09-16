@@ -1057,13 +1057,21 @@ impl UI {
     }
 
     /// Draw the query window area
-    fn draw_query_window(&self, frame: &mut Frame, area: Rect, state: &AppState) {
+    fn draw_query_window(&self, frame: &mut Frame, area: Rect, state: &mut AppState) {
         let is_focused = state.ui.focused_pane == FocusedPane::QueryWindow;
         let border_style = if is_focused {
             Style::default().fg(self.theme.get_color("active_border"))
         } else {
             Style::default().fg(self.theme.get_color("border"))
         };
+
+        // Calculate the available height for the editor (accounting for borders and status)
+        // Reserve lines for: border(2) + mode/file info(4 if focused)
+        let reserved_lines = if is_focused { 6 } else { 2 };
+        let available_height = area.height.saturating_sub(reserved_lines) as usize;
+
+        // Update the viewport height in state
+        state.ui.query_viewport_height = available_height;
 
         // Check if there's an active connection for better help messages
         let has_active_connection = state
@@ -1073,7 +1081,7 @@ impl UI {
             .iter()
             .any(|conn| conn.is_connected());
 
-        // Get query content lines
+        // Get query content lines with viewport
         let mut query_lines: Vec<Line> = if state.query_content.is_empty() {
             if !has_active_connection {
                 vec![
@@ -1131,35 +1139,64 @@ impl UI {
                 ]
             }
         } else {
-            state
-                .query_content
-                .lines()
+            // Collect all lines into a vector for viewport calculation
+            let all_lines: Vec<&str> = state.query_content.lines().collect();
+            let total_lines = all_lines.len();
+
+            // Calculate the visible range
+            let viewport_start = state.ui.query_viewport_offset;
+            let viewport_end = (viewport_start + available_height).min(total_lines);
+
+            // Get only the visible lines
+            all_lines[viewport_start..viewport_end]
+                .iter()
                 .enumerate()
-                .map(|(i, line)| {
-                    if i == state.ui.query_cursor_line {
-                        // Highlight current line
-                        let mut spans = Vec::new();
-                        if state.ui.query_cursor_column > 0 {
+                .map(|(relative_idx, line)| {
+                    let actual_line_idx = viewport_start + relative_idx;
+
+                    // Add line numbers for better navigation visibility
+                    let line_number = format!("{:>4} ", actual_line_idx + 1);
+                    let line_number_style = if actual_line_idx == state.ui.query_cursor_line {
+                        Style::default().fg(Color::Yellow).add_modifier(Modifier::BOLD)
+                    } else {
+                        Style::default().fg(Color::DarkGray)
+                    };
+
+                    let mut spans = vec![Span::styled(line_number, line_number_style)];
+
+                    // Render the line content with cursor if needed
+                    if actual_line_idx == state.ui.query_cursor_line && is_focused {
+                        // Highlight current line with cursor
+                        if state.ui.query_cursor_column > 0 && state.ui.query_cursor_column <= line.len() {
                             spans.push(Span::raw(&line[..state.ui.query_cursor_column]));
                         }
-                        if is_focused {
-                            spans.push(Span::styled(
-                                if state.ui.query_cursor_column < line.len() {
-                                    &line[state.ui.query_cursor_column
-                                        ..state.ui.query_cursor_column + 1]
-                                } else {
-                                    " "
-                                },
-                                Style::default().bg(Color::Gray).fg(Color::Black),
-                            ));
-                        }
+
+                        // Render cursor
+                        let cursor_char = if state.ui.query_cursor_column < line.len() {
+                            &line[state.ui.query_cursor_column..state.ui.query_cursor_column + 1]
+                        } else {
+                            " "
+                        };
+
+                        let cursor_style = if state.ui.query_edit_mode == crate::app::state::QueryEditMode::Insert {
+                            Style::default().bg(Color::Green).fg(Color::Black)
+                        } else {
+                            Style::default().bg(Color::Gray).fg(Color::Black)
+                        };
+
+                        spans.push(Span::styled(cursor_char, cursor_style));
+
                         if state.ui.query_cursor_column + 1 < line.len() {
                             spans.push(Span::raw(&line[state.ui.query_cursor_column + 1..]));
+                        } else if state.ui.query_cursor_column > 0 && state.ui.query_cursor_column == line.len() {
+                            // Cursor is at end of line - already handled above
                         }
-                        Line::from(spans)
                     } else {
-                        Line::from(line)
+                        // Normal line without cursor
+                        spans.push(Span::raw(*line));
                     }
+
+                    Line::from(spans)
                 })
                 .collect()
         };
@@ -1238,10 +1275,24 @@ impl UI {
             ]));
         }
 
+        // Create title with scroll indicator
+        let total_lines = state.query_content.lines().count();
+        let title = if total_lines > 0 {
+            let current_line = state.ui.query_cursor_line + 1;
+            let scroll_percent = if total_lines > 1 {
+                ((state.ui.query_viewport_offset as f32 / (total_lines.saturating_sub(available_height).max(1)) as f32) * 100.0) as u32
+            } else {
+                0
+            };
+            format!(" SQL Query Editor [{}:{}/{}] {}% ", current_line, state.ui.query_cursor_column + 1, total_lines, scroll_percent)
+        } else {
+            " SQL Query Editor ".to_string()
+        };
+
         let query_editor = Paragraph::new(query_lines)
             .block(
                 Block::default()
-                    .title(" SQL Query Editor ")
+                    .title(title)
                     .borders(Borders::ALL)
                     .border_style(border_style),
             )
