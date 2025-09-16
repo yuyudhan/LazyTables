@@ -1089,6 +1089,23 @@ impl App {
                         KeyCode::Char('$') => {
                             self.state.move_to_line_end();
                         }
+                        // File navigation
+                        KeyCode::Char('g') => {
+                            // Check for double 'g' (gg command)
+                            // Note: For simplicity, using single 'g' for now
+                            // TODO: Implement proper double-key detection
+                            self.state.move_to_file_start();
+                        }
+                        KeyCode::Char('G') => {
+                            self.state.move_to_file_end();
+                        }
+                        // Page scrolling
+                        KeyCode::Char('d') if key.modifiers.contains(KeyModifiers::CONTROL) => {
+                            self.state.scroll_half_page_down();
+                        }
+                        KeyCode::Char('u') if key.modifiers.contains(KeyModifiers::CONTROL) => {
+                            self.state.scroll_half_page_up();
+                        }
                         // Execute query
                         KeyCode::Enter if key.modifiers.contains(KeyModifiers::CONTROL) => {
                             if let Some(statement) = self.state.get_statement_under_cursor() {
