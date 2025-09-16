@@ -63,6 +63,16 @@ pub struct ConnectionModalState {
     pub using_connection_string: bool,
     /// Password storage list state for dropdown
     pub password_storage_list_state: ListState,
+    /// Test connection status
+    pub test_status: Option<TestConnectionStatus>,
+}
+
+/// Status of test connection
+#[derive(Debug, Clone)]
+pub enum TestConnectionStatus {
+    Testing,
+    Success(String),
+    Failed(String),
 }
 
 /// Fields in the connection modal
@@ -81,6 +91,7 @@ pub enum ConnectionField {
     EncryptionKey,
     EncryptionHint,
     SslMode,
+    Test,
     Save,
     Cancel,
 }
@@ -108,7 +119,8 @@ impl ConnectionField {
                 if using_connection_string {
                     match self {
                         Self::Name => Self::ConnectionString,
-                        Self::ConnectionString => Self::Save,
+                        Self::ConnectionString => Self::Test,
+                        Self::Test => Self::Save,
                         Self::Save => Self::Cancel,
                         Self::Cancel => Self::Name,
                         _ => Self::Name,
@@ -126,7 +138,8 @@ impl ConnectionField {
                         Self::PasswordEnvVar => Self::EncryptionKey, // This will be conditionally shown
                         Self::EncryptionKey => Self::EncryptionHint,
                         Self::EncryptionHint => Self::SslMode,
-                        Self::SslMode => Self::Save,
+                        Self::SslMode => Self::Test,
+                        Self::Test => Self::Save,
                         Self::Save => Self::Cancel,
                         Self::Cancel => Self::Name,
                         _ => Self::Name,
@@ -150,7 +163,8 @@ impl ConnectionField {
                     match self {
                         Self::Name => Self::Cancel,
                         Self::ConnectionString => Self::Name,
-                        Self::Save => Self::ConnectionString,
+                        Self::Test => Self::ConnectionString,
+                        Self::Save => Self::Test,
                         Self::Cancel => Self::Save,
                         _ => Self::Name,
                     }
@@ -164,7 +178,8 @@ impl ConnectionField {
                         Self::Username => Self::Database,
                         Self::Password => Self::Username,
                         Self::SslMode => Self::Password,
-                        Self::Save => Self::SslMode,
+                        Self::Test => Self::SslMode,
+                        Self::Save => Self::Test,
                         Self::Cancel => Self::Save,
                         _ => Self::Name,
                     }
@@ -189,6 +204,7 @@ impl ConnectionField {
             Self::EncryptionKey => "Encryption Key",
             Self::EncryptionHint => "Key Hint (Optional)",
             Self::SslMode => "SSL Mode",
+            Self::Test => "Test Connection (t)",
             Self::Save => "Save (s)",
             Self::Cancel => "Cancel (c)",
         }
@@ -224,6 +240,7 @@ impl Default for ConnectionModalState {
             error_message: None,
             using_connection_string: false,
             password_storage_list_state: ListState::default(),
+            test_status: None,
         }
     }
 }
@@ -403,6 +420,7 @@ impl ConnectionModalState {
             _ => {}
         }
         self.error_message = None; // Clear error on input
+        self.test_status = None; // Clear test status on input
     }
 
     /// Handle backspace for the current field
@@ -730,6 +748,11 @@ impl ConnectionModalState {
 
             Ok(connection)
         }
+    }
+
+    /// Clear test status (called when fields change)
+    pub fn clear_test_status(&mut self) {
+        self.test_status = None;
     }
 
     /// Clear all fields
@@ -1447,7 +1470,7 @@ fn render_modal_footer(f: &mut Frame, modal_state: &ConnectionModalState, area: 
         .direction(Direction::Vertical)
         .constraints([
             Constraint::Length(3), // Buttons
-            Constraint::Length(1), // Error message
+            Constraint::Length(1), // Error/Test status message
         ])
         .split(area);
 
@@ -1461,8 +1484,27 @@ fn render_modal_footer(f: &mut Frame, modal_state: &ConnectionModalState, area: 
         }
     }
 
-    // Render error message if present
-    if let Some(error) = &modal_state.error_message {
+    // Render test status or error message
+    if let Some(test_status) = &modal_state.test_status {
+        let (message, style) = match test_status {
+            TestConnectionStatus::Testing => (
+                "🔄 Testing connection...".to_string(),
+                Style::default().fg(Color::Yellow).add_modifier(Modifier::BOLD | Modifier::RAPID_BLINK),
+            ),
+            TestConnectionStatus::Success(msg) => (
+                format!("✅ {msg}"),
+                Style::default().fg(Color::Green).add_modifier(Modifier::BOLD),
+            ),
+            TestConnectionStatus::Failed(msg) => (
+                format!("❌ {msg}"),
+                Style::default().fg(Color::Red).add_modifier(Modifier::BOLD),
+            ),
+        };
+        let status_paragraph = Paragraph::new(message)
+            .style(style)
+            .alignment(Alignment::Center);
+        f.render_widget(status_paragraph, footer_chunks[1]);
+    } else if let Some(error) = &modal_state.error_message {
         let error_paragraph = Paragraph::new(format!("❗ {error}"))
             .style(Style::default().fg(Color::Red).add_modifier(Modifier::BOLD))
             .alignment(Alignment::Center);
@@ -1540,13 +1582,26 @@ fn render_connection_details_buttons(
     let button_chunks = Layout::default()
         .direction(Direction::Horizontal)
         .constraints([
-            Constraint::Percentage(30),
-            Constraint::Percentage(10),
-            Constraint::Percentage(30),
-            Constraint::Percentage(10),
-            Constraint::Percentage(20),
+            Constraint::Percentage(22),
+            Constraint::Percentage(5),
+            Constraint::Percentage(22),
+            Constraint::Percentage(5),
+            Constraint::Percentage(22),
+            Constraint::Percentage(5),
+            Constraint::Percentage(19),
         ])
         .split(area);
+
+    let test_style = if modal_state.focused_field == ConnectionField::Test {
+        Style::default()
+            .fg(Color::Black)
+            .bg(Color::Blue)
+            .add_modifier(Modifier::BOLD)
+    } else {
+        Style::default()
+            .fg(Color::Blue)
+            .add_modifier(Modifier::BOLD)
+    };
 
     let save_style = if modal_state.focused_field == ConnectionField::Save {
         Style::default()
@@ -1567,6 +1622,17 @@ fn render_connection_details_buttons(
     } else {
         Style::default().fg(Color::Red).add_modifier(Modifier::BOLD)
     };
+
+    let test_button = Paragraph::new("🔌 Test (t)")
+        .style(test_style)
+        .alignment(Alignment::Center)
+        .block(Block::default().borders(Borders::ALL).border_style(
+            if modal_state.focused_field == ConnectionField::Test {
+                Style::default().fg(Color::Blue)
+            } else {
+                Style::default().fg(Color::Rgb(69, 71, 90))
+            },
+        ));
 
     let save_button = Paragraph::new("💾 Save (s)")
         .style(save_style)
@@ -1603,9 +1669,10 @@ fn render_connection_details_buttons(
                 .border_style(Style::default().fg(Color::Rgb(69, 71, 90))),
         );
 
-    f.render_widget(save_button, button_chunks[0]);
-    f.render_widget(cancel_button, button_chunks[2]);
-    f.render_widget(back_button, button_chunks[4]);
+    f.render_widget(test_button, button_chunks[0]);
+    f.render_widget(save_button, button_chunks[2]);
+    f.render_widget(cancel_button, button_chunks[4]);
+    f.render_widget(back_button, button_chunks[6]);
 }
 
 /// Helper function to create a centered rectangle
