@@ -464,10 +464,26 @@ impl UI {
                 },
             ]
         } else if state.db.tables.is_empty() {
-            // Show loading or no tables message
+            // Check connection status to show appropriate message
+            let message = if let Some(connection) = state
+                .db
+                .connections
+                .connections
+                .get(state.ui.selected_connection)
+            {
+                match &connection.status {
+                    ConnectionStatus::Connected => "No tables in database",
+                    ConnectionStatus::Connecting => "Connecting to database...",
+                    ConnectionStatus::Failed(_error) => "Connection failed (see status bar)",
+                    ConnectionStatus::Disconnected => "Not connected",
+                }
+            } else {
+                "No connection selected"
+            };
+
             vec![ListItem::new(Line::from(vec![Span::styled(
-                "Loading tables...",
-                Style::default().fg(Color::Yellow),
+                message,
+                Style::default().fg(if message.contains("failed") { Color::Red } else { Color::Yellow }),
             )]))]
         } else {
             // Show actual tables from connected database
@@ -1280,3 +1296,4 @@ fn format_bytes(bytes: i64) -> String {
         format!("{:.2} {}", size, UNITS[i])
     }
 }
+
