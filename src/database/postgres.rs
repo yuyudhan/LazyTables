@@ -79,6 +79,214 @@ impl Connection for PostgresConnection {
     fn config(&self) -> &ConnectionConfig {
         &self.config
     }
+
+    // Query execution capabilities (AC1 requirement)
+    async fn execute_raw_query(&self, query: &str) -> Result<(Vec<String>, Vec<Vec<String>>)> {
+        PostgresConnection::execute_raw_query(self, query).await
+    }
+
+    // Metadata operations (AC1 & AC2 requirements)
+    async fn list_tables(&self) -> Result<Vec<String>> {
+        PostgresConnection::list_tables(self).await
+    }
+
+    async fn list_database_objects(&self) -> Result<crate::database::DatabaseObjectList> {
+        PostgresConnection::list_database_objects(self).await
+    }
+
+    async fn get_table_metadata(&self, table_name: &str) -> Result<crate::database::TableMetadata> {
+        PostgresConnection::get_table_metadata(self, table_name).await
+    }
+
+    async fn get_table_columns(&self, table_name: &str) -> Result<Vec<crate::database::TableColumn>> {
+        PostgresConnection::get_table_columns(self, table_name).await
+    }
+
+    async fn get_table_data(&self, table_name: &str, limit: usize, offset: usize) -> Result<Vec<Vec<String>>> {
+        PostgresConnection::get_table_data(self, table_name, limit, offset).await
+    }
+
+    // Database-specific capabilities (AC1 & AC2 requirement)
+    async fn get_database_capabilities(&self) -> Result<crate::database::DatabaseCapabilities> {
+        Ok(crate::database::DatabaseCapabilities {
+            supports_schemas: true,
+            supports_transactions: true,
+            supports_foreign_keys: true,
+            supports_json: true,
+            supports_arrays: true,
+            supports_stored_procedures: true,
+            supports_triggers: true,
+            supports_views: true,
+            supports_materialized_views: true,
+            supports_window_functions: true,
+            supports_cte: true,
+            max_identifier_length: 63, // PostgreSQL identifier limit
+            max_query_length: None, // No specific limit
+            supported_isolation_levels: vec![
+                "READ UNCOMMITTED".to_string(),
+                "READ COMMITTED".to_string(),
+                "REPEATABLE READ".to_string(),
+                "SERIALIZABLE".to_string(),
+            ],
+        })
+    }
+
+    async fn health_check(&self) -> Result<crate::database::HealthStatus> {
+        let start = std::time::Instant::now();
+
+        if let Some(pool) = &self.pool {
+            match sqlx::query("SELECT 1").fetch_one(pool).await {
+                Ok(_) => {
+                    let response_time = start.elapsed().as_millis() as u64;
+
+                    Ok(crate::database::HealthStatus {
+                        is_healthy: true,
+                        response_time_ms: response_time,
+                        last_error: None,
+                        database_version: None, // TODO: Get version
+                        active_connections: pool.size(),
+                        max_connections: 5, // Hard-coded from pool config
+                        uptime_seconds: None, // TODO: Get uptime
+                    })
+                }
+                Err(e) => {
+                    Ok(crate::database::HealthStatus {
+                        is_healthy: false,
+                        response_time_ms: start.elapsed().as_millis() as u64,
+                        last_error: Some(e.to_string()),
+                        database_version: None,
+                        active_connections: 0,
+                        max_connections: 0,
+                        uptime_seconds: None,
+                    })
+                }
+            }
+        } else {
+            Ok(crate::database::HealthStatus {
+                is_healthy: false,
+                response_time_ms: 0,
+                last_error: Some("No active connection".to_string()),
+                database_version: None,
+                active_connections: 0,
+                max_connections: 0,
+                uptime_seconds: None,
+            })
+        }
+    }
+
+    async fn get_server_info(&self) -> Result<crate::database::ServerInfo> {
+        if let Some(_pool) = &self.pool {
+            Ok(crate::database::ServerInfo {
+                version: "PostgreSQL 14+".to_string(), // TODO: Get actual version
+                build_info: None,
+                server_name: Some("PostgreSQL".to_string()),
+                charset: Some("UTF8".to_string()),
+                timezone: None, // TODO: Get timezone
+                uptime_seconds: None, // TODO: Get uptime
+                current_database: self.config.database.clone(),
+                current_user: Some(self.config.username.clone()),
+            })
+        } else {
+            Err(LazyTablesError::Connection("No active connection".to_string()))
+        }
+    }
+
+    // Connection pooling support (AC4 requirement)
+    fn get_pool_status(&self) -> Option<crate::database::PoolStatus> {
+        self.pool.as_ref().map(|pool| crate::database::PoolStatus {
+            size: pool.size(),
+            active: pool.size(),
+            idle: 0,
+            waiting: 0,
+            max_size: 5,
+            min_size: 0,
+        })
+    }
+
+    fn max_connections(&self) -> u32 {
+        5
+    }
+
+    fn active_connections(&self) -> u32 {
+        if let Some(pool) = &self.pool {
+            pool.size()
+        } else {
+            0
+        }
+    }
+
+    // Database-specific error handling (AC5 requirement)
+    fn format_error(&self, error: &str) -> crate::database::FormattedError {
+        let error_lower = error.to_lowercase();
+        let mut recovery_suggestions = Vec::new();
+        let mut is_connection_error = false;
+        let mut is_syntax_error = false;
+        let mut is_permission_error = false;
+
+        let user_message = if error_lower.contains("permission denied") || error_lower.contains("authentication failed") {
+            is_permission_error = true;
+            recovery_suggestions.push("Check username and password".to_string());
+            recovery_suggestions.push("Verify user has permission to access the database".to_string());
+            "Access denied. Please check your credentials."
+        } else if error_lower.contains("database") && error_lower.contains("does not exist") {
+            is_connection_error = true;
+            recovery_suggestions.push("Check database name spelling".to_string());
+            recovery_suggestions.push("Ensure database exists on the server".to_string());
+            "Database not found. Please verify the database name."
+        } else if error_lower.contains("connection refused") || error_lower.contains("could not connect") {
+            is_connection_error = true;
+            recovery_suggestions.push("Check if PostgreSQL server is running".to_string());
+            recovery_suggestions.push("Verify host and port are correct".to_string());
+            recovery_suggestions.push("Check firewall settings".to_string());
+            "Cannot connect to PostgreSQL server. Please check server status and connection details."
+        } else if error_lower.contains("syntax error") {
+            is_syntax_error = true;
+            recovery_suggestions.push("Check SQL syntax for typos".to_string());
+            recovery_suggestions.push("Refer to PostgreSQL documentation for correct syntax".to_string());
+            "SQL syntax error. Please check your query for syntax mistakes."
+        } else if error_lower.contains("relation") && error_lower.contains("does not exist") {
+            recovery_suggestions.push("Check table name spelling".to_string());
+            recovery_suggestions.push("Use \\dt to list available tables".to_string());
+            "Table not found. Please verify the table name."
+        } else {
+            recovery_suggestions.push("Check PostgreSQL error log for details".to_string());
+            recovery_suggestions.push("Consult PostgreSQL documentation".to_string());
+            "PostgreSQL database error occurred."
+        };
+
+        crate::database::FormattedError {
+            original_error: error.to_string(),
+            user_message: user_message.to_string(),
+            error_code: None,
+            recovery_suggestions,
+            is_connection_error,
+            is_syntax_error,
+            is_permission_error,
+        }
+    }
+
+    fn get_keywords(&self) -> Vec<String> {
+        vec![
+            "SELECT".to_string(), "FROM".to_string(), "WHERE".to_string(), "INSERT".to_string(),
+            "UPDATE".to_string(), "DELETE".to_string(), "CREATE".to_string(), "DROP".to_string(),
+            "ALTER".to_string(), "TABLE".to_string(), "INDEX".to_string(), "VIEW".to_string(),
+            "DATABASE".to_string(), "SCHEMA".to_string(), "PROCEDURE".to_string(), "FUNCTION".to_string(),
+            "TRIGGER".to_string(), "SEQUENCE".to_string(), "PRIMARY".to_string(), "KEY".to_string(),
+            "FOREIGN".to_string(), "REFERENCES".to_string(), "UNIQUE".to_string(), "SERIAL".to_string(),
+            "BIGSERIAL".to_string(), "ARRAY".to_string(), "JSONB".to_string(), "EXPLAIN".to_string(),
+        ]
+    }
+
+    fn get_functions(&self) -> Vec<String> {
+        vec![
+            "COUNT".to_string(), "SUM".to_string(), "AVG".to_string(), "MIN".to_string(), "MAX".to_string(),
+            "CONCAT".to_string(), "SUBSTRING".to_string(), "LENGTH".to_string(), "UPPER".to_string(), "LOWER".to_string(),
+            "NOW".to_string(), "CURRENT_DATE".to_string(), "CURRENT_TIME".to_string(), "DATE_TRUNC".to_string(),
+            "EXTRACT".to_string(), "AGE".to_string(), "COALESCE".to_string(), "NULLIF".to_string(),
+            "ARRAY_AGG".to_string(), "STRING_AGG".to_string(), "GENERATE_SERIES".to_string(),
+            "RANDOM".to_string(), "ROUND".to_string(), "FLOOR".to_string(), "CEIL".to_string(),
+        ]
+    }
 }
 
 impl PostgresConnection {
@@ -479,13 +687,10 @@ impl PostgresConnection {
                 schema.replace("'", "''"),
                 table.replace("'", "''"));
 
-            let pk_rows = match sqlx::query(pk_query)
+            let pk_rows: Vec<sqlx::postgres::PgRow> = sqlx::query(pk_query)
                 .bind(&qualified_name)
                 .fetch_all(pool)
-                .await {
-                Ok(rows) => rows,
-                Err(_) => vec![] // Return empty if query fails
-            };
+                .await.unwrap_or_default();
 
             let primary_keys: Vec<String> = pk_rows
                 .iter()
@@ -507,14 +712,11 @@ impl PostgresConnection {
                     AND tc.table_name = $1
                     AND tc.table_schema = $2";
 
-            let fk_rows = match sqlx::query(fk_query)
+            let fk_rows: Vec<sqlx::postgres::PgRow> = sqlx::query(fk_query)
                 .bind(table)
                 .bind(schema)
                 .fetch_all(pool)
-                .await {
-                Ok(rows) => rows,
-                Err(_) => vec![] // Return empty if query fails
-            };
+                .await.unwrap_or_default();
 
             let foreign_keys: Vec<String> = fk_rows
                 .iter()
@@ -528,14 +730,11 @@ impl PostgresConnection {
                 WHERE tablename = $1
                 AND schemaname = $2";
 
-            let index_rows = match sqlx::query(index_query)
+            let index_rows: Vec<sqlx::postgres::PgRow> = sqlx::query(index_query)
                 .bind(table)
                 .bind(schema)
                 .fetch_all(pool)
-                .await {
-                Ok(rows) => rows,
-                Err(_) => vec![] // Return empty if query fails
-            };
+                .await.unwrap_or_default();
 
             let indexes: Vec<String> = index_rows
                 .iter()

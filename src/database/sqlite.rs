@@ -6,7 +6,7 @@ use crate::database::{
 };
 use async_trait::async_trait;
 use sqlx::sqlite::{SqlitePool, SqlitePoolOptions};
-use sqlx::Row;
+use sqlx::{Column, Row};
 use std::path::Path;
 
 /// SQLite database connection implementation
@@ -78,6 +78,216 @@ impl Connection for SqliteConnection {
 
     fn config(&self) -> &ConnectionConfig {
         &self.config
+    }
+
+    // Query execution capabilities (AC1 requirement)
+    async fn execute_raw_query(&self, query: &str) -> Result<(Vec<String>, Vec<Vec<String>>)> {
+        SqliteConnection::execute_raw_query(self, query).await
+    }
+
+    // Metadata operations (AC1 & AC2 requirements)
+    async fn list_tables(&self) -> Result<Vec<String>> {
+        SqliteConnection::list_tables(self).await
+    }
+
+    async fn list_database_objects(&self) -> Result<crate::database::DatabaseObjectList> {
+        // SQLite basic implementation - convert tables to database objects
+        let tables = SqliteConnection::list_tables(self).await?;
+        let mut result = crate::database::DatabaseObjectList::default();
+
+        for table_name in tables {
+            let obj = crate::database::DatabaseObject {
+                name: table_name,
+                schema: Some("main".to_string()),
+                object_type: crate::database::DatabaseObjectType::Table,
+                row_count: None,
+                size_bytes: None,
+                comment: None,
+            };
+            result.tables.push(obj);
+        }
+        result.total_count = result.tables.len();
+        Ok(result)
+    }
+
+    async fn get_table_metadata(&self, table_name: &str) -> Result<crate::database::TableMetadata> {
+        SqliteConnection::get_table_metadata(self, table_name).await
+    }
+
+    async fn get_table_columns(&self, table_name: &str) -> Result<Vec<crate::database::TableColumn>> {
+        SqliteConnection::get_table_columns(self, table_name).await
+    }
+
+    async fn get_table_data(&self, table_name: &str, limit: usize, offset: usize) -> Result<Vec<Vec<String>>> {
+        SqliteConnection::get_table_data(self, table_name, limit, offset).await
+    }
+
+    // Database-specific capabilities (AC1 & AC2 requirement)
+    async fn get_database_capabilities(&self) -> Result<crate::database::DatabaseCapabilities> {
+        Ok(crate::database::DatabaseCapabilities {
+            supports_schemas: false, // SQLite has limited schema support
+            supports_transactions: true,
+            supports_foreign_keys: true,
+            supports_json: true, // SQLite 3.38+
+            supports_arrays: false,
+            supports_stored_procedures: false,
+            supports_triggers: true,
+            supports_views: true,
+            supports_materialized_views: false,
+            supports_window_functions: true,
+            supports_cte: true,
+            max_identifier_length: 1000, // SQLite identifier limit is very high
+            max_query_length: Some(1_000_000), // 1MB limit
+            supported_isolation_levels: vec![
+                "DEFERRED".to_string(),
+                "IMMEDIATE".to_string(),
+                "EXCLUSIVE".to_string(),
+            ],
+        })
+    }
+
+    async fn health_check(&self) -> Result<crate::database::HealthStatus> {
+        let start = std::time::Instant::now();
+
+        if let Some(pool) = &self.pool {
+            match sqlx::query("SELECT 1").fetch_one(pool).await {
+                Ok(_) => {
+                    let response_time = start.elapsed().as_millis() as u64;
+
+                    Ok(crate::database::HealthStatus {
+                        is_healthy: true,
+                        response_time_ms: response_time,
+                        last_error: None,
+                        database_version: None, // TODO: Get SQLite version
+                        active_connections: 1, // SQLite is single connection
+                        max_connections: 1,
+                        uptime_seconds: None, // SQLite doesn't have uptime
+                    })
+                }
+                Err(e) => {
+                    Ok(crate::database::HealthStatus {
+                        is_healthy: false,
+                        response_time_ms: start.elapsed().as_millis() as u64,
+                        last_error: Some(e.to_string()),
+                        database_version: None,
+                        active_connections: 0,
+                        max_connections: 1,
+                        uptime_seconds: None,
+                    })
+                }
+            }
+        } else {
+            Ok(crate::database::HealthStatus {
+                is_healthy: false,
+                response_time_ms: 0,
+                last_error: Some("No active connection".to_string()),
+                database_version: None,
+                active_connections: 0,
+                max_connections: 1,
+                uptime_seconds: None,
+            })
+        }
+    }
+
+    async fn get_server_info(&self) -> Result<crate::database::ServerInfo> {
+        if let Some(_pool) = &self.pool {
+            Ok(crate::database::ServerInfo {
+                version: "SQLite 3.x".to_string(), // TODO: Get actual version
+                build_info: None,
+                server_name: Some("SQLite".to_string()),
+                charset: Some("UTF-8".to_string()),
+                timezone: None, // SQLite doesn't have timezone
+                uptime_seconds: None, // SQLite doesn't have uptime
+                current_database: self.config.database.clone(),
+                current_user: None, // SQLite doesn't have users
+            })
+        } else {
+            Err(LazyTablesError::Connection("No active connection".to_string()))
+        }
+    }
+
+    // Connection pooling support (AC4 requirement)
+    fn get_pool_status(&self) -> Option<crate::database::PoolStatus> {
+        self.pool.as_ref().map(|_pool| crate::database::PoolStatus {
+            size: 1,
+            active: 1,
+            idle: 0,
+            waiting: 0,
+            max_size: 1,
+            min_size: 1,
+        })
+    }
+
+    fn max_connections(&self) -> u32 {
+        1 // SQLite is single connection
+    }
+
+    fn active_connections(&self) -> u32 {
+        if self.pool.is_some() { 1 } else { 0 }
+    }
+
+    // Database-specific error handling (AC5 requirement)
+    fn format_error(&self, error: &str) -> crate::database::FormattedError {
+        let error_lower = error.to_lowercase();
+        let mut recovery_suggestions = Vec::new();
+        let mut is_connection_error = false;
+        let mut is_syntax_error = false;
+        let is_permission_error = false;
+
+        let user_message = if error_lower.contains("no such table") {
+            recovery_suggestions.push("Check table name spelling".to_string());
+            recovery_suggestions.push("Use .tables to list available tables".to_string());
+            "Table not found. Please verify the table name."
+        } else if error_lower.contains("syntax error") {
+            is_syntax_error = true;
+            recovery_suggestions.push("Check SQL syntax for typos".to_string());
+            recovery_suggestions.push("Refer to SQLite documentation for correct syntax".to_string());
+            "SQL syntax error. Please check your query for syntax mistakes."
+        } else if error_lower.contains("database is locked") {
+            is_connection_error = true;
+            recovery_suggestions.push("Close other connections to the database".to_string());
+            recovery_suggestions.push("Check if another process is using the database".to_string());
+            "Database is locked. Please close other connections."
+        } else if error_lower.contains("no such file") || error_lower.contains("unable to open") {
+            is_connection_error = true;
+            recovery_suggestions.push("Check file path is correct".to_string());
+            recovery_suggestions.push("Ensure directory exists and is writable".to_string());
+            "Database file not found or cannot be opened."
+        } else {
+            recovery_suggestions.push("Check SQLite documentation".to_string());
+            "SQLite database error occurred."
+        };
+
+        crate::database::FormattedError {
+            original_error: error.to_string(),
+            user_message: user_message.to_string(),
+            error_code: None,
+            recovery_suggestions,
+            is_connection_error,
+            is_syntax_error,
+            is_permission_error,
+        }
+    }
+
+    fn get_keywords(&self) -> Vec<String> {
+        vec![
+            "SELECT".to_string(), "FROM".to_string(), "WHERE".to_string(), "INSERT".to_string(),
+            "UPDATE".to_string(), "DELETE".to_string(), "CREATE".to_string(), "DROP".to_string(),
+            "ALTER".to_string(), "TABLE".to_string(), "INDEX".to_string(), "VIEW".to_string(),
+            "DATABASE".to_string(), "TRIGGER".to_string(), "PRIMARY".to_string(), "KEY".to_string(),
+            "FOREIGN".to_string(), "REFERENCES".to_string(), "UNIQUE".to_string(), "AUTOINCREMENT".to_string(),
+            "PRAGMA".to_string(), "EXPLAIN".to_string(), "ANALYZE".to_string(), "VACUUM".to_string(),
+        ]
+    }
+
+    fn get_functions(&self) -> Vec<String> {
+        vec![
+            "COUNT".to_string(), "SUM".to_string(), "AVG".to_string(), "MIN".to_string(), "MAX".to_string(),
+            "LENGTH".to_string(), "SUBSTR".to_string(), "UPPER".to_string(), "LOWER".to_string(),
+            "DATETIME".to_string(), "DATE".to_string(), "TIME".to_string(), "STRFTIME".to_string(),
+            "COALESCE".to_string(), "IFNULL".to_string(), "NULLIF".to_string(), "CASE".to_string(),
+            "RANDOM".to_string(), "ROUND".to_string(), "ABS".to_string(), "TRIM".to_string(),
+        ]
     }
 }
 
@@ -320,6 +530,43 @@ impl SqliteConnection {
             }
 
             Ok(result)
+        } else {
+            Err(LazyTablesError::Connection(
+                "Not connected to database".to_string(),
+            ))
+        }
+    }
+
+    /// Execute a raw SQL query and return columns and rows
+    pub async fn execute_raw_query(&self, query: &str) -> Result<(Vec<String>, Vec<Vec<String>>)> {
+        if let Some(pool) = &self.pool {
+            // Try to execute the query
+            let rows = sqlx::query(query).fetch_all(pool).await?;
+
+            if rows.is_empty() {
+                return Ok((Vec::new(), Vec::new()));
+            }
+
+            // Get column information from the first row
+            let first_row = &rows[0];
+            let columns = first_row.columns();
+
+            let column_names: Vec<String> =
+                columns.iter().map(|col| col.name().to_string()).collect();
+
+            // Extract data from all rows
+            let mut result_rows = Vec::new();
+            for row in &rows {
+                let mut row_data = Vec::new();
+                for col in columns {
+                    // Try to get value as string
+                    let value: Option<String> = row.try_get(col.ordinal()).ok();
+                    row_data.push(value.unwrap_or_else(|| "NULL".to_string()));
+                }
+                result_rows.push(row_data);
+            }
+
+            Ok((column_names, result_rows))
         } else {
             Err(LazyTablesError::Connection(
                 "Not connected to database".to_string(),
