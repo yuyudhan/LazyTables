@@ -116,6 +116,16 @@ make clean            # Clean build artifacts
 
 ## Key Features to Implement
 
+### UI Pane Update System (In Progress)
+- Event-driven pane synchronization with <100ms latency
+- Update queue with priority and deduplication
+- Virtual scrolling for >1000 rows, pagination at 10K
+- Loading state indicators per pane
+- Error display in status bar with inline context
+- Manual refresh: Ctrl+R (focused), Shift+Ctrl+R (all)
+- Dependency tracking between panes
+- State preservation during updates (cursor, scroll)
+
 ### Core Functionality
 - Connection management with secure credential storage
 - Lazy loading for large datasets with virtual scrolling
