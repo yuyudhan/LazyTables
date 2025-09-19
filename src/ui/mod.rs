@@ -263,16 +263,29 @@ impl UI {
                     ),
                 };
 
-                // Format: "✓ CONN: ConnectionName, DB: database_name: Connected"
+                // Get database type icon (AC5 requirement)
+                let db_type_icon = match connection.database_type {
+                    crate::database::DatabaseType::PostgreSQL => "🐘",
+                    crate::database::DatabaseType::MySQL => "🐬",
+                    crate::database::DatabaseType::MariaDB => "🗄️",
+                    crate::database::DatabaseType::SQLite => "📁",
+                    crate::database::DatabaseType::Oracle => "🏛️",
+                    crate::database::DatabaseType::Redis => "🔴",
+                    crate::database::DatabaseType::MongoDB => "🍃",
+                };
+
+                // Format: "🐘 ✓ ConnectionName (postgresql) [DB: database_name] Connected"
                 let db_name = connection.database.as_deref().unwrap_or("default");
+                let db_type_name = connection.database_type.display_name();
+
                 let line = Line::from(vec![
+                    Span::styled(format!("{} ", db_type_icon), Style::default().fg(Color::Cyan)),
                     Span::styled(format!("{} ", connection.status_symbol()), symbol_style),
-                    Span::styled("CONN: ", Style::default().fg(Color::DarkGray)),
-                    Span::styled(&connection.name, Style::default().fg(Color::White)),
-                    Span::styled(", ", Style::default().fg(Color::DarkGray)),
-                    Span::styled("DB: ", Style::default().fg(Color::DarkGray)),
+                    Span::styled(&connection.name, Style::default().fg(Color::White).add_modifier(Modifier::BOLD)),
+                    Span::styled(format!(" ({})", db_type_name), Style::default().fg(Color::Blue)),
+                    Span::styled(" [DB: ", Style::default().fg(Color::DarkGray)),
                     Span::styled(db_name, Style::default().fg(Color::Cyan)),
-                    Span::styled(": ", Style::default().fg(Color::DarkGray)),
+                    Span::styled("] ", Style::default().fg(Color::DarkGray)),
                     Span::styled(connection.status_text(), text_style),
                 ]);
 
@@ -416,202 +429,8 @@ impl UI {
 
     /// Draw the tables/views pane
     fn draw_tables_pane(&self, frame: &mut Frame, area: Rect, state: &mut AppState) {
-        let is_focused = state.ui.focused_pane == FocusedPane::Tables;
-        let border_style = if is_focused {
-            Style::default().fg(self.theme.get_color("active_border"))
-        } else {
-            Style::default().fg(self.theme.get_color("border"))
-        };
-
-        // Check if there's an active connection
-        let has_active_connection = state
-            .db
-            .connections
-            .connections
-            .iter()
-            .any(|conn| conn.is_connected());
-
-        let items: Vec<ListItem> = if !has_active_connection {
-            // Show "not connected" message
-            vec![
-                ListItem::new(Line::from(vec![Span::styled(
-                    "Choose a connection",
-                    Style::default().fg(Color::Gray),
-                )])),
-                ListItem::new(""),
-                ListItem::new(Line::from(vec![Span::styled(
-                    "from the Connections pane",
-                    Style::default().fg(Color::Gray),
-                )])),
-                ListItem::new(Line::from(vec![Span::styled(
-                    "to view tables and views",
-                    Style::default().fg(Color::Gray),
-                )])),
-                ListItem::new(""),
-                if is_focused {
-                    ListItem::new(Line::from(vec![
-                        Span::styled("Press ", Style::default().fg(Color::Gray)),
-                        Span::styled(
-                            "Ctrl+h",
-                            Style::default()
-                                .fg(Color::Yellow)
-                                .add_modifier(Modifier::BOLD),
-                        ),
-                        Span::styled(" to go to connections", Style::default().fg(Color::Gray)),
-                    ]))
-                } else {
-                    ListItem::new("")
-                },
-            ]
-        } else if state.db.tables.is_empty() {
-            // Check connection status to show appropriate message
-            let message = if let Some(connection) = state
-                .db
-                .connections
-                .connections
-                .get(state.ui.selected_connection)
-            {
-                match &connection.status {
-                    ConnectionStatus::Connected => "No tables in database",
-                    ConnectionStatus::Connecting => "Connecting to database...",
-                    ConnectionStatus::Failed(_error) => "Connection failed (see status bar)",
-                    ConnectionStatus::Disconnected => "Not connected",
-                }
-            } else {
-                "No connection selected"
-            };
-
-            vec![ListItem::new(Line::from(vec![Span::styled(
-                message,
-                Style::default().fg(if message.contains("failed") {
-                    Color::Red
-                } else {
-                    Color::Yellow
-                }),
-            )]))]
-        } else {
-            // Build list items - only actual selectable objects
-            let mut table_items = Vec::new();
-
-            // Only add actual table/view items that can be selected
-            for table in &state.db.tables {
-                // Determine icon and color based on database objects if available
-                let (icon, color) = if let Some(ref db_objects) = state.db.database_objects {
-                    // Find the object to get its type
-                    if let Some(obj) = db_objects.tables.iter().find(|o| o.name == *table) {
-                        (obj.object_type.icon(), Color::Blue)
-                    } else if let Some(obj) = db_objects.views.iter().find(|o| o.name == *table) {
-                        (obj.object_type.icon(), Color::Green)
-                    } else if let Some(obj) = db_objects.materialized_views.iter().find(|o| o.name == *table) {
-                        (obj.object_type.icon(), Color::Magenta)
-                    } else {
-                        ("📋", Color::Blue) // Default icon
-                    }
-                } else {
-                    ("📋", Color::Blue) // Default icon
-                };
-
-                table_items.push(ListItem::new(Line::from(vec![
-                    Span::styled(format!("  {} ", icon), Style::default().fg(color)),
-                    Span::styled(table, Style::default().fg(Color::White)),
-                ])));
-            }
-
-            // Add navigation help if focused
-            if is_focused && !state.db.tables.is_empty() {
-                table_items.push(ListItem::new(""));
-                table_items.push(ListItem::new(Line::from(vec![
-                    Span::styled("Press ", Style::default().fg(Color::Gray)),
-                    Span::styled(
-                        "j/k",
-                        Style::default()
-                            .fg(Color::Yellow)
-                            .add_modifier(Modifier::BOLD),
-                    ),
-                    Span::styled(" to navigate tables", Style::default().fg(Color::Gray)),
-                ])));
-                table_items.push(ListItem::new(Line::from(vec![
-                    Span::styled("Press ", Style::default().fg(Color::Gray)),
-                    Span::styled(
-                        "Enter",
-                        Style::default()
-                            .fg(Color::Yellow)
-                            .add_modifier(Modifier::BOLD),
-                    ),
-                    Span::styled(" to view table data", Style::default().fg(Color::Gray)),
-                ])));
-                table_items.push(ListItem::new(Line::from(vec![
-                    Span::styled("Press ", Style::default().fg(Color::Gray)),
-                    Span::styled(
-                        "n",
-                        Style::default()
-                            .fg(Color::Yellow)
-                            .add_modifier(Modifier::BOLD),
-                    ),
-                    Span::styled(" to create new table", Style::default().fg(Color::Gray)),
-                ])));
-            }
-
-            table_items
-        };
-
-        // Build title with object counts and schema info
-        let title = if let Some(ref db_objects) = state.db.database_objects {
-            let mut title_parts = Vec::new();
-
-            // Add schema info if multiple schemas
-            if state.db.schemas.len() > 1 {
-                let schema = state.db.selected_schema.as_deref().unwrap_or("all");
-                title_parts.push(format!("Schema: {}", schema));
-            }
-
-            // Add object counts
-            let mut counts = Vec::new();
-            if db_objects.tables.len() > 0 {
-                counts.push(format!("{} tables", db_objects.tables.len()));
-            }
-            if db_objects.views.len() > 0 {
-                counts.push(format!("{} views", db_objects.views.len()));
-            }
-            if db_objects.materialized_views.len() > 0 {
-                counts.push(format!("{} mat. views", db_objects.materialized_views.len()));
-            }
-
-            if !counts.is_empty() {
-                title_parts.push(counts.join(", "));
-            }
-
-            if !title_parts.is_empty() {
-                format!(" Tables/Views ({}) ", title_parts.join(" | "))
-            } else {
-                " Tables/Views ".to_string()
-            }
-        } else {
-            " Tables/Views ".to_string()
-        };
-
-        let tables = List::new(items)
-            .block(
-                Block::default()
-                    .title(title)
-                    .borders(Borders::ALL)
-                    .border_style(border_style),
-            )
-            .highlight_style(
-                Style::default()
-                    .bg(self.theme.get_color("selection_bg"))
-                    .add_modifier(Modifier::BOLD),
-            );
-
-        // Use stateful widget to show selection
-        // Direct selection without offset since we're only showing selectable items
-        if !state.db.tables.is_empty() && has_active_connection {
-            state
-                .ui
-                .tables_list_state
-                .select(Some(state.ui.selected_table));
-        }
-        frame.render_stateful_widget(tables, area, &mut state.ui.tables_list_state);
+        // Use the dedicated TablesPane component with database-adaptive features
+        components::render_tables_pane(frame, area, state, &self.theme);
     }
 
     /// Draw the table details pane
