@@ -147,7 +147,7 @@ impl MySqlConnection {
             let row_count: i64 = count_row.get(0);
 
             // Get column count
-            let columns_query = "SELECT COUNT(*) FROM information_schema.columns 
+            let columns_query = "SELECT COUNT(*) FROM information_schema.columns
                                 WHERE table_schema = DATABASE() AND table_name = ?";
             let col_row = sqlx::query(columns_query)
                 .bind(table_name)
@@ -156,11 +156,11 @@ impl MySqlConnection {
             let column_count: i64 = col_row.get(0);
 
             // Get table size
-            let size_query = "SELECT 
+            let size_query = "SELECT
                 data_length + index_length AS total_size,
                 data_length AS table_size,
                 index_length AS indexes_size
-                FROM information_schema.tables 
+                FROM information_schema.tables
                 WHERE table_schema = DATABASE() AND table_name = ?";
 
             let size_row = sqlx::query(size_query)
@@ -173,10 +173,10 @@ impl MySqlConnection {
             let indexes_size: Option<i64> = size_row.get(2);
 
             // Get primary keys
-            let pk_query = "SELECT column_name 
-                           FROM information_schema.key_column_usage 
-                           WHERE table_schema = DATABASE() 
-                           AND table_name = ? 
+            let pk_query = "SELECT column_name
+                           FROM information_schema.key_column_usage
+                           WHERE table_schema = DATABASE()
+                           AND table_name = ?
                            AND constraint_name = 'PRIMARY'
                            ORDER BY ordinal_position";
 
@@ -189,11 +189,11 @@ impl MySqlConnection {
                 pk_rows.iter().map(|row| row.get::<String, _>(0)).collect();
 
             // Get foreign keys
-            let fk_query = "SELECT 
+            let fk_query = "SELECT
                 CONCAT(column_name, ' → ', referenced_table_name, '.', referenced_column_name) as fk_info
-                FROM information_schema.key_column_usage 
-                WHERE table_schema = DATABASE() 
-                AND table_name = ? 
+                FROM information_schema.key_column_usage
+                WHERE table_schema = DATABASE()
+                AND table_name = ?
                 AND referenced_table_name IS NOT NULL";
 
             let fk_rows = sqlx::query(fk_query)
@@ -205,10 +205,10 @@ impl MySqlConnection {
                 fk_rows.iter().map(|row| row.get::<String, _>(0)).collect();
 
             // Get indexes
-            let index_query = "SELECT DISTINCT index_name 
-                              FROM information_schema.statistics 
-                              WHERE table_schema = DATABASE() 
-                              AND table_name = ? 
+            let index_query = "SELECT DISTINCT index_name
+                              FROM information_schema.statistics
+                              WHERE table_schema = DATABASE()
+                              AND table_name = ?
                               AND index_name != 'PRIMARY'";
 
             let index_rows = sqlx::query(index_query)
@@ -222,9 +222,9 @@ impl MySqlConnection {
                 .collect();
 
             // Get table comment
-            let comment_query = "SELECT table_comment 
-                                FROM information_schema.tables 
-                                WHERE table_schema = DATABASE() 
+            let comment_query = "SELECT table_comment
+                                FROM information_schema.tables
+                                WHERE table_schema = DATABASE()
                                 AND table_name = ?";
 
             let comment_row = sqlx::query(comment_query)
@@ -261,14 +261,14 @@ impl MySqlConnection {
     /// Get column information for a table
     pub async fn get_table_columns(&self, table_name: &str) -> Result<Vec<TableColumn>> {
         if let Some(pool) = &self.pool {
-            let query = "SELECT 
+            let query = "SELECT
                 column_name,
                 data_type,
                 is_nullable,
                 column_default,
                 column_key
-                FROM information_schema.columns 
-                WHERE table_schema = DATABASE() 
+                FROM information_schema.columns
+                WHERE table_schema = DATABASE()
                 AND table_name = ?
                 ORDER BY ordinal_position";
 
@@ -324,8 +324,8 @@ impl MySqlConnection {
     ) -> Result<Vec<Vec<String>>> {
         if let Some(pool) = &self.pool {
             // Get column names first to maintain order
-            let columns_query = "SELECT column_name 
-                FROM information_schema.columns 
+            let columns_query = "SELECT column_name
+                FROM information_schema.columns
                 WHERE table_schema = DATABASE() AND table_name = ?
                 ORDER BY ordinal_position";
 
@@ -398,3 +398,4 @@ fn parse_mysql_type(type_str: &str) -> DataType {
         _ => DataType::Text,
     }
 }
+
