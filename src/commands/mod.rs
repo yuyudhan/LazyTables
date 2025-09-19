@@ -161,6 +161,11 @@ pub enum CommandAction {
     OpenModal(ModalType),
     CloseModal,
     ExecuteQuery(String),
+    ExecuteQueryWithContext {
+        query: String,
+        database_type: crate::database::DatabaseType,
+        connection_name: String,
+    },
     LoadFile(String),
     SaveFile(String),
     Navigate(NavigationTarget),

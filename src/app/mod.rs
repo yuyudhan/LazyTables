@@ -163,6 +163,15 @@ impl App {
                 // TODO: Execute query through database connection
                 self.state.toast_manager.info(format!("Executing: {query}"));
             }
+            CommandAction::ExecuteQueryWithContext { query, database_type, connection_name } => {
+                // Enhanced query execution with database context
+                self.state.toast_manager.info(format!("Executing {} query on {}: {}",
+                    database_type.display_name(),
+                    connection_name,
+                    query.lines().next().unwrap_or("").chars().take(50).collect::<String>()
+                ));
+                // TODO: Execute query through specific database adapter
+            }
             CommandAction::LoadFile(path) => {
                 // TODO: Load file
                 self.state.toast_manager.info(format!("Loading: {path}"));

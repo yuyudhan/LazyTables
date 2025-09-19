@@ -135,6 +135,12 @@ pub struct UIState {
     #[serde(skip)]
     pub confirmation_modal: Option<crate::ui::ConfirmationModal>,
 
+    // Hierarchical browsing state
+    /// Expanded schemas/databases in tables pane
+    pub expanded_schemas: std::collections::HashSet<String>,
+    /// Expanded object type groups (Tables, Views, etc.)
+    pub expanded_object_groups: std::collections::HashSet<String>,
+
     // List UI states (not serialized)
     #[serde(skip)]
     pub connections_list_state: ListState,
@@ -171,6 +177,8 @@ impl UIState {
             show_table_creator: false,
             show_table_editor: false,
             confirmation_modal: None,
+            expanded_schemas: std::collections::HashSet::new(),
+            expanded_object_groups: std::collections::HashSet::new(),
             connections_list_state,
             tables_list_state: ListState::default(),
         }
@@ -416,6 +424,34 @@ impl UIState {
     pub fn exit_vim_command(&mut self) {
         self.in_vim_command = false;
         self.vim_command_buffer.clear();
+    }
+
+    /// Toggle expansion state of a schema/database
+    pub fn toggle_schema_expansion(&mut self, schema_name: &str) {
+        if self.expanded_schemas.contains(schema_name) {
+            self.expanded_schemas.remove(schema_name);
+        } else {
+            self.expanded_schemas.insert(schema_name.to_string());
+        }
+    }
+
+    /// Check if a schema/database is expanded
+    pub fn is_schema_expanded(&self, schema_name: &str) -> bool {
+        self.expanded_schemas.contains(schema_name)
+    }
+
+    /// Toggle expansion state of an object group (Tables, Views, etc.)
+    pub fn toggle_object_group_expansion(&mut self, group_name: &str) {
+        if self.expanded_object_groups.contains(group_name) {
+            self.expanded_object_groups.remove(group_name);
+        } else {
+            self.expanded_object_groups.insert(group_name.to_string());
+        }
+    }
+
+    /// Check if an object group is expanded
+    pub fn is_object_group_expanded(&self, group_name: &str) -> bool {
+        self.expanded_object_groups.contains(group_name)
     }
 }
 

@@ -5,12 +5,21 @@ use crate::{
     database::{ConnectionConfig, ConnectionStatus, DatabaseType},
     state::{ui::UIState, DatabaseState},
     ui::components::{
-        ConnectionModalState, TableCreatorState, TableEditorState, TableViewerState, ToastManager,
+        ConnectionModalState, QueryEditor, TableCreatorState, TableEditorState, TableViewerState, ToastManager,
     },
 };
 
 // Re-export for backward compatibility
 pub use crate::state::ui::{FocusedPane, HelpMode, QueryEditMode};
+
+/// Query editor movement directions
+#[derive(Debug, Clone, Copy)]
+pub enum QueryEditorMovement {
+    Up,
+    Down,
+    Left,
+    Right,
+}
 
 /// Main application state
 #[derive(Debug, Clone)]
@@ -33,6 +42,8 @@ pub struct AppState {
     pub table_viewer_state: TableViewerState,
     /// Toast notifications manager
     pub toast_manager: ToastManager,
+    /// Query editor component
+    pub query_editor: QueryEditor,
 }
 
 impl AppState {
@@ -60,6 +71,7 @@ impl AppState {
             table_editor_state: TableEditorState::new("table".to_string()),
             table_viewer_state: TableViewerState::new(),
             toast_manager: ToastManager::new(),
+            query_editor: QueryEditor::new(),
         }
     }
 
@@ -1263,44 +1275,81 @@ impl AppState {
 
     /// Get the SQL statement under the cursor
     pub fn get_statement_under_cursor(&self) -> Option<String> {
-        let lines: Vec<&str> = self.query_content.lines().collect();
-        if lines.is_empty() || self.ui.query_cursor_line >= lines.len() {
-            return None;
-        }
+        self.query_editor.get_statement_at_cursor()
+    }
 
-        // Find the SQL statement boundaries (statements separated by semicolons or empty lines)
-        let mut start_line = self.ui.query_cursor_line;
-        let mut end_line = self.ui.query_cursor_line;
+    /// Update query editor content and sync with legacy query_content field
+    pub fn set_query_content(&mut self, content: String) {
+        self.query_content = content.clone();
+        self.query_editor.set_content(content);
+        self.ui.query_modified = true;
+    }
 
-        // Find start of statement (go backwards until we find a semicolon or empty line)
-        while start_line > 0 {
-            let line = lines[start_line - 1].trim();
-            if line.is_empty() || line.ends_with(';') {
-                break;
-            }
-            start_line -= 1;
-        }
+    /// Get query content from the editor
+    pub fn get_query_content(&self) -> &str {
+        self.query_editor.get_content()
+    }
 
-        // Find end of statement (go forwards until we find a semicolon or empty line)
-        while end_line < lines.len() {
-            let line = lines[end_line].trim();
-            if line.ends_with(';') {
-                break;
-            }
-            if end_line < lines.len() - 1 && lines[end_line + 1].trim().is_empty() {
-                break;
-            }
-            end_line += 1;
-        }
-
-        let statement_lines: Vec<&str> = lines[start_line..=end_line].to_vec();
-        let statement = statement_lines.join("\n").trim().to_string();
-
-        if statement.is_empty() {
-            None
+    /// Update query editor database context when connection changes
+    pub fn update_query_editor_context(&mut self) {
+        if let Some(connection) = self.get_selected_connection() {
+            self.query_editor.set_database_type(Some(connection.database_type.clone()));
         } else {
-            Some(statement)
+            self.query_editor.set_database_type(None);
         }
+    }
+
+    /// Set query editor focus state
+    pub fn set_query_editor_focus(&mut self, focused: bool) {
+        self.query_editor.set_focused(focused);
+    }
+
+    /// Toggle query editor insert mode
+    pub fn toggle_query_editor_insert_mode(&mut self) {
+        self.query_editor.toggle_insert_mode();
+    }
+
+    /// Handle character input in query editor
+    pub fn handle_query_editor_input(&mut self, ch: char) {
+        self.query_editor.insert_char(ch);
+        // Sync content back to legacy field
+        self.query_content = self.query_editor.get_content().to_string();
+        self.ui.query_modified = true;
+    }
+
+    /// Handle newline in query editor
+    pub fn handle_query_editor_newline(&mut self) {
+        self.query_editor.insert_newline();
+        // Sync content back to legacy field
+        self.query_content = self.query_editor.get_content().to_string();
+        self.ui.query_modified = true;
+    }
+
+    /// Handle backspace in query editor
+    pub fn handle_query_editor_backspace(&mut self) {
+        self.query_editor.backspace();
+        // Sync content back to legacy field
+        self.query_content = self.query_editor.get_content().to_string();
+        self.ui.query_modified = true;
+    }
+
+    /// Handle cursor movement in query editor
+    pub fn handle_query_editor_movement(&mut self, direction: QueryEditorMovement) {
+        match direction {
+            QueryEditorMovement::Up => self.query_editor.move_cursor_up(),
+            QueryEditorMovement::Down => self.query_editor.move_cursor_down(),
+            QueryEditorMovement::Left => self.query_editor.move_cursor_left(),
+            QueryEditorMovement::Right => self.query_editor.move_cursor_right(),
+        }
+    }
+
+    /// Load SQL file into query editor
+    pub fn load_sql_file_into_editor(&mut self, filename: &str) -> Result<(), Box<dyn std::error::Error>> {
+        self.load_query_file(filename)?;
+        // Sync to query editor
+        self.query_editor.set_content(self.query_content.clone());
+        self.update_query_editor_context();
+        Ok(())
     }
 }
 
