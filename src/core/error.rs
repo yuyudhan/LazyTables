@@ -47,6 +47,12 @@ pub enum LazyTablesError {
     #[error("Password error: {0}")]
     PasswordError(String),
 
+    #[error("Unsupported operation: {0}")]
+    Unsupported(String),
+
+    #[error("Invalid connection string: {0}")]
+    InvalidConnectionString(String),
+
     #[error("{0}")]
     Other(String),
 }

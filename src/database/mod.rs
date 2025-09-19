@@ -2,20 +2,29 @@
 
 // Database adapter modules
 pub mod connection;
+pub mod factory;
 pub mod mysql;
 pub mod objects;
 pub mod postgres;
+pub mod query_history;
 pub mod sqlite;
 
 pub use connection::{
     ConnectionConfig, ConnectionStatus, ConnectionStorage, DatabaseType, SslMode,
+    DatabaseCapabilities, HealthStatus, ServerInfo, PoolStatus, FormattedError,
 };
 
 // Re-export the Connection trait from connection module
 pub use connection::Connection;
 
+// Re-export adapter factory for AC3 compliance
+pub use factory::AdapterFactory;
+
 // Re-export database object types
 pub use objects::{DatabaseObject, DatabaseObjectList, DatabaseObjectType};
+
+// Re-export query history types
+pub use query_history::{QueryHistoryEntry, QueryHistoryManager};
 
 /// Represents a table column
 #[derive(Debug, Clone)]

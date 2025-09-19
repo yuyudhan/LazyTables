@@ -339,4 +339,121 @@ pub trait Connection: Send + Sync {
 
     /// Get connection config
     fn config(&self) -> &ConnectionConfig;
+
+    // Query execution capabilities (AC1 requirement)
+    /// Execute a raw SQL query and return columns and data
+    async fn execute_raw_query(&self, query: &str) -> Result<(Vec<String>, Vec<Vec<String>>)>;
+
+    // Metadata operations (AC1 & AC2 requirements)
+    /// List all tables in the current database
+    async fn list_tables(&self) -> Result<Vec<String>>;
+
+    /// List all database objects (tables, views, etc.)
+    async fn list_database_objects(&self) -> Result<crate::database::DatabaseObjectList>;
+
+    /// Get detailed metadata for a specific table
+    async fn get_table_metadata(&self, table_name: &str) -> Result<crate::database::TableMetadata>;
+
+    /// Get column information for a table
+    async fn get_table_columns(&self, table_name: &str) -> Result<Vec<crate::database::TableColumn>>;
+
+    /// Get table data with pagination
+    async fn get_table_data(&self, table_name: &str, limit: usize, offset: usize) -> Result<Vec<Vec<String>>>;
+
+    // Database-specific capabilities (AC1 & AC2 requirement)
+    /// Get database-specific capabilities and features
+    async fn get_database_capabilities(&self) -> Result<DatabaseCapabilities>;
+
+    /// Test connection health with database-specific checks
+    async fn health_check(&self) -> Result<HealthStatus>;
+
+    /// Get database version and server information
+    async fn get_server_info(&self) -> Result<ServerInfo>;
+
+    // Connection pooling support (AC4 requirement)
+    /// Get current pool statistics
+    fn get_pool_status(&self) -> Option<PoolStatus>;
+
+    /// Get maximum connections supported by this adapter
+    fn max_connections(&self) -> u32;
+
+    /// Get current active connections count
+    fn active_connections(&self) -> u32;
+
+    // Database-specific error handling (AC5 requirement)
+    /// Convert database-specific error to user-friendly message with recovery suggestions
+    fn format_error(&self, error: &str) -> FormattedError;
+
+    /// Get database-specific keywords for syntax highlighting
+    fn get_keywords(&self) -> Vec<String>;
+
+    /// Get database-specific functions for autocomplete
+    fn get_functions(&self) -> Vec<String>;
+}
+
+/// Database-specific capabilities and features
+#[derive(Debug, Clone)]
+pub struct DatabaseCapabilities {
+    pub supports_schemas: bool,
+    pub supports_transactions: bool,
+    pub supports_foreign_keys: bool,
+    pub supports_json: bool,
+    pub supports_arrays: bool,
+    pub supports_stored_procedures: bool,
+    pub supports_triggers: bool,
+    pub supports_views: bool,
+    pub supports_materialized_views: bool,
+    pub supports_window_functions: bool,
+    pub supports_cte: bool, // Common Table Expressions
+    pub max_identifier_length: usize,
+    pub max_query_length: Option<usize>,
+    pub supported_isolation_levels: Vec<String>,
+}
+
+/// Health status for connection monitoring
+#[derive(Debug, Clone)]
+pub struct HealthStatus {
+    pub is_healthy: bool,
+    pub response_time_ms: u64,
+    pub last_error: Option<String>,
+    pub database_version: Option<String>,
+    pub active_connections: u32,
+    pub max_connections: u32,
+    pub uptime_seconds: Option<u64>,
+}
+
+/// Server information for database instance
+#[derive(Debug, Clone)]
+pub struct ServerInfo {
+    pub version: String,
+    pub build_info: Option<String>,
+    pub server_name: Option<String>,
+    pub charset: Option<String>,
+    pub timezone: Option<String>,
+    pub uptime_seconds: Option<u64>,
+    pub current_database: Option<String>,
+    pub current_user: Option<String>,
+}
+
+/// Connection pool status
+#[derive(Debug, Clone)]
+pub struct PoolStatus {
+    pub size: u32,
+    pub active: u32,
+    pub idle: u32,
+    pub waiting: u32,
+    pub max_size: u32,
+    pub min_size: u32,
+}
+
+/// Formatted error with recovery suggestions
+#[derive(Debug, Clone)]
+pub struct FormattedError {
+    pub original_error: String,
+    pub user_message: String,
+    pub error_code: Option<String>,
+    pub recovery_suggestions: Vec<String>,
+    pub is_connection_error: bool,
+    pub is_syntax_error: bool,
+    pub is_permission_error: bool,
 }
