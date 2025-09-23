@@ -10,6 +10,13 @@ use ratatui::{
 };
 use std::collections::HashMap;
 
+/// View mode for the table viewer
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum TableViewMode {
+    Data,
+    Schema,
+}
+
 /// Represents a single table tab
 #[derive(Debug, Clone)]
 pub struct TableTab {
@@ -33,6 +40,7 @@ pub struct TableTab {
     pub search_results: Vec<(usize, usize)>,
     pub current_search_result: usize,
     pub in_search_mode: bool,
+    pub view_mode: TableViewMode,
 }
 
 #[derive(Debug, Clone)]
@@ -67,7 +75,19 @@ impl TableTab {
             search_results: Vec::new(),
             current_search_result: 0,
             in_search_mode: false,
+            view_mode: TableViewMode::Data,
         }
+    }
+
+    /// Toggle between data and schema view
+    pub fn toggle_view_mode(&mut self) {
+        self.view_mode = match self.view_mode {
+            TableViewMode::Data => TableViewMode::Schema,
+            TableViewMode::Schema => TableViewMode::Data,
+        };
+        // Reset selection when switching views
+        self.selected_row = 0;
+        self.selected_col = 0;
     }
 
     /// Get the current cell value (including any modifications)
@@ -203,7 +223,11 @@ impl TableTab {
 
     /// Move selection left
     pub fn move_left(&mut self) {
-        crate::debug_log!("move_left called, current col: {}, total cols: {}", self.selected_col, self.columns.len());
+        crate::debug_log!(
+            "move_left called, current col: {}, total cols: {}",
+            self.selected_col,
+            self.columns.len()
+        );
         if self.selected_col > 0 {
             self.selected_col -= 1;
             crate::debug_log!("moved left to col: {}", self.selected_col);
@@ -214,7 +238,11 @@ impl TableTab {
 
     /// Move selection right
     pub fn move_right(&mut self) {
-        crate::debug_log!("move_right called, current col: {}, total cols: {}", self.selected_col, self.columns.len());
+        crate::debug_log!(
+            "move_right called, current col: {}, total cols: {}",
+            self.selected_col,
+            self.columns.len()
+        );
         if self.selected_col < self.columns.len().saturating_sub(1) {
             self.selected_col += 1;
             crate::debug_log!("moved right to col: {}", self.selected_col);
@@ -701,7 +729,11 @@ fn render_tabs(f: &mut Frame, state: &TableViewerState, area: Rect, theme: &Them
 
 fn render_table_content(f: &mut Frame, tab: &TableTab, area: Rect, theme: &Theme) {
     if tab.loading {
-        let loading = Paragraph::new("Loading table data...")
+        let loading_msg = match tab.view_mode {
+            TableViewMode::Data => "Loading table data...",
+            TableViewMode::Schema => "Loading table schema...",
+        };
+        let loading = Paragraph::new(loading_msg)
             .style(Style::default().fg(theme.get_color("warning")))
             .block(
                 Block::default()
@@ -727,6 +759,14 @@ fn render_table_content(f: &mut Frame, tab: &TableTab, area: Rect, theme: &Theme
         return;
     }
 
+    // Render based on view mode
+    match tab.view_mode {
+        TableViewMode::Data => render_data_view(f, tab, area, theme),
+        TableViewMode::Schema => render_schema_view(f, tab, area, theme),
+    }
+}
+
+fn render_data_view(f: &mut Frame, tab: &TableTab, area: Rect, theme: &Theme) {
     // Prepare table headers
     let headers: Vec<TableCell> = tab
         .columns
@@ -845,7 +885,7 @@ fn render_table_content(f: &mut Frame, tab: &TableTab, area: Rect, theme: &Theme
             Block::default()
                 .borders(Borders::ALL)
                 .title(format!(
-                    " {} - Page {}/{} ({} rows){} ",
+                    " {} - Data - Page {}/{} ({} rows) [t] Toggle View{} ",
                     tab.table_name,
                     tab.current_page + 1,
                     (tab.total_rows.saturating_sub(1)) / tab.rows_per_page + 1,
@@ -885,6 +925,106 @@ fn render_table_content(f: &mut Frame, tab: &TableTab, area: Rect, theme: &Theme
     f.render_widget(table, area);
 }
 
+fn render_schema_view(f: &mut Frame, tab: &TableTab, area: Rect, theme: &Theme) {
+    // Create schema rows showing column information
+    let schema_headers = vec![
+        TableCell::from(" Column Name ").style(
+            Style::default()
+                .fg(theme.get_color("text_primary"))
+                .add_modifier(Modifier::BOLD),
+        ),
+        TableCell::from(" Data Type ").style(
+            Style::default()
+                .fg(theme.get_color("text_primary"))
+                .add_modifier(Modifier::BOLD),
+        ),
+        TableCell::from(" Nullable ").style(
+            Style::default()
+                .fg(theme.get_color("text_primary"))
+                .add_modifier(Modifier::BOLD),
+        ),
+        TableCell::from(" Primary Key ").style(
+            Style::default()
+                .fg(theme.get_color("text_primary"))
+                .add_modifier(Modifier::BOLD),
+        ),
+    ];
+
+    let header = Row::new(schema_headers)
+        .style(Style::default().add_modifier(Modifier::BOLD))
+        .height(1)
+        .bottom_margin(1);
+
+    // Create rows for each column showing its schema information
+    let schema_rows: Vec<Row> = tab
+        .columns
+        .iter()
+        .enumerate()
+        .map(|(row_idx, col)| {
+            let is_selected = row_idx == tab.selected_row;
+
+            // Base style with alternating row background
+            let base_style = if row_idx % 2 == 0 {
+                Style::default().bg(theme.get_color("row_alternate_bg"))
+            } else {
+                Style::default()
+            };
+
+            let row_style = if is_selected {
+                Style::default()
+                    .fg(theme.get_color("selected_text"))
+                    .bg(theme.get_color("selected_bg"))
+            } else {
+                base_style
+            };
+
+            let cells = vec![
+                TableCell::from(format!(
+                    " {} {}",
+                    if col.is_primary_key { "🔑" } else { " " },
+                    col.name
+                ))
+                .style(row_style),
+                TableCell::from(format!(" {} ", col.data_type)).style(row_style),
+                TableCell::from(format!(" {} ", if col.is_nullable { "YES" } else { "NO" }))
+                    .style(row_style),
+                TableCell::from(format!(
+                    " {} ",
+                    if col.is_primary_key { "YES" } else { "NO" }
+                ))
+                .style(row_style),
+            ];
+
+            Row::new(cells).height(1).bottom_margin(0)
+        })
+        .collect();
+
+    // Calculate column widths for schema view
+    let widths = vec![
+        Constraint::Min(20), // Column Name
+        Constraint::Min(15), // Data Type
+        Constraint::Min(10), // Nullable
+        Constraint::Min(12), // Primary Key
+    ];
+
+    let table = Table::new(schema_rows, widths)
+        .header(header)
+        .block(
+            Block::default()
+                .borders(Borders::ALL)
+                .title(format!(
+                    " {} - Schema ({} columns) [t] Toggle View ",
+                    tab.table_name,
+                    tab.columns.len()
+                ))
+                .border_style(Style::default().fg(theme.get_color("secondary_highlight"))),
+        )
+        .column_spacing(1)
+        .row_highlight_style(Style::default().add_modifier(Modifier::REVERSED));
+
+    f.render_widget(table, area);
+}
+
 fn render_status_bar(f: &mut Frame, state: &TableViewerState, area: Rect, theme: &Theme) {
     let help_text = if let Some(tab) = state.current_tab() {
         if tab.in_edit_mode {
@@ -892,7 +1032,10 @@ fn render_status_bar(f: &mut Frame, state: &TableViewerState, area: Rect, theme:
         } else if tab.in_search_mode {
             " Type to search | [Enter] Confirm | [ESC] Cancel | [n/N] Next/Previous "
         } else {
-            " [?] Help | [i] Edit Cell | [/] Search | [x] Close Tab | [S/D] Switch Tabs | [Ctrl+D/U] Page Down/Up "
+            match tab.view_mode {
+                TableViewMode::Data => " [?] Help | [i] Edit Cell | [/] Search | [t] Schema View | [x] Close Tab | [S/D] Switch Tabs ",
+                TableViewMode::Schema => " [?] Help | [t] Data View | [x] Close Tab | [S/D] Switch Tabs ",
+            }
         }
     } else {
         " [?] Help | Open a table to start "
