@@ -500,7 +500,9 @@ impl App {
                     }
                     // Vim-style navigation within panes
                     (KeyModifiers::NONE, KeyCode::Char('j')) => {
-                        if self.state.ui.focused_pane == FocusedPane::Tables && !self.state.ui.tables_search_active {
+                        if self.state.ui.focused_pane == FocusedPane::Tables
+                            && !self.state.ui.tables_search_active
+                        {
                             self.state.ui.table_search_selection_down();
                             // Cancel any pending gg command
                             self.state.ui.cancel_pending_gg();
@@ -509,7 +511,9 @@ impl App {
                         }
                     }
                     (KeyModifiers::NONE, KeyCode::Char('k')) => {
-                        if self.state.ui.focused_pane == FocusedPane::Tables && !self.state.ui.tables_search_active {
+                        if self.state.ui.focused_pane == FocusedPane::Tables
+                            && !self.state.ui.tables_search_active
+                        {
                             self.state.ui.table_search_selection_up();
                             // Cancel any pending gg command
                             self.state.ui.cancel_pending_gg();
@@ -518,9 +522,11 @@ impl App {
                         }
                     }
                     (KeyModifiers::NONE, KeyCode::Char('h')) => {
+                        eprintln!("DEBUG: H key pressed, focused_pane: {:?}", self.state.ui.focused_pane);
                         self.state.move_left();
                     }
                     (KeyModifiers::NONE, KeyCode::Char('l')) => {
+                        eprintln!("DEBUG: L key pressed, focused_pane: {:?}", self.state.ui.focused_pane);
                         self.state.move_right();
                     }
                     // Enter insert mode (or Query mode for query window, or edit cell in table viewer)
@@ -900,7 +906,9 @@ impl App {
                             } else {
                                 self.leader_pressed = true;
                             }
-                        } else if self.state.ui.focused_pane == FocusedPane::Tables && !self.state.ui.tables_search_active {
+                        } else if self.state.ui.focused_pane == FocusedPane::Tables
+                            && !self.state.ui.tables_search_active
+                        {
                             self.state.ui.handle_g_key_press();
                         }
                     }
@@ -910,7 +918,9 @@ impl App {
                             if let Some(tab) = self.state.table_viewer_state.current_tab_mut() {
                                 tab.jump_to_last();
                             }
-                        } else if self.state.ui.focused_pane == FocusedPane::Tables && !self.state.ui.tables_search_active {
+                        } else if self.state.ui.focused_pane == FocusedPane::Tables
+                            && !self.state.ui.tables_search_active
+                        {
                             self.state.ui.table_go_to_last();
                         }
                     }
