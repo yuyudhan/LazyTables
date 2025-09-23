@@ -1,4 +1,29 @@
+     │ High Priority (Core Functionality)                 │
+     │                                                    │
+     │ 1. Complete Core Implementation: Finish TODO items │
+     │ in connection commands                             │
+     │ 2. Connection Testing: Implement full connection   │
+     │ testing with detailed feedback                     │
+     │ 3. Edit Connection: Complete edit modal            │
+     │ functionality with pre-populated fields            │
+     │ 4. Connection String Validation: Add real-time     │
+     │ validation for connection strings                  │
+     │
 
+=======================================
+I want you to complete the edit functionality modal in the connections pane so that all the connections can be properly edited. Just validate if any other tasks need to be done to make it completed.
+
+=======================================
+I want you to implement the search functionality in the connection screen. The search shall be triggered by pressing the slash command. And after the search is done, I should be able to use the arrow keys to search within the connections. And when I press enter on anything pointed, even after searching, it should open that connection.
+=======================================
+I want you to focus on the SQL files pane so the SQL files pane I press control and it shows a lot of SQL files that were created. We want to allow creating the SQL files that is okay. First of all I want you to validate if the SQL files pane focus only on that does what functionalities does it miss right now that need to be created few that I can think is changing the name of the SQL file another can be renaming of the SQL file.
+=======================================
+=======================================
+DONE:
+THIS WILL NEED TO BE DONE AGAIN AND AGAIN
+Can you check the help modal that opens when pressing question mark? It should align with all the panes, current options that are there. So it should not show anything different from what options are available in each of the panes.
+
+=======================================
 =======================================
 =======================================
 =======================================
@@ -7,13 +32,15 @@
 DONE:
 There is a table details view pane where we see the tabular data and the schema. I think there is something wrong with the pane because like for other panes, when we focus on that pane only, then it is shown in blue color in a highlighted manner. But the details of the table, I mean the data of the table and the table schema, the pane this is always showing to be highlighted in blue color. Can you resolve this particular problem?
 =======================================
-
+DONE:
 the table data viewer so basically we are showing 20 rows but one problem I am seeing when all the 20 rows are not coming within the panes allotted size in the screen what is happening is while pressing J it is going down but I don't think the scrolling is happening properly can you please validate and see if this is the problem and if you can resolve it please
 
 =======================================
+DONE:
 Can you check the help modal that opens when pressing question mark? It should align with all the panes, current options that are there. So it should not show anything different from what options are available in each of the panes.
 
 =======================================
+DONE
 When I press Q, it basically closes the application. So if accidentally somebody presses Q, then the application will get closed and their connection will get lost and they have to again open the app. So when Q is pressed, can you ensure to ask a confirmation from the user in the confirmation? When you're asking for the confirmation, you should basically tell the connection will be closed. And do you want to confirm that you want to exit the application? Make a proper message and get that confirmation, please. You can try and identify the right key bindings for the confirmation box. In the confirmation box, you should show a proper message.The buttons that are shown should have a key binding of them their own.
 =======================================
 =======================================
