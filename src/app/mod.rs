@@ -868,6 +868,25 @@ impl App {
                             }
                         }
                     }
+                    (KeyModifiers::NONE, KeyCode::Char('t')) => {
+                        if self.state.ui.focused_pane == FocusedPane::TabularOutput {
+                            // Toggle between data and schema view
+                            if let Some(tab) = self.state.table_viewer_state.current_tab_mut() {
+                                tab.toggle_view_mode();
+                                let mode_name = match tab.view_mode {
+                                    crate::ui::components::table_viewer::TableViewMode::Data => {
+                                        "Data"
+                                    }
+                                    crate::ui::components::table_viewer::TableViewMode::Schema => {
+                                        "Schema"
+                                    }
+                                };
+                                self.state
+                                    .toast_manager
+                                    .info(format!("Switched to {} view", mode_name));
+                            }
+                        }
+                    }
                     // Pagination
                     (KeyModifiers::CONTROL, KeyCode::Char('d')) => {
                         if self.state.ui.focused_pane == FocusedPane::TabularOutput {
