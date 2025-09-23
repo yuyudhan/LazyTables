@@ -4,6 +4,7 @@
 =======================================
 =======================================
 =======================================
+DONE:
 There is a table details view pane where we see the tabular data and the schema. I think there is something wrong with the pane because like for other panes, when we focus on that pane only, then it is shown in blue color in a highlighted manner. But the details of the table, I mean the data of the table and the table schema, the pane this is always showing to be highlighted in blue color. Can you resolve this particular problem?
 =======================================
 
