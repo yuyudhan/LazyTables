@@ -187,45 +187,47 @@ impl AppState {
 
     /// Move selection left based on current focus
     pub fn move_left(&mut self) {
-        eprintln!("DEBUG: move_left called with focused_pane: {:?}", self.ui.focused_pane);
+        crate::debug_log!("AppState::move_left called, focused_pane: {:?}", self.ui.focused_pane);
         match self.ui.focused_pane {
             FocusedPane::TabularOutput => {
-                eprintln!("DEBUG: In TabularOutput branch");
+                crate::debug_log!("In TabularOutput branch");
                 if let Some(tab) = self.table_viewer_state.current_tab_mut() {
-                    eprintln!("DEBUG: Found tab, in_edit_mode: {}, columns: {}", tab.in_edit_mode, tab.columns.len());
+                    crate::debug_log!("Got current tab, in_edit_mode: {}", tab.in_edit_mode);
                     if !tab.in_edit_mode {
-                        eprintln!("DEBUG: Calling tab.move_left(), current selected_col: {}", tab.selected_col);
+                        crate::debug_log!("Calling tab.move_left()");
                         tab.move_left();
-                        eprintln!("DEBUG: After move_left, selected_col: {}", tab.selected_col);
+                    } else {
+                        crate::debug_log!("Skipping because in edit mode");
                     }
                 } else {
-                    eprintln!("DEBUG: No current tab found");
+                    crate::debug_log!("No current tab available");
                 }
             }
             FocusedPane::QueryWindow => {
                 self.ui.query_cursor_column = self.ui.query_cursor_column.saturating_sub(1);
             }
             _ => {
-                eprintln!("DEBUG: In other pane: {:?}", self.ui.focused_pane);
+                crate::debug_log!("Not in TabularOutput or QueryWindow pane");
             }
         }
     }
 
     /// Move selection right based on current focus
     pub fn move_right(&mut self) {
-        eprintln!("DEBUG: move_right called with focused_pane: {:?}", self.ui.focused_pane);
+        crate::debug_log!("AppState::move_right called, focused_pane: {:?}", self.ui.focused_pane);
         match self.ui.focused_pane {
             FocusedPane::TabularOutput => {
-                eprintln!("DEBUG: In TabularOutput branch");
+                crate::debug_log!("In TabularOutput branch");
                 if let Some(tab) = self.table_viewer_state.current_tab_mut() {
-                    eprintln!("DEBUG: Found tab, in_edit_mode: {}, columns: {}", tab.in_edit_mode, tab.columns.len());
+                    crate::debug_log!("Got current tab, in_edit_mode: {}", tab.in_edit_mode);
                     if !tab.in_edit_mode {
-                        eprintln!("DEBUG: Calling tab.move_right(), current selected_col: {}", tab.selected_col);
+                        crate::debug_log!("Calling tab.move_right()");
                         tab.move_right();
-                        eprintln!("DEBUG: After move_right, selected_col: {}", tab.selected_col);
+                    } else {
+                        crate::debug_log!("Skipping because in edit mode");
                     }
                 } else {
-                    eprintln!("DEBUG: No current tab found");
+                    crate::debug_log!("No current tab available");
                 }
             }
             FocusedPane::QueryWindow => {
@@ -237,7 +239,9 @@ impl AppState {
                     }
                 }
             }
-            _ => {}
+            _ => {
+                crate::debug_log!("Not in TabularOutput or QueryWindow pane");
+            }
         }
     }
 
