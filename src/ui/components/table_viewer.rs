@@ -203,23 +203,23 @@ impl TableTab {
 
     /// Move selection left
     pub fn move_left(&mut self) {
-        eprintln!("DEBUG: TableTab::move_left called, selected_col: {}, columns.len(): {}", self.selected_col, self.columns.len());
+        crate::debug_log!("move_left called, current col: {}, total cols: {}", self.selected_col, self.columns.len());
         if self.selected_col > 0 {
             self.selected_col -= 1;
-            eprintln!("DEBUG: Moved left to column: {}", self.selected_col);
+            crate::debug_log!("moved left to col: {}", self.selected_col);
         } else {
-            eprintln!("DEBUG: Already at leftmost column");
+            crate::debug_log!("already at leftmost column");
         }
     }
 
     /// Move selection right
     pub fn move_right(&mut self) {
-        eprintln!("DEBUG: TableTab::move_right called, selected_col: {}, columns.len(): {}", self.selected_col, self.columns.len());
+        crate::debug_log!("move_right called, current col: {}, total cols: {}", self.selected_col, self.columns.len());
         if self.selected_col < self.columns.len().saturating_sub(1) {
             self.selected_col += 1;
-            eprintln!("DEBUG: Moved right to column: {}", self.selected_col);
+            crate::debug_log!("moved right to col: {}", self.selected_col);
         } else {
-            eprintln!("DEBUG: Already at rightmost column");
+            crate::debug_log!("already at rightmost column");
         }
     }
 
