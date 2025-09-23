@@ -483,7 +483,12 @@ impl UI {
                 )]),
             ]
         } else if let Some(selected_table_name) = state.ui.get_selected_table_name() {
-            self.build_comprehensive_table_details(selected_table_name, &state.db, &state.ui)
+            self.build_comprehensive_table_details(
+                selected_table_name,
+                &state.db,
+                &state.ui,
+                is_focused,
+            )
         } else {
             vec![
                 Line::from(""),
@@ -499,7 +504,10 @@ impl UI {
         let available_height = area.height.saturating_sub(2) as usize; // Account for borders
 
         let visible_lines = if content_height > available_height {
-            let start = state.ui.details_viewport_offset.min(content_height.saturating_sub(available_height));
+            let start = state
+                .ui
+                .details_viewport_offset
+                .min(content_height.saturating_sub(available_height));
             let end = (start + available_height).min(content_height);
             details_text[start..end].to_vec()
         } else {
@@ -536,27 +544,54 @@ impl UI {
         table_name: String,
         db_state: &crate::state::DatabaseState,
         _ui_state: &crate::state::UIState,
+        is_focused: bool,
     ) -> Vec<Line<'static>> {
         let mut lines = Vec::new();
 
+        // Define colors based on focus state
+        let label_color = if is_focused {
+            Color::Cyan
+        } else {
+            Color::DarkGray
+        };
+        let text_color = if is_focused {
+            Color::White
+        } else {
+            Color::Gray
+        };
+
         // === HEADER SECTION ===
         lines.push(Line::from(vec![
-            Span::styled("Object: ".to_string(), Style::default().fg(Color::Cyan)),
+            Span::styled("Object: ".to_string(), Style::default().fg(label_color)),
             Span::styled(
                 table_name.clone(),
-                Style::default()
-                    .fg(Color::White)
-                    .add_modifier(Modifier::BOLD),
+                Style::default().fg(text_color).add_modifier(if is_focused {
+                    Modifier::BOLD
+                } else {
+                    Modifier::empty()
+                }),
             ),
         ]));
 
         // Determine table type
         let table_type = if let Some(ref db_objects) = db_state.database_objects {
-            if db_objects.tables.iter().any(|t| t.name == table_name || t.qualified_name() == table_name) {
+            if db_objects
+                .tables
+                .iter()
+                .any(|t| t.name == table_name || t.qualified_name() == table_name)
+            {
                 "Table"
-            } else if db_objects.views.iter().any(|v| v.name == table_name || v.qualified_name() == table_name) {
+            } else if db_objects
+                .views
+                .iter()
+                .any(|v| v.name == table_name || v.qualified_name() == table_name)
+            {
                 "View"
-            } else if db_objects.materialized_views.iter().any(|mv| mv.name == table_name || mv.qualified_name() == table_name) {
+            } else if db_objects
+                .materialized_views
+                .iter()
+                .any(|mv| mv.name == table_name || mv.qualified_name() == table_name)
+            {
                 "Materialized View"
             } else {
                 "Unknown"
@@ -566,14 +601,18 @@ impl UI {
         };
 
         lines.push(Line::from(vec![
-            Span::styled("Type: ".to_string(), Style::default().fg(Color::Cyan)),
+            Span::styled("Type: ".to_string(), Style::default().fg(label_color)),
             Span::styled(
                 table_type.to_string(),
-                Style::default().fg(match table_type {
-                    "Table" => Color::Blue,
-                    "View" => Color::Green,
-                    "Materialized View" => Color::Magenta,
-                    _ => Color::Gray,
+                Style::default().fg(if is_focused {
+                    match table_type {
+                        "Table" => Color::Blue,
+                        "View" => Color::Green,
+                        "Materialized View" => Color::Magenta,
+                        _ => Color::Gray,
+                    }
+                } else {
+                    Color::DarkGray
                 }),
             ),
         ]));
@@ -582,27 +621,37 @@ impl UI {
 
         // === METADATA SECTION ===
         if let Some(metadata) = &db_state.current_table_metadata {
+            let section_color = if is_focused {
+                Color::Yellow
+            } else {
+                Color::DarkGray
+            };
+
             // Basic metrics
             lines.push(Line::from(vec![Span::styled(
                 "📊 Metrics".to_string(),
                 Style::default()
-                    .fg(Color::Yellow)
-                    .add_modifier(Modifier::BOLD),
+                    .fg(section_color)
+                    .add_modifier(if is_focused {
+                        Modifier::BOLD
+                    } else {
+                        Modifier::empty()
+                    }),
             )]));
 
             lines.push(Line::from(vec![
-                Span::styled("  Rows: ".to_string(), Style::default().fg(Color::Cyan)),
+                Span::styled("  Rows: ".to_string(), Style::default().fg(label_color)),
                 Span::styled(
                     metadata.row_count.to_string(),
-                    Style::default().fg(Color::White),
+                    Style::default().fg(text_color),
                 ),
             ]));
 
             lines.push(Line::from(vec![
-                Span::styled("  Columns: ".to_string(), Style::default().fg(Color::Cyan)),
+                Span::styled("  Columns: ".to_string(), Style::default().fg(label_color)),
                 Span::styled(
                     metadata.column_count.to_string(),
-                    Style::default().fg(Color::White),
+                    Style::default().fg(text_color),
                 ),
             ]));
 
@@ -611,31 +660,44 @@ impl UI {
             lines.push(Line::from(vec![Span::styled(
                 "💾 Storage".to_string(),
                 Style::default()
-                    .fg(Color::Yellow)
-                    .add_modifier(Modifier::BOLD),
+                    .fg(section_color)
+                    .add_modifier(if is_focused {
+                        Modifier::BOLD
+                    } else {
+                        Modifier::empty()
+                    }),
             )]));
 
             lines.push(Line::from(vec![
-                Span::styled("  Total Size: ".to_string(), Style::default().fg(Color::Cyan)),
+                Span::styled(
+                    "  Total Size: ".to_string(),
+                    Style::default().fg(label_color),
+                ),
                 Span::styled(
                     crate::database::TableMetadata::format_size(metadata.total_size),
-                    Style::default().fg(Color::White),
+                    Style::default().fg(text_color),
                 ),
             ]));
 
             lines.push(Line::from(vec![
-                Span::styled("  Table Size: ".to_string(), Style::default().fg(Color::Cyan)),
+                Span::styled(
+                    "  Table Size: ".to_string(),
+                    Style::default().fg(label_color),
+                ),
                 Span::styled(
                     crate::database::TableMetadata::format_size(metadata.table_size),
-                    Style::default().fg(Color::White),
+                    Style::default().fg(text_color),
                 ),
             ]));
 
             lines.push(Line::from(vec![
-                Span::styled("  Indexes Size: ".to_string(), Style::default().fg(Color::Cyan)),
+                Span::styled(
+                    "  Indexes Size: ".to_string(),
+                    Style::default().fg(label_color),
+                ),
                 Span::styled(
                     crate::database::TableMetadata::format_size(metadata.indexes_size),
-                    Style::default().fg(Color::White),
+                    Style::default().fg(text_color),
                 ),
             ]));
 
@@ -644,36 +706,46 @@ impl UI {
             lines.push(Line::from(vec![Span::styled(
                 "🔗 Relationships".to_string(),
                 Style::default()
-                    .fg(Color::Yellow)
-                    .add_modifier(Modifier::BOLD),
+                    .fg(section_color)
+                    .add_modifier(if is_focused {
+                        Modifier::BOLD
+                    } else {
+                        Modifier::empty()
+                    }),
             )]));
 
             if !metadata.primary_keys.is_empty() {
                 lines.push(Line::from(vec![
-                    Span::styled("  Primary Keys: ".to_string(), Style::default().fg(Color::Cyan)),
+                    Span::styled(
+                        "  Primary Keys: ".to_string(),
+                        Style::default().fg(label_color),
+                    ),
                     Span::styled(
                         metadata.primary_keys.join(", "),
-                        Style::default().fg(Color::White),
+                        Style::default().fg(text_color),
                     ),
                 ]));
             }
 
             if !metadata.foreign_keys.is_empty() {
                 lines.push(Line::from(vec![
-                    Span::styled("  Foreign Keys: ".to_string(), Style::default().fg(Color::Cyan)),
+                    Span::styled(
+                        "  Foreign Keys: ".to_string(),
+                        Style::default().fg(label_color),
+                    ),
                     Span::styled(
                         format!("{} relationships", metadata.foreign_keys.len()),
-                        Style::default().fg(Color::White),
+                        Style::default().fg(text_color),
                     ),
                 ]));
             }
 
             if !metadata.indexes.is_empty() {
                 lines.push(Line::from(vec![
-                    Span::styled("  Indexes: ".to_string(), Style::default().fg(Color::Cyan)),
+                    Span::styled("  Indexes: ".to_string(), Style::default().fg(label_color)),
                     Span::styled(
                         format!("{} total", metadata.indexes.len()),
-                        Style::default().fg(Color::White),
+                        Style::default().fg(text_color),
                     ),
                 ]));
             }
@@ -684,25 +756,36 @@ impl UI {
                 lines.push(Line::from(vec![Span::styled(
                     "💬 Comment".to_string(),
                     Style::default()
-                        .fg(Color::Yellow)
-                        .add_modifier(Modifier::BOLD),
+                        .fg(section_color)
+                        .add_modifier(if is_focused {
+                            Modifier::BOLD
+                        } else {
+                            Modifier::empty()
+                        }),
                 )]));
                 lines.push(Line::from(vec![
                     Span::styled("  ".to_string(), Style::default()),
                     Span::styled(
                         comment.clone(),
                         Style::default()
-                            .fg(Color::Gray)
+                            .fg(if is_focused {
+                                Color::Gray
+                            } else {
+                                Color::DarkGray
+                            })
                             .add_modifier(Modifier::ITALIC),
                     ),
                 ]));
             }
-
         } else {
             // No metadata loaded yet
             lines.push(Line::from(vec![Span::styled(
                 "Press Enter to load detailed metadata".to_string(),
-                Style::default().fg(Color::Yellow),
+                Style::default().fg(if is_focused {
+                    Color::Yellow
+                } else {
+                    Color::DarkGray
+                }),
             )]));
         }
 
@@ -712,22 +795,39 @@ impl UI {
         lines.push(Line::from(vec![Span::styled(
             "⌨️  Actions".to_string(),
             Style::default()
-                .fg(Color::DarkGray)
-                .add_modifier(Modifier::BOLD),
+                .fg(if is_focused {
+                    Color::DarkGray
+                } else {
+                    Color::Black
+                })
+                .add_modifier(if is_focused {
+                    Modifier::BOLD
+                } else {
+                    Modifier::empty()
+                }),
         )]));
 
-        let actions = vec![
-            ("Enter", "View/browse table data"),
-            ("r", "Refresh metadata"),
-            ("e", "Edit table structure"),
-            ("d", "Drop table"),
-        ];
+        let actions = vec![("r", "Refresh metadata")];
 
         for (key, desc) in actions {
             lines.push(Line::from(vec![
                 Span::styled("  ".to_string(), Style::default()),
-                Span::styled(format!("{}: ", key), Style::default().fg(Color::Yellow)),
-                Span::styled(desc.to_string(), Style::default().fg(Color::Gray)),
+                Span::styled(
+                    format!("{}: ", key),
+                    Style::default().fg(if is_focused {
+                        Color::Yellow
+                    } else {
+                        Color::DarkGray
+                    }),
+                ),
+                Span::styled(
+                    desc.to_string(),
+                    Style::default().fg(if is_focused {
+                        Color::Gray
+                    } else {
+                        Color::DarkGray
+                    }),
+                ),
             ]));
         }
 
@@ -738,11 +838,13 @@ impl UI {
     fn draw_tabular_output(&self, frame: &mut Frame, area: Rect, state: &mut AppState) {
         // Use table viewer if tables are open
         if !state.table_viewer_state.tabs.is_empty() {
+            let is_focused = state.ui.focused_pane == FocusedPane::TabularOutput;
             crate::ui::components::render_table_viewer(
                 frame,
                 &mut state.table_viewer_state,
                 area,
                 &self.theme,
+                is_focused,
             );
             return;
         }
@@ -1330,4 +1432,3 @@ impl UI {
         frame.render_widget(status_bar, area);
     }
 }
-
