@@ -30,10 +30,10 @@ impl HelpSystem {
         };
 
         lines.push(Line::from(vec![Span::styled(
-            format!("─── {pane_name} Commands "),
+            format!("🎯 {} Commands", pane_name),
             Style::default()
-                .fg(Color::Rgb(180, 180, 100))
-                .add_modifier(Modifier::BOLD),
+                .fg(Color::Rgb(120, 180, 255))
+                .add_modifier(Modifier::BOLD | Modifier::UNDERLINED),
         )]));
         lines.push(Line::from(""));
 
@@ -51,10 +51,10 @@ impl HelpSystem {
         // Add separator
         lines.push(Line::from(""));
         lines.push(Line::from(vec![Span::styled(
-            "─── Global Commands ",
+            "🌍 Global Commands",
             Style::default()
-                .fg(Color::Rgb(100, 180, 180))
-                .add_modifier(Modifier::BOLD),
+                .fg(Color::Rgb(100, 220, 180))
+                .add_modifier(Modifier::BOLD | Modifier::UNDERLINED),
         )]));
         lines.push(Line::from(""));
 
@@ -77,10 +77,10 @@ impl HelpSystem {
         let mut lines = vec![];
 
         lines.push(Line::from(vec![Span::styled(
-            "─── All Panes Overview ",
+            "📋 All Panes Overview",
             Style::default()
-                .fg(Color::Rgb(180, 100, 180))
-                .add_modifier(Modifier::BOLD),
+                .fg(Color::Rgb(255, 150, 200))
+                .add_modifier(Modifier::BOLD | Modifier::UNDERLINED),
         )]));
         lines.push(Line::from(""));
 
@@ -120,14 +120,14 @@ impl HelpSystem {
         let is_current = mode == current_mode;
         let header_style = if is_current {
             Style::default()
-                .fg(Color::Yellow)
+                .fg(Color::Rgb(255, 220, 100))
                 .add_modifier(Modifier::BOLD)
         } else {
-            Style::default().fg(Color::Rgb(150, 150, 150))
+            Style::default().fg(Color::Rgb(160, 170, 185))
         };
 
         lines.push(Line::from(vec![
-            Span::styled(if is_current { "▶ " } else { "  " }, header_style),
+            Span::styled(if is_current { "👉 " } else { "   " }, header_style),
             Span::styled(
                 name.to_string(),
                 header_style.add_modifier(Modifier::UNDERLINED),
@@ -135,15 +135,15 @@ impl HelpSystem {
         ]));
 
         let key_style = if is_current {
-            Style::default().fg(Color::Rgb(100, 200, 200))
+            Style::default().fg(Color::Rgb(150, 200, 255))
         } else {
-            Style::default().fg(Color::Rgb(100, 100, 100))
+            Style::default().fg(Color::Rgb(130, 140, 160))
         };
 
         let desc_style = if is_current {
-            Style::default().fg(Color::Rgb(200, 200, 200))
+            Style::default().fg(Color::Rgb(220, 230, 245))
         } else {
-            Style::default().fg(Color::Rgb(120, 120, 120))
+            Style::default().fg(Color::Rgb(140, 150, 170))
         };
 
         // Add key commands with descriptions for each pane
@@ -212,15 +212,16 @@ impl HelpSystem {
     /// Helper to add a command line with proper formatting
     fn add_command(lines: &mut Vec<Line<'static>>, key: &str, desc: &str) {
         lines.push(Line::from(vec![
+            Span::raw("  "),
             Span::styled(
-                format!("{key:10}"),
+                format!("⌨️  {key:<12}"),
                 Style::default()
-                    .fg(Color::Rgb(100, 200, 200))
+                    .fg(Color::Rgb(170, 220, 255))
                     .add_modifier(Modifier::BOLD),
             ),
             Span::styled(
                 desc.to_string(),
-                Style::default().fg(Color::Rgb(200, 200, 200)),
+                Style::default().fg(Color::Rgb(240, 245, 250)),
             ),
         ]));
     }
@@ -293,8 +294,8 @@ impl HelpSystem {
             return;
         }
 
-        // Create a more elegant modal size - smaller and centered
-        let area = centered_rect(65, 50, f.area());
+        // Create a larger, more spacious modal
+        let area = centered_rect(78, 65, f.area());
 
         // Create the main block with title
         let pane_name = match help_mode {
@@ -307,87 +308,99 @@ impl HelpSystem {
             HelpMode::None => "LazyTables",
         };
 
-        // Create an elegant dark overlay without completely clearing the background
-        let overlay_block = Block::default().style(Style::default().bg(Color::Rgb(20, 20, 20)));
+        // Create a solid dark overlay for better readability
+        let overlay_block = Block::default().style(Style::default().bg(Color::Rgb(15, 18, 22)));
         f.render_widget(overlay_block, area);
 
+        // Main block with elegant styling
         let main_block = Block::default()
-            .title(format!(" Help • {pane_name} "))
+            .title(format!(" ❓ Help Guide • {} ", pane_name))
             .title_alignment(Alignment::Center)
             .borders(Borders::ALL)
-            .border_style(Style::default().fg(Color::Rgb(80, 80, 100)))
+            .border_style(
+                Style::default()
+                    .fg(Color::Rgb(120, 150, 220))
+                    .add_modifier(Modifier::BOLD),
+            )
             .border_type(ratatui::widgets::BorderType::Rounded)
-            .style(Style::default().bg(Color::Rgb(20, 20, 20)));
+            .style(Style::default().bg(Color::Rgb(20, 25, 30)));
 
         let inner_area = main_block.inner(area);
         f.render_widget(main_block, area);
 
-        // Create two columns layout
+        // Create layout with more padding and two columns
+        let main_layout = Layout::default()
+            .direction(Direction::Vertical)
+            .constraints([
+                Constraint::Length(2), // Increased top padding
+                Constraint::Min(0),    // Content area
+                Constraint::Length(3), // Increased bottom padding for footer
+            ])
+            .split(inner_area);
+
         let columns = Layout::default()
             .direction(Direction::Horizontal)
-            .constraints([Constraint::Percentage(50), Constraint::Percentage(50)])
-            .split(inner_area);
+            .constraints([
+                Constraint::Percentage(46), // Left column (slightly smaller for more padding)
+                Constraint::Length(4),      // More separator space for padding
+                Constraint::Percentage(50), // Right column
+            ])
+            .split(main_layout[1]);
 
         // Left column - current pane commands + global
         let left_content = Self::create_left_column(help_mode);
         let left_widget = Paragraph::new(left_content)
-            .style(Style::default().fg(Color::White))
-            .wrap(Wrap { trim: true });
+            .style(Style::default().fg(Color::Rgb(240, 245, 250)))
+            .wrap(Wrap { trim: true })
+            .block(
+                Block::default()
+                    .borders(Borders::ALL)
+                    .border_type(ratatui::widgets::BorderType::Rounded)
+                    .border_style(Style::default().fg(Color::Rgb(80, 100, 150)))
+                    .style(Style::default().bg(Color::Rgb(25, 30, 35))),
+            );
 
-        // Add a subtle border between columns
-        let left_area = Rect {
-            x: columns[0].x,
-            y: columns[0].y,
-            width: columns[0].width.saturating_sub(1),
-            height: columns[0].height,
-        };
-        f.render_widget(left_widget, left_area);
+        f.render_widget(left_widget, columns[0]);
 
         // Right column - all panes overview
         let right_content = Self::create_right_column(help_mode);
         let right_widget = Paragraph::new(right_content)
-            .style(Style::default().fg(Color::White))
-            .wrap(Wrap { trim: true });
+            .style(Style::default().fg(Color::Rgb(240, 245, 250)))
+            .wrap(Wrap { trim: true })
+            .block(
+                Block::default()
+                    .borders(Borders::ALL)
+                    .border_type(ratatui::widgets::BorderType::Rounded)
+                    .border_style(Style::default().fg(Color::Rgb(80, 100, 150)))
+                    .style(Style::default().bg(Color::Rgb(25, 30, 35))),
+            );
 
-        let right_area = Rect {
-            x: columns[1].x + 1,
-            y: columns[1].y,
-            width: columns[1].width.saturating_sub(1),
-            height: columns[1].height,
-        };
-        f.render_widget(right_widget, right_area);
+        f.render_widget(right_widget, columns[2]);
 
-        // Draw vertical separator
-        let separator_area = Rect {
-            x: columns[1].x,
-            y: columns[1].y,
-            width: 1,
-            height: columns[1].height,
-        };
+        // Draw elegant vertical separator
+        let separator_chars = "│".repeat(columns[1].height as usize);
+        let separator_paragraph = Paragraph::new(separator_chars)
+            .style(Style::default().fg(Color::Rgb(80, 95, 140)))
+            .alignment(Alignment::Center);
+        f.render_widget(separator_paragraph, columns[1]);
 
-        let separator = Block::default()
-            .borders(Borders::LEFT)
-            .border_style(Style::default().fg(Color::DarkGray));
-        f.render_widget(separator, separator_area);
-
-        // Add footer hint
-        let footer_text = " ESC or ? to close ";
+        // Add elegant footer with instructions
+        let footer_text = "💡 Press ESC or ? to close this help guide";
         let footer = Paragraph::new(footer_text)
             .style(
                 Style::default()
-                    .fg(Color::DarkGray)
+                    .fg(Color::Rgb(140, 160, 200))
                     .add_modifier(Modifier::ITALIC),
             )
-            .alignment(Alignment::Center);
+            .alignment(Alignment::Center)
+            .block(
+                Block::default()
+                    .borders(Borders::TOP)
+                    .border_style(Style::default().fg(Color::Rgb(80, 100, 150)))
+                    .style(Style::default().bg(Color::Rgb(20, 25, 30))),
+            );
 
-        let footer_area = Rect {
-            x: area.x + 1,
-            y: area.y + area.height - 1,
-            width: area.width - 2,
-            height: 1,
-        };
-
-        f.render_widget(footer, footer_area);
+        f.render_widget(footer, main_layout[2]);
     }
 }
 

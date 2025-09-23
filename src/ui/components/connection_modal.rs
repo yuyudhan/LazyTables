@@ -1489,11 +1489,15 @@ fn render_modal_footer(f: &mut Frame, modal_state: &ConnectionModalState, area: 
         let (message, style) = match test_status {
             TestConnectionStatus::Testing => (
                 "🔄 Testing connection...".to_string(),
-                Style::default().fg(Color::Yellow).add_modifier(Modifier::BOLD | Modifier::RAPID_BLINK),
+                Style::default()
+                    .fg(Color::Yellow)
+                    .add_modifier(Modifier::BOLD | Modifier::RAPID_BLINK),
             ),
             TestConnectionStatus::Success(msg) => (
                 format!("✅ {msg}"),
-                Style::default().fg(Color::Green).add_modifier(Modifier::BOLD),
+                Style::default()
+                    .fg(Color::Green)
+                    .add_modifier(Modifier::BOLD),
             ),
             TestConnectionStatus::Failed(msg) => (
                 format!("❌ {msg}"),
@@ -1875,13 +1879,24 @@ mod tests {
 
         // Test setting status
         state.test_status = Some(TestConnectionStatus::Testing);
-        assert!(matches!(state.test_status, Some(TestConnectionStatus::Testing)));
+        assert!(matches!(
+            state.test_status,
+            Some(TestConnectionStatus::Testing)
+        ));
 
         state.test_status = Some(TestConnectionStatus::Success("Connected!".to_string()));
-        assert!(matches!(state.test_status, Some(TestConnectionStatus::Success(_))));
+        assert!(matches!(
+            state.test_status,
+            Some(TestConnectionStatus::Success(_))
+        ));
 
-        state.test_status = Some(TestConnectionStatus::Failed("Connection failed".to_string()));
-        assert!(matches!(state.test_status, Some(TestConnectionStatus::Failed(_))));
+        state.test_status = Some(TestConnectionStatus::Failed(
+            "Connection failed".to_string(),
+        ));
+        assert!(matches!(
+            state.test_status,
+            Some(TestConnectionStatus::Failed(_))
+        ));
     }
 
     #[test]

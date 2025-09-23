@@ -21,14 +21,7 @@ impl Command for NavigateUpCommand {
                 }
             }
             FocusedPane::Tables => {
-                if context.state.ui.selected_table > 0 {
-                    context.state.ui.selected_table -= 1;
-                    context
-                        .state
-                        .ui
-                        .tables_list_state
-                        .select(Some(context.state.ui.selected_table));
-                }
+                context.state.ui.table_selection_up();
             }
             FocusedPane::SqlFiles => {
                 if context.state.ui.selected_sql_file > 0 {
@@ -90,15 +83,7 @@ impl Command for NavigateDownCommand {
                 }
             }
             FocusedPane::Tables => {
-                let max = context.state.db.tables.len();
-                if context.state.ui.selected_table < max.saturating_sub(1) {
-                    context.state.ui.selected_table += 1;
-                    context
-                        .state
-                        .ui
-                        .tables_list_state
-                        .select(Some(context.state.ui.selected_table));
-                }
+                context.state.ui.table_selection_down();
             }
             FocusedPane::SqlFiles => {
                 let max = context.state.saved_sql_files.len();
