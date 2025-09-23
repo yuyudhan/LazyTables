@@ -163,6 +163,7 @@ impl HelpSystem {
                 Self::add_overview_command(lines, "Enter", "Open", key_style, desc_style);
                 Self::add_overview_command(lines, "n", "Create", key_style, desc_style);
                 Self::add_overview_command(lines, "e", "Edit", key_style, desc_style);
+                Self::add_overview_command(lines, "/", "Search", key_style, desc_style);
             }
             HelpMode::Details => {
                 Self::add_overview_command(lines, "r", "Refresh metadata", key_style, desc_style);
@@ -170,13 +171,21 @@ impl HelpSystem {
             HelpMode::TabularOutput => {
                 Self::add_overview_command(lines, "i", "Edit", key_style, desc_style);
                 Self::add_overview_command(lines, "dd/yy", "Delete/Copy", key_style, desc_style);
-                Self::add_overview_command(lines, "S/D", "Switch tabs", key_style, desc_style);
+                Self::add_overview_command(lines, "S/D", "Prev/Next tabs", key_style, desc_style);
                 Self::add_overview_command(lines, "/", "Search", key_style, desc_style);
+                Self::add_overview_command(lines, "t", "Toggle view", key_style, desc_style);
             }
             HelpMode::SqlFiles => {
                 Self::add_overview_command(lines, "Enter", "Load file", key_style, desc_style);
-                Self::add_overview_command(lines, "C-o", "Refresh", key_style, desc_style);
-                Self::add_overview_command(lines, "C-n", "New file", key_style, desc_style);
+                Self::add_overview_command(
+                    lines,
+                    "n/r/d/c",
+                    "New/Rename/Delete/Copy",
+                    key_style,
+                    desc_style,
+                );
+                Self::add_overview_command(lines, "/", "Search files", key_style, desc_style);
+                Self::add_overview_command(lines, "C-n", "New query", key_style, desc_style);
             }
             HelpMode::QueryWindow => {
                 Self::add_overview_command(lines, "i", "Edit mode", key_style, desc_style);
@@ -240,6 +249,8 @@ impl HelpSystem {
         Self::add_command(lines, "Enter", "Open table");
         Self::add_command(lines, "n", "Create table");
         Self::add_command(lines, "e", "Edit structure");
+        Self::add_command(lines, "/", "Search tables");
+        Self::add_command(lines, "gg/G", "First/last table");
     }
 
     fn add_details_commands(lines: &mut Vec<Line<'static>>) {
@@ -267,6 +278,7 @@ impl HelpSystem {
         Self::add_command(lines, "S/D", "Prev/next tab");
         Self::add_command(lines, "x", "Close tab");
         Self::add_command(lines, "r", "Refresh data");
+        Self::add_command(lines, "t", "Toggle Data/Schema view");
         Self::add_command(lines, "C-d/u", "Page down/up");
         Self::add_command(lines, "gg/G", "First/last row");
         Self::add_command(lines, "0/$", "First/last col");
@@ -275,8 +287,14 @@ impl HelpSystem {
     fn add_sql_files_commands(lines: &mut Vec<Line<'static>>) {
         Self::add_command(lines, "j/k", "Navigate files");
         Self::add_command(lines, "Enter", "Load file");
-        Self::add_command(lines, "C-o", "Refresh list");
-        Self::add_command(lines, "C-n", "New query file");
+        Self::add_command(lines, "n", "Create new file");
+        Self::add_command(lines, "r", "Rename file");
+        Self::add_command(lines, "d", "Delete file (with confirmation)");
+        Self::add_command(lines, "c", "Copy/duplicate file");
+        Self::add_command(lines, "/", "Search files");
+        Self::add_command(lines, "ESC", "Exit input modes");
+        Self::add_command(lines, "C-o", "Refresh file list");
+        Self::add_command(lines, "C-n", "New timestamped query");
     }
 
     fn add_query_window_commands(lines: &mut Vec<Line<'static>>) {
@@ -285,7 +303,7 @@ impl HelpSystem {
         Self::add_command(lines, "C-Enter", "Execute query at cursor");
         Self::add_command(lines, "C-s", "Save query");
         Self::add_command(lines, "C-o", "Refresh file list");
-        Self::add_command(lines, "C-n", "New query");
+        Self::add_command(lines, "C-n", "New timestamped query");
     }
 
     /// Render the help overlay
