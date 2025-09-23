@@ -37,6 +37,8 @@ pub struct ConfirmationModal {
 pub enum ConfirmationAction {
     DeleteConnection(usize),
     DeleteTable(String),
+    DeleteSqlFile(usize),
+    ExitApplication,
     // Add more actions as needed
 }
 
@@ -115,10 +117,29 @@ impl UI {
             .style(Style::default().fg(Color::White));
         frame.render_widget(message, chunks[0]);
 
-        // Render instructions
-        let instructions = Paragraph::new("Press Y to confirm, N or ESC to cancel")
-            .alignment(Alignment::Center)
-            .style(Style::default().fg(Color::Gray));
+        // Render instructions with highlighted key bindings
+        let instructions = Paragraph::new(Line::from(vec![
+            Span::raw("Press "),
+            Span::styled(
+                "Y",
+                Style::default()
+                    .fg(Color::Green)
+                    .add_modifier(Modifier::BOLD),
+            ),
+            Span::raw(" to confirm, "),
+            Span::styled(
+                "N",
+                Style::default().fg(Color::Red).add_modifier(Modifier::BOLD),
+            ),
+            Span::raw(" or "),
+            Span::styled(
+                "ESC",
+                Style::default().fg(Color::Red).add_modifier(Modifier::BOLD),
+            ),
+            Span::raw(" to cancel"),
+        ]))
+        .alignment(Alignment::Center)
+        .style(Style::default().fg(Color::Gray));
         frame.render_widget(instructions, chunks[2]);
     }
 
@@ -987,9 +1008,12 @@ impl UI {
             Style::default().fg(self.theme.get_color("border"))
         };
 
+        // Get filtered files list for display
+        let display_files = state.get_filtered_sql_files();
+        let selected_index = state.get_filtered_sql_file_selection();
+
         // Create list items from SQL files
-        let mut items: Vec<ListItem> = state
-            .saved_sql_files
+        let mut items: Vec<ListItem> = display_files
             .iter()
             .enumerate()
             .map(|(i, filename)| {
@@ -1003,48 +1027,176 @@ impl UI {
                     Style::default()
                         .fg(Color::Green)
                         .add_modifier(Modifier::BOLD)
-                } else if i == state.ui.selected_sql_file && is_focused {
+                } else if i == selected_index && is_focused {
                     Style::default().fg(self.theme.get_color("primary_highlight"))
                 } else {
                     Style::default().fg(self.theme.get_color("text"))
                 };
 
-                ListItem::new(Line::from(vec![Span::styled(
-                    format!("{prefix}{filename}.sql"),
-                    style,
-                )]))
+                // Add file metadata if focused and not in input mode
+                let file_display = if is_focused
+                    && !state.ui.sql_files_search_active
+                    && !state.ui.sql_files_rename_mode
+                    && !state.ui.sql_files_create_mode
+                {
+                    // Get file size and modification time
+                    let connection_name = if let Some(connection) = state
+                        .db
+                        .connections
+                        .connections
+                        .get(state.ui.selected_connection)
+                    {
+                        connection.name.clone()
+                    } else {
+                        "default".to_string()
+                    };
+
+                    let connection_dir =
+                        crate::config::Config::sql_files_dir().join(&connection_name);
+                    let root_dir = crate::config::Config::sql_files_dir();
+
+                    let connection_path = connection_dir.join(format!("{filename}.sql"));
+                    let root_path = root_dir.join(format!("{filename}.sql"));
+
+                    let (size_str, modified_str) = if connection_path.exists() {
+                        self.get_file_metadata(&connection_path)
+                    } else if root_path.exists() {
+                        self.get_file_metadata(&root_path)
+                    } else {
+                        ("?".to_string(), "?".to_string())
+                    };
+
+                    format!("{prefix}{filename}.sql  [{size_str}] {modified_str}")
+                } else {
+                    format!("{prefix}{filename}.sql")
+                };
+
+                ListItem::new(Line::from(vec![Span::styled(file_display, style)]))
             })
             .collect();
 
+        // Handle input modes
+        if state.ui.sql_files_search_active && is_focused {
+            items.insert(
+                0,
+                ListItem::new(Line::from(vec![
+                    Span::styled("Search: ", Style::default().fg(Color::Yellow)),
+                    Span::styled(
+                        &state.ui.sql_files_search_query,
+                        Style::default().fg(Color::White),
+                    ),
+                    Span::styled("_", Style::default().fg(Color::Gray)),
+                ])),
+            );
+            items.insert(1, ListItem::new(""));
+        } else if state.ui.sql_files_rename_mode && is_focused {
+            items.insert(
+                0,
+                ListItem::new(Line::from(vec![
+                    Span::styled("Rename to: ", Style::default().fg(Color::Yellow)),
+                    Span::styled(
+                        &state.ui.sql_files_rename_buffer,
+                        Style::default().fg(Color::White),
+                    ),
+                    Span::styled("_", Style::default().fg(Color::Gray)),
+                ])),
+            );
+            items.insert(1, ListItem::new(""));
+        } else if state.ui.sql_files_create_mode && is_focused {
+            items.insert(
+                0,
+                ListItem::new(Line::from(vec![
+                    Span::styled("New file: ", Style::default().fg(Color::Yellow)),
+                    Span::styled(
+                        &state.ui.sql_files_create_buffer,
+                        Style::default().fg(Color::White),
+                    ),
+                    Span::styled("_", Style::default().fg(Color::Gray)),
+                ])),
+            );
+            items.insert(1, ListItem::new(""));
+        }
+
         // Add instruction text if no files exist
-        if items.is_empty() {
+        if display_files.is_empty() && !state.ui.sql_files_create_mode {
             items.push(ListItem::new(Line::from(vec![Span::styled(
                 "No SQL files found",
                 Style::default().fg(Color::Gray),
             )])));
             items.push(ListItem::new(Line::from(vec![Span::styled(
-                "Create files with Ctrl+N",
+                "Press 'n' to create files",
                 Style::default().fg(Color::Gray),
             )])));
-        } else if is_focused {
+        } else if is_focused
+            && !state.ui.sql_files_search_active
+            && !state.ui.sql_files_rename_mode
+            && !state.ui.sql_files_create_mode
+        {
             // Add keybinding help when focused
             items.push(ListItem::new(""));
             items.push(ListItem::new(Line::from(vec![
-                Span::styled("Press ", Style::default().fg(Color::Gray)),
                 Span::styled(
                     "Enter",
                     Style::default()
                         .fg(Color::Yellow)
                         .add_modifier(Modifier::BOLD),
                 ),
-                Span::styled(" to load file", Style::default().fg(Color::Gray)),
+                Span::styled(" load | ", Style::default().fg(Color::Gray)),
+                Span::styled(
+                    "n",
+                    Style::default()
+                        .fg(Color::Yellow)
+                        .add_modifier(Modifier::BOLD),
+                ),
+                Span::styled(" new | ", Style::default().fg(Color::Gray)),
+                Span::styled(
+                    "r",
+                    Style::default()
+                        .fg(Color::Yellow)
+                        .add_modifier(Modifier::BOLD),
+                ),
+                Span::styled(" rename", Style::default().fg(Color::Gray)),
+            ])));
+            items.push(ListItem::new(Line::from(vec![
+                Span::styled(
+                    "d",
+                    Style::default()
+                        .fg(Color::Yellow)
+                        .add_modifier(Modifier::BOLD),
+                ),
+                Span::styled(" delete | ", Style::default().fg(Color::Gray)),
+                Span::styled(
+                    "c",
+                    Style::default()
+                        .fg(Color::Yellow)
+                        .add_modifier(Modifier::BOLD),
+                ),
+                Span::styled(" copy | ", Style::default().fg(Color::Gray)),
+                Span::styled(
+                    "/",
+                    Style::default()
+                        .fg(Color::Yellow)
+                        .add_modifier(Modifier::BOLD),
+                ),
+                Span::styled(" search", Style::default().fg(Color::Gray)),
             ])));
         }
+
+        // Create title with search/mode indicator
+        let title = if state.ui.sql_files_search_active {
+            format!(" SQL Files [SEARCH: {}] ", state.ui.sql_files_search_query)
+        } else if state.ui.sql_files_rename_mode {
+            " SQL Files [RENAME] ".to_string()
+        } else if state.ui.sql_files_create_mode {
+            " SQL Files [CREATE] ".to_string()
+        } else {
+            format!(" SQL Files ({}) ", display_files.len())
+        };
 
         let sql_files = List::new(items)
             .block(
                 Block::default()
-                    .title(" SQL Files ")
+                    .title(title)
                     .borders(Borders::ALL)
                     .border_style(border_style),
             )
@@ -1055,6 +1207,47 @@ impl UI {
             );
 
         frame.render_widget(sql_files, area);
+    }
+
+    /// Get file metadata as formatted strings
+    fn get_file_metadata(&self, path: &std::path::Path) -> (String, String) {
+        use std::fs;
+        use std::time::SystemTime;
+
+        match fs::metadata(path) {
+            Ok(metadata) => {
+                // Format file size
+                let size = metadata.len();
+                let size_str = if size < 1024 {
+                    format!("{}B", size)
+                } else if size < 1024 * 1024 {
+                    format!("{:.1}KB", size as f64 / 1024.0)
+                } else {
+                    format!("{:.1}MB", size as f64 / (1024.0 * 1024.0))
+                };
+
+                // Format modification time
+                let modified_str = metadata
+                    .modified()
+                    .map(|time| {
+                        let duration = SystemTime::now().duration_since(time).unwrap_or_default();
+                        let secs = duration.as_secs();
+                        if secs < 60 {
+                            "now".to_string()
+                        } else if secs < 3600 {
+                            format!("{}m", secs / 60)
+                        } else if secs < 86400 {
+                            format!("{}h", secs / 3600)
+                        } else {
+                            format!("{}d", secs / 86400)
+                        }
+                    })
+                    .unwrap_or_else(|_| "?".to_string());
+
+                (size_str, modified_str)
+            }
+            Err(_) => ("?".to_string(), "?".to_string()),
+        }
     }
 
     /// Draw the query window area

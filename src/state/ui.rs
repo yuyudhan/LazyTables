@@ -247,6 +247,20 @@ pub struct UIState {
     #[serde(skip)]
     pub pending_gg_command: bool,
 
+    // SQL Files pane state
+    /// Whether search mode is active in SQL files pane
+    pub sql_files_search_active: bool,
+    /// Current search query for SQL files
+    pub sql_files_search_query: String,
+    /// Whether rename mode is active
+    pub sql_files_rename_mode: bool,
+    /// New name buffer during rename
+    pub sql_files_rename_buffer: String,
+    /// Whether create new file mode is active
+    pub sql_files_create_mode: bool,
+    /// New file name buffer during creation
+    pub sql_files_create_buffer: String,
+
     // List UI states (not serialized)
     #[serde(skip)]
     pub connections_list_state: ListState,
@@ -298,6 +312,12 @@ impl UIState {
             tables_search_query: String::new(),
             filtered_table_items: Vec::new(),
             pending_gg_command: false,
+            sql_files_search_active: false,
+            sql_files_search_query: String::new(),
+            sql_files_rename_mode: false,
+            sql_files_rename_buffer: String::new(),
+            sql_files_create_mode: false,
+            sql_files_create_buffer: String::new(),
             connections_list_state,
             tables_list_state: ListState::default(),
         }
@@ -969,6 +989,113 @@ impl UIState {
     /// Cancel pending gg command
     pub fn cancel_pending_gg(&mut self) {
         self.pending_gg_command = false;
+    }
+
+    // === SQL FILES FUNCTIONALITY ===
+
+    /// Enter search mode for SQL files pane
+    pub fn enter_sql_files_search(&mut self) {
+        self.sql_files_search_active = true;
+        self.sql_files_search_query.clear();
+    }
+
+    /// Exit search mode for SQL files pane
+    pub fn exit_sql_files_search(&mut self) {
+        self.sql_files_search_active = false;
+        self.sql_files_search_query.clear();
+    }
+
+    /// Add character to SQL files search query
+    pub fn add_to_sql_files_search(&mut self, ch: char) {
+        if self.sql_files_search_active {
+            self.sql_files_search_query.push(ch);
+        }
+    }
+
+    /// Remove character from SQL files search query
+    pub fn backspace_sql_files_search(&mut self) {
+        if self.sql_files_search_active && !self.sql_files_search_query.is_empty() {
+            self.sql_files_search_query.pop();
+        }
+    }
+
+    /// Filter SQL files based on search query
+    pub fn filter_sql_files(&self, files: &[String]) -> Vec<String> {
+        if !self.sql_files_search_active || self.sql_files_search_query.is_empty() {
+            return files.to_vec();
+        }
+
+        let query = self.sql_files_search_query.to_lowercase();
+        files
+            .iter()
+            .filter(|file| {
+                let filename = file.to_lowercase();
+                matches_sequence(&filename, &query)
+            })
+            .cloned()
+            .collect()
+    }
+
+    /// Enter rename mode for SQL files pane
+    pub fn enter_sql_files_rename(&mut self, current_name: &str) {
+        self.sql_files_rename_mode = true;
+        self.sql_files_rename_buffer = current_name.to_string();
+    }
+
+    /// Exit rename mode for SQL files pane
+    pub fn exit_sql_files_rename(&mut self) {
+        self.sql_files_rename_mode = false;
+        self.sql_files_rename_buffer.clear();
+    }
+
+    /// Add character to rename buffer
+    pub fn add_to_sql_files_rename(&mut self, ch: char) {
+        if self.sql_files_rename_mode {
+            self.sql_files_rename_buffer.push(ch);
+        }
+    }
+
+    /// Remove character from rename buffer
+    pub fn backspace_sql_files_rename(&mut self) {
+        if self.sql_files_rename_mode && !self.sql_files_rename_buffer.is_empty() {
+            self.sql_files_rename_buffer.pop();
+        }
+    }
+
+    /// Enter create new file mode for SQL files pane
+    pub fn enter_sql_files_create(&mut self) {
+        self.sql_files_create_mode = true;
+        self.sql_files_create_buffer.clear();
+    }
+
+    /// Exit create new file mode for SQL files pane
+    pub fn exit_sql_files_create(&mut self) {
+        self.sql_files_create_mode = false;
+        self.sql_files_create_buffer.clear();
+        // Also clear search state to ensure files are visible
+        self.sql_files_search_active = false;
+        self.sql_files_search_query.clear();
+    }
+
+    /// Add character to create buffer
+    pub fn add_to_sql_files_create(&mut self, ch: char) {
+        if self.sql_files_create_mode {
+            self.sql_files_create_buffer.push(ch);
+        }
+    }
+
+    /// Remove character from create buffer
+    pub fn backspace_sql_files_create(&mut self) {
+        if self.sql_files_create_mode && !self.sql_files_create_buffer.is_empty() {
+            self.sql_files_create_buffer.pop();
+        }
+    }
+
+    /// Clear all SQL files input modes
+    pub fn clear_sql_files_input_modes(&mut self) {
+        self.exit_sql_files_search();
+        self.exit_sql_files_rename();
+        self.exit_sql_files_create();
     }
 }
 

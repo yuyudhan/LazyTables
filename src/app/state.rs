@@ -62,7 +62,7 @@ impl AppState {
         // Update list states based on loaded connections
         ui.update_connection_selection(db.connections.connections.len());
 
-        Self {
+        let mut app_state = Self {
             ui,
             db,
             connection_modal_state: ConnectionModalState::new(),
@@ -73,7 +73,12 @@ impl AppState {
             table_viewer_state: TableViewerState::new(),
             toast_manager: ToastManager::new(),
             query_editor: QueryEditor::new(),
-        }
+        };
+
+        // Load SQL files during initialization
+        app_state.refresh_sql_files();
+
+        app_state
     }
 
     /// Cycle focus to the next pane
@@ -1032,6 +1037,256 @@ impl AppState {
         self.refresh_sql_files();
 
         Ok(())
+    }
+
+    /// Delete a SQL file by index
+    pub fn delete_sql_file(&mut self, file_index: usize) -> Result<(), Box<dyn std::error::Error>> {
+        if file_index >= self.saved_sql_files.len() {
+            return Err("Invalid file index".into());
+        }
+
+        let filename = &self.saved_sql_files[file_index];
+        let connection_name = if let Some(connection) = self
+            .db
+            .connections
+            .connections
+            .get(self.ui.selected_connection)
+        {
+            connection.name.clone()
+        } else {
+            "default".to_string()
+        };
+
+        // Delete from both possible locations
+        let connection_dir = Config::sql_files_dir().join(&connection_name);
+        let root_dir = Config::sql_files_dir();
+
+        let connection_path = connection_dir.join(format!("{filename}.sql"));
+        let root_path = root_dir.join(format!("{filename}.sql"));
+
+        let mut deleted = false;
+        if connection_path.exists() {
+            std::fs::remove_file(&connection_path)?;
+            deleted = true;
+        }
+        if root_path.exists() {
+            std::fs::remove_file(&root_path)?;
+            deleted = true;
+        }
+
+        if !deleted {
+            return Err("File not found".into());
+        }
+
+        // If we deleted the currently loaded file, clear it
+        if self.ui.current_sql_file.as_ref() == Some(filename) {
+            self.ui.current_sql_file = None;
+            self.query_content.clear();
+            self.ui.query_modified = false;
+        }
+
+        self.refresh_sql_files();
+        Ok(())
+    }
+
+    /// Rename a SQL file
+    pub fn rename_sql_file(
+        &mut self,
+        file_index: usize,
+        new_name: &str,
+    ) -> Result<(), Box<dyn std::error::Error>> {
+        if file_index >= self.saved_sql_files.len() {
+            return Err("Invalid file index".into());
+        }
+
+        let old_name = &self.saved_sql_files[file_index];
+        let connection_name = if let Some(connection) = self
+            .db
+            .connections
+            .connections
+            .get(self.ui.selected_connection)
+        {
+            connection.name.clone()
+        } else {
+            "default".to_string()
+        };
+
+        // Check both possible locations for the file
+        let connection_dir = Config::sql_files_dir().join(&connection_name);
+        let root_dir = Config::sql_files_dir();
+
+        let old_connection_path = connection_dir.join(format!("{old_name}.sql"));
+        let old_root_path = root_dir.join(format!("{old_name}.sql"));
+
+        let new_connection_path = connection_dir.join(format!("{new_name}.sql"));
+        let new_root_path = root_dir.join(format!("{new_name}.sql"));
+
+        // Rename in the location where it exists
+        if old_connection_path.exists() {
+            std::fs::rename(&old_connection_path, &new_connection_path)?;
+        } else if old_root_path.exists() {
+            std::fs::rename(&old_root_path, &new_root_path)?;
+        } else {
+            return Err("File not found".into());
+        }
+
+        // Update current file reference if needed
+        if self.ui.current_sql_file.as_ref() == Some(old_name) {
+            self.ui.current_sql_file = Some(new_name.to_string());
+        }
+
+        self.refresh_sql_files();
+        Ok(())
+    }
+
+    /// Duplicate a SQL file
+    pub fn duplicate_sql_file(
+        &mut self,
+        file_index: usize,
+        new_name: &str,
+    ) -> Result<(), Box<dyn std::error::Error>> {
+        if file_index >= self.saved_sql_files.len() {
+            return Err("Invalid file index".into());
+        }
+
+        let source_name = &self.saved_sql_files[file_index];
+        let connection_name = if let Some(connection) = self
+            .db
+            .connections
+            .connections
+            .get(self.ui.selected_connection)
+        {
+            connection.name.clone()
+        } else {
+            "default".to_string()
+        };
+
+        // Find and read the source file
+        let connection_dir = Config::sql_files_dir().join(&connection_name);
+        let root_dir = Config::sql_files_dir();
+
+        let source_connection_path = connection_dir.join(format!("{source_name}.sql"));
+        let source_root_path = root_dir.join(format!("{source_name}.sql"));
+
+        let content = if source_connection_path.exists() {
+            std::fs::read_to_string(&source_connection_path)?
+        } else if source_root_path.exists() {
+            std::fs::read_to_string(&source_root_path)?
+        } else {
+            return Err("Source file not found".into());
+        };
+
+        // Write to the same location (connection-specific if it existed there, otherwise root)
+        let target_path = if source_connection_path.exists() {
+            connection_dir.join(format!("{new_name}.sql"))
+        } else {
+            root_dir.join(format!("{new_name}.sql"))
+        };
+
+        std::fs::write(&target_path, content)?;
+        self.refresh_sql_files();
+        Ok(())
+    }
+
+    /// Create a new SQL file
+    pub fn create_sql_file(&mut self, filename: &str) -> Result<(), Box<dyn std::error::Error>> {
+        let connection_name = if let Some(connection) = self
+            .db
+            .connections
+            .connections
+            .get(self.ui.selected_connection)
+        {
+            connection.name.clone()
+        } else {
+            "default".to_string()
+        };
+
+        // Create in connection-specific directory
+        let connection_dir = Config::sql_files_dir().join(&connection_name);
+        std::fs::create_dir_all(&connection_dir)?;
+
+        let file_path = connection_dir.join(format!("{filename}.sql"));
+
+        // Create empty file
+        std::fs::write(&file_path, "")?;
+
+        // Load the new file and refresh list
+        self.query_content.clear();
+        self.ui.current_sql_file = Some(filename.to_string());
+        self.ui.query_modified = false;
+
+        // Clear any search state to ensure new file is visible
+        self.ui.sql_files_search_active = false;
+        self.ui.sql_files_search_query.clear();
+
+        self.refresh_sql_files();
+
+        // Select the newly created file in the list
+        if let Some(index) = self.saved_sql_files.iter().position(|f| f == filename) {
+            self.ui.selected_sql_file = index;
+        }
+
+        // Set cursor to beginning
+        self.ui.query_cursor_line = 0;
+        self.ui.query_cursor_column = 0;
+
+        Ok(())
+    }
+
+    /// Get filtered SQL files list for display
+    pub fn get_filtered_sql_files(&self) -> Vec<String> {
+        self.ui.filter_sql_files(&self.saved_sql_files)
+    }
+
+    /// Get selected SQL file index adjusted for filtered list
+    pub fn get_filtered_sql_file_selection(&self) -> usize {
+        let filtered = self.get_filtered_sql_files();
+        if filtered.is_empty() {
+            return 0;
+        }
+
+        if self.ui.sql_files_search_active {
+            // When searching, use selection as-is but clamp to filtered list
+            self.ui
+                .selected_sql_file
+                .min(filtered.len().saturating_sub(1))
+        } else {
+            self.ui.selected_sql_file
+        }
+    }
+
+    /// Update SQL file selection for filtered list
+    pub fn update_sql_file_selection_for_filtered(&mut self, direction: i32) {
+        let filtered = self.get_filtered_sql_files();
+        if filtered.is_empty() {
+            return;
+        }
+
+        let current = self.get_filtered_sql_file_selection();
+        let new_selection = if direction > 0 {
+            (current + 1) % filtered.len()
+        } else if direction < 0 {
+            if current > 0 {
+                current - 1
+            } else {
+                filtered.len() - 1
+            }
+        } else {
+            current
+        };
+
+        if self.ui.sql_files_search_active {
+            self.ui.selected_sql_file = new_selection;
+        } else {
+            // Map back to original list
+            if let Some(selected_name) = filtered.get(new_selection) {
+                if let Some(original_index) =
+                    self.saved_sql_files.iter().position(|f| f == selected_name)
+                {
+                    self.ui.selected_sql_file = original_index;
+                }
+            }
+        }
     }
 
     /// Open table creator view
