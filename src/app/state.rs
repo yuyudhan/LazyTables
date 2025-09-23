@@ -5,7 +5,8 @@ use crate::{
     database::{ConnectionConfig, ConnectionStatus, DatabaseType},
     state::{ui::UIState, DatabaseState},
     ui::components::{
-        ConnectionModalState, QueryEditor, TableCreatorState, TableEditorState, TableViewerState, ToastManager,
+        ConnectionModalState, QueryEditor, TableCreatorState, TableEditorState, TableViewerState,
+        ToastManager,
     },
 };
 
@@ -173,8 +174,10 @@ impl AppState {
                         20 // Default height if not yet calculated
                     };
 
-                    if self.ui.query_cursor_line >= self.ui.query_viewport_offset + effective_height {
-                        self.ui.query_viewport_offset = self.ui.query_cursor_line.saturating_sub(effective_height) + 1;
+                    if self.ui.query_cursor_line >= self.ui.query_viewport_offset + effective_height
+                    {
+                        self.ui.query_viewport_offset =
+                            self.ui.query_cursor_line.saturating_sub(effective_height) + 1;
                     }
                 }
             }
@@ -348,54 +351,25 @@ impl AppState {
 
     /// Move table selection down
     pub fn table_down(&mut self) {
-        if !self.db.tables.is_empty() {
-            let len = self.db.tables.len();
-            self.ui.selected_table = (self.ui.selected_table + 1) % len;
-            // Direct selection without offset
-            self.ui
-                .tables_list_state
-                .select(Some(self.ui.selected_table));
-
-            // Clear metadata when selection changes (will load when Enter is pressed)
-            self.db.current_table_metadata = None;
-        }
+        self.ui.table_selection_down();
+        // Clear metadata when selection changes (will load when Enter is pressed)
+        self.db.current_table_metadata = None;
     }
 
     /// Move table selection up
     pub fn table_up(&mut self) {
-        if !self.db.tables.is_empty() {
-            let len = self.db.tables.len();
-            self.ui.selected_table = if self.ui.selected_table > 0 {
-                self.ui.selected_table - 1
-            } else {
-                len - 1
-            };
-            // Direct selection without offset
-            self.ui
-                .tables_list_state
-                .select(Some(self.ui.selected_table));
-
-            // Clear metadata when selection changes (will load when Enter is pressed)
-            self.db.current_table_metadata = None;
-        }
+        self.ui.table_selection_up();
+        // Clear metadata when selection changes (will load when Enter is pressed)
+        self.db.current_table_metadata = None;
     }
 
     /// Update table list state when tables change
     pub fn update_table_selection(&mut self) {
-        if !self.db.tables.is_empty() {
-            // Preserve selection if possible, otherwise clamp to valid range
-            let max_index = self.db.tables.len() - 1;
-            if self.ui.selected_table > max_index {
-                self.ui.selected_table = max_index;
-            }
-            // Direct selection without offset
-            self.ui
-                .tables_list_state
-                .select(Some(self.ui.selected_table));
-        } else {
-            self.ui.selected_table = 0;
-            self.ui.tables_list_state.select(None);
-        }
+        // The unified selection system now handles this automatically
+        // through build_selectable_table_items(), so this method is kept
+        // for backward compatibility but delegates to the new system
+        self.ui
+            .build_selectable_table_items(&self.db.database_objects);
     }
 
     /// Disconnect all connections except the one at the given index
@@ -456,12 +430,17 @@ impl AppState {
                         if let Some(ref error) = objects.error {
                             self.db.table_load_error = Some(error.clone());
                         }
+                        // Update the selectable table items list
+                        self.ui
+                            .build_selectable_table_items(&self.db.database_objects);
                     }
                     Err(error) => {
                         let error_msg = error.clone();
                         conn.status = ConnectionStatus::Failed(error.clone());
                         self.db.database_objects = None;
                         self.db.tables.clear();
+                        // Clear the selectable table items list
+                        self.ui.build_selectable_table_items(&None);
                         self.toast_manager
                             .error(format!("Connection failed: {error_msg}"));
                     }
@@ -497,8 +476,11 @@ impl AppState {
             .get_mut(self.ui.selected_connection)
         {
             connection.status = ConnectionStatus::Disconnected;
+            self.db.database_objects = None;
             self.db.tables.clear();
             self.db.table_load_error = None;
+            // Clear the selectable table items list
+            self.ui.build_selectable_table_items(&None);
             self.update_table_selection();
 
             // Save updated connection status
@@ -724,7 +706,8 @@ impl AppState {
 
         if let Some(current_line) = new_lines.get_mut(self.ui.query_cursor_line) {
             // Split the current line at the cursor position
-            let (before, after) = current_line.split_at(self.ui.query_cursor_column.min(current_line.len()));
+            let (before, after) =
+                current_line.split_at(self.ui.query_cursor_column.min(current_line.len()));
             let after = after.to_string();
             *current_line = before.to_string();
 
@@ -747,7 +730,8 @@ impl AppState {
         };
 
         if self.ui.query_cursor_line >= self.ui.query_viewport_offset + effective_height {
-            self.ui.query_viewport_offset = self.ui.query_cursor_line.saturating_sub(effective_height) + 1;
+            self.ui.query_viewport_offset =
+                self.ui.query_cursor_line.saturating_sub(effective_height) + 1;
         }
     }
 
@@ -928,7 +912,8 @@ impl AppState {
         let half_page = self.ui.query_viewport_height.saturating_div(2).max(1);
 
         // Move cursor down by half page
-        self.ui.query_cursor_line = (self.ui.query_cursor_line + half_page).min(lines.saturating_sub(1));
+        self.ui.query_cursor_line =
+            (self.ui.query_cursor_line + half_page).min(lines.saturating_sub(1));
 
         // Adjust viewport
         let effective_height = if self.ui.query_viewport_height > 0 {
@@ -938,7 +923,8 @@ impl AppState {
         };
 
         if self.ui.query_cursor_line >= self.ui.query_viewport_offset + effective_height {
-            self.ui.query_viewport_offset = self.ui.query_cursor_line.saturating_sub(effective_height) + 1;
+            self.ui.query_viewport_offset =
+                self.ui.query_cursor_line.saturating_sub(effective_height) + 1;
         }
     }
 
@@ -1007,7 +993,7 @@ impl AppState {
 
     /// Open table editor view
     pub async fn open_table_editor(&mut self) {
-        if let Some(table_name) = self.db.tables.get(self.ui.selected_table).cloned() {
+        if let Some(table_name) = self.ui.get_selected_table_name() {
             self.ui.show_table_editor = true;
             self.table_editor_state = TableEditorState::new(table_name.clone());
 
@@ -1198,7 +1184,7 @@ impl AppState {
 
     /// Open a table for viewing
     pub async fn open_table_for_viewing(&mut self) {
-        if let Some(table_name) = self.db.tables.get(self.ui.selected_table).cloned() {
+        if let Some(table_name) = self.ui.get_selected_table_name() {
             // Add tab to viewer
             let tab_idx = self.table_viewer_state.add_tab(table_name.clone());
 
@@ -1293,7 +1279,8 @@ impl AppState {
     /// Update query editor database context when connection changes
     pub fn update_query_editor_context(&mut self) {
         if let Some(connection) = self.get_selected_connection() {
-            self.query_editor.set_database_type(Some(connection.database_type.clone()));
+            self.query_editor
+                .set_database_type(Some(connection.database_type.clone()));
         } else {
             self.query_editor.set_database_type(None);
         }
@@ -1344,7 +1331,10 @@ impl AppState {
     }
 
     /// Load SQL file into query editor
-    pub fn load_sql_file_into_editor(&mut self, filename: &str) -> Result<(), Box<dyn std::error::Error>> {
+    pub fn load_sql_file_into_editor(
+        &mut self,
+        filename: &str,
+    ) -> Result<(), Box<dyn std::error::Error>> {
         self.load_query_file(filename)?;
         // Sync to query editor
         self.query_editor.set_content(self.query_content.clone());
