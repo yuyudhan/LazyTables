@@ -263,6 +263,25 @@ impl App {
                         crate::ui::ConfirmationAction::DeleteTable(_) => {
                             // Handle table deletion if needed in future
                         }
+                        crate::ui::ConfirmationAction::DeleteSqlFile(index) => {
+                            let index = *index;
+                            // Delete the SQL file
+                            if let Err(e) = self.state.delete_sql_file(index) {
+                                self.state
+                                    .toast_manager
+                                    .error(format!("Failed to delete SQL file: {e}"));
+                            } else {
+                                self.state.toast_manager.success("SQL file deleted");
+                            }
+                            // Update UI selection after deletion
+                            self.state
+                                .ui
+                                .update_sql_file_selection(self.state.saved_sql_files.len());
+                        }
+                        crate::ui::ConfirmationAction::ExitApplication => {
+                            // Exit the application
+                            self.should_quit = true;
+                        }
                     }
                     self.state.ui.confirmation_modal = None;
                 }
@@ -314,20 +333,39 @@ impl App {
                 && !self.state.ui.show_edit_connection_modal
                 && !self.state.ui.show_table_creator
                 && !self.state.ui.show_table_editor
+                && self.state.ui.confirmation_modal.is_none()
+                && !self.state.ui.sql_files_search_active
+                && !self.state.ui.sql_files_rename_mode
+                && !self.state.ui.sql_files_create_mode
             {
                 // Check if we're editing in table viewer
                 if self.state.ui.focused_pane == FocusedPane::TabularOutput {
                     if let Some(tab) = self.state.table_viewer_state.current_tab() {
                         if !tab.in_edit_mode && !tab.in_search_mode {
-                            self.execute_command(CommandId::Quit)?;
+                            // Show exit confirmation modal
+                            self.state.ui.confirmation_modal = Some(crate::ui::ConfirmationModal {
+                                title: "Exit LazyTables".to_string(),
+                                message: "Are you sure you want to exit?\n\nAll active database connections will be closed.".to_string(),
+                                action: crate::ui::ConfirmationAction::ExitApplication,
+                            });
                             return Ok(());
                         }
                     } else {
-                        self.should_quit = true;
+                        // Show exit confirmation modal
+                        self.state.ui.confirmation_modal = Some(crate::ui::ConfirmationModal {
+                            title: "Exit LazyTables".to_string(),
+                            message: "Are you sure you want to exit?\n\nAll active database connections will be closed.".to_string(),
+                            action: crate::ui::ConfirmationAction::ExitApplication,
+                        });
                         return Ok(());
                     }
                 } else {
-                    self.should_quit = true;
+                    // Show exit confirmation modal
+                    self.state.ui.confirmation_modal = Some(crate::ui::ConfirmationModal {
+                        title: "Exit LazyTables".to_string(),
+                        message: "Are you sure you want to exit?\n\nAll active database connections will be closed.".to_string(),
+                        action: crate::ui::ConfirmationAction::ExitApplication,
+                    });
                     return Ok(());
                 }
             }
@@ -471,6 +509,119 @@ impl App {
             }
         }
 
+        // Handle input modes in SQL files pane
+        if self.state.ui.focused_pane == FocusedPane::SqlFiles {
+            if self.state.ui.sql_files_search_active {
+                match key.code {
+                    KeyCode::Esc => {
+                        self.state.ui.exit_sql_files_search();
+                        return Ok(());
+                    }
+                    KeyCode::Backspace => {
+                        self.state.ui.backspace_sql_files_search();
+                        return Ok(());
+                    }
+                    KeyCode::Enter => {
+                        self.state.ui.exit_sql_files_search();
+                        return Ok(());
+                    }
+                    KeyCode::Down | KeyCode::Char('j') => {
+                        self.state.update_sql_file_selection_for_filtered(1);
+                        return Ok(());
+                    }
+                    KeyCode::Up | KeyCode::Char('k') => {
+                        self.state.update_sql_file_selection_for_filtered(-1);
+                        return Ok(());
+                    }
+                    KeyCode::Char(c) => {
+                        // Don't handle navigation keys as input
+                        if c != 'j' && c != 'k' {
+                            self.state.ui.add_to_sql_files_search(c);
+                        }
+                        return Ok(());
+                    }
+                    _ => {}
+                }
+            } else if self.state.ui.sql_files_rename_mode {
+                match key.code {
+                    KeyCode::Esc => {
+                        self.state.ui.exit_sql_files_rename();
+                        return Ok(());
+                    }
+                    KeyCode::Backspace => {
+                        self.state.ui.backspace_sql_files_rename();
+                        return Ok(());
+                    }
+                    KeyCode::Enter => {
+                        let new_name = self.state.ui.sql_files_rename_buffer.clone();
+                        if !new_name.is_empty() {
+                            let filtered_files = self.state.get_filtered_sql_files();
+                            let selected_index = self.state.get_filtered_sql_file_selection();
+                            if let Some(old_name) = filtered_files.get(selected_index) {
+                                if let Some(original_index) = self
+                                    .state
+                                    .saved_sql_files
+                                    .iter()
+                                    .position(|f| f == old_name)
+                                {
+                                    if let Err(e) =
+                                        self.state.rename_sql_file(original_index, &new_name)
+                                    {
+                                        self.state
+                                            .toast_manager
+                                            .error(format!("Failed to rename file: {e}"));
+                                    } else {
+                                        self.state
+                                            .toast_manager
+                                            .success("File renamed successfully");
+                                    }
+                                }
+                            }
+                        }
+                        self.state.ui.exit_sql_files_rename();
+                        return Ok(());
+                    }
+                    KeyCode::Char(c) => {
+                        self.state.ui.add_to_sql_files_rename(c);
+                        return Ok(());
+                    }
+                    _ => {}
+                }
+            } else if self.state.ui.sql_files_create_mode {
+                match key.code {
+                    KeyCode::Esc => {
+                        self.state.ui.exit_sql_files_create();
+                        return Ok(());
+                    }
+                    KeyCode::Backspace => {
+                        self.state.ui.backspace_sql_files_create();
+                        return Ok(());
+                    }
+                    KeyCode::Enter => {
+                        let filename = self.state.ui.sql_files_create_buffer.clone();
+                        if !filename.is_empty() {
+                            if let Err(e) = self.state.create_sql_file(&filename) {
+                                self.state
+                                    .toast_manager
+                                    .error(format!("Failed to create file: {e}"));
+                            } else {
+                                self.state
+                                    .toast_manager
+                                    .success("File created successfully");
+                            }
+                        }
+                        self.state.ui.exit_sql_files_create();
+                        return Ok(());
+                    }
+                    KeyCode::Char(c) => {
+                        self.state.ui.add_to_sql_files_create(c);
+                        return Ok(());
+                    }
+                    _ => {}
+                }
+            }
+        }
+
         match self.mode {
             Mode::Normal => {
                 match (key.modifiers, key.code) {
@@ -513,6 +664,12 @@ impl App {
                             self.state.ui.table_search_selection_down();
                             // Cancel any pending gg command
                             self.state.ui.cancel_pending_gg();
+                        } else if self.state.ui.focused_pane == FocusedPane::SqlFiles
+                            && !self.state.ui.sql_files_search_active
+                            && !self.state.ui.sql_files_rename_mode
+                            && !self.state.ui.sql_files_create_mode
+                        {
+                            self.state.update_sql_file_selection_for_filtered(1);
                         } else {
                             self.state.move_down();
                         }
@@ -524,6 +681,12 @@ impl App {
                             self.state.ui.table_search_selection_up();
                             // Cancel any pending gg command
                             self.state.ui.cancel_pending_gg();
+                        } else if self.state.ui.focused_pane == FocusedPane::SqlFiles
+                            && !self.state.ui.sql_files_search_active
+                            && !self.state.ui.sql_files_rename_mode
+                            && !self.state.ui.sql_files_create_mode
+                        {
+                            self.state.update_sql_file_selection_for_filtered(-1);
                         } else {
                             self.state.move_up();
                         }
@@ -610,6 +773,14 @@ impl App {
                                     self.state.open_table_creator();
                                 }
                             }
+                        } else if self.state.ui.focused_pane == FocusedPane::SqlFiles {
+                            // Create new SQL file
+                            if !self.state.ui.sql_files_search_active
+                                && !self.state.ui.sql_files_rename_mode
+                                && !self.state.ui.sql_files_create_mode
+                            {
+                                self.state.ui.enter_sql_files_create();
+                            }
                         } else if self.state.ui.focused_pane == FocusedPane::TabularOutput {
                             // Next search result (when not in search mode)
                             if let Some(tab) = self.state.table_viewer_state.current_tab_mut() {
@@ -651,6 +822,41 @@ impl App {
                             _ => {}
                         }
                     }
+                    // Copy SQL file (only in SQL Files pane)
+                    (KeyModifiers::NONE, KeyCode::Char('c'))
+                        if self.state.ui.focused_pane == FocusedPane::SqlFiles =>
+                    {
+                        if !self.state.ui.sql_files_search_active
+                            && !self.state.ui.sql_files_rename_mode
+                            && !self.state.ui.sql_files_create_mode
+                            && !self.state.saved_sql_files.is_empty()
+                        {
+                            let filtered_files = self.state.get_filtered_sql_files();
+                            let selected_index = self.state.get_filtered_sql_file_selection();
+                            if let Some(filename) = filtered_files.get(selected_index) {
+                                // Find the original index in the full list
+                                if let Some(original_index) = self
+                                    .state
+                                    .saved_sql_files
+                                    .iter()
+                                    .position(|f| f == filename)
+                                {
+                                    let new_name = format!("{}_copy", filename);
+                                    if let Err(e) =
+                                        self.state.duplicate_sql_file(original_index, &new_name)
+                                    {
+                                        self.state
+                                            .toast_manager
+                                            .error(format!("Failed to copy file: {e}"));
+                                    } else {
+                                        self.state
+                                            .toast_manager
+                                            .success(format!("File copied as {new_name}"));
+                                    }
+                                }
+                            }
+                        }
+                    }
                     // Delete connection with confirmation (only in Connections pane)
                     (KeyModifiers::NONE, KeyCode::Char('d'))
                         if self.state.ui.focused_pane
@@ -673,6 +879,36 @@ impl App {
                                     self.state.ui.selected_connection,
                                 ),
                             });
+                        }
+                    }
+                    // Delete SQL file with confirmation (only in SQL Files pane)
+                    (KeyModifiers::NONE, KeyCode::Char('d'))
+                        if self.state.ui.focused_pane == FocusedPane::SqlFiles =>
+                    {
+                        if !self.state.ui.sql_files_search_active
+                            && !self.state.ui.sql_files_rename_mode
+                            && !self.state.ui.sql_files_create_mode
+                            && !self.state.saved_sql_files.is_empty()
+                        {
+                            let filtered_files = self.state.get_filtered_sql_files();
+                            let selected_index = self.state.get_filtered_sql_file_selection();
+                            if let Some(filename) = filtered_files.get(selected_index) {
+                                self.state.ui.confirmation_modal =
+                                    Some(crate::ui::ConfirmationModal {
+                                        title: "Delete SQL File".to_string(),
+                                        message: format!(
+                                        "Are you sure you want to delete the SQL file '{filename}'?"
+                                    ),
+                                        action: crate::ui::ConfirmationAction::DeleteSqlFile(
+                                            // Find the original index in the full list
+                                            self.state
+                                                .saved_sql_files
+                                                .iter()
+                                                .position(|f| f == filename)
+                                                .unwrap_or(0),
+                                        ),
+                                    });
+                            }
                         }
                     }
                     // Connect/select action
@@ -836,6 +1072,13 @@ impl App {
                         } else if self.state.ui.focused_pane == FocusedPane::Tables {
                             // Start search mode in tables pane
                             self.state.ui.enter_tables_search();
+                        } else if self.state.ui.focused_pane == FocusedPane::SqlFiles {
+                            // Start search mode in SQL files pane
+                            if !self.state.ui.sql_files_rename_mode
+                                && !self.state.ui.sql_files_create_mode
+                            {
+                                self.state.ui.enter_sql_files_search();
+                            }
                         }
                     }
                     // Handle uppercase S for previous tab (both with and without SHIFT modifier)
@@ -884,6 +1127,21 @@ impl App {
                                     }
                                 } else {
                                     self.state.toast_manager.warning("No table selected");
+                                }
+                            }
+                            FocusedPane::SqlFiles => {
+                                // Rename SQL file
+                                if !self.state.ui.sql_files_search_active
+                                    && !self.state.ui.sql_files_rename_mode
+                                    && !self.state.ui.sql_files_create_mode
+                                    && !self.state.saved_sql_files.is_empty()
+                                {
+                                    let filtered_files = self.state.get_filtered_sql_files();
+                                    let selected_index =
+                                        self.state.get_filtered_sql_file_selection();
+                                    if let Some(filename) = filtered_files.get(selected_index) {
+                                        self.state.ui.enter_sql_files_rename(filename);
+                                    }
                                 }
                             }
                             _ => {}
