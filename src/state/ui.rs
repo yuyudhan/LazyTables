@@ -195,6 +195,10 @@ pub struct UIState {
     pub query_viewport_offset: usize,
     /// Number of visible lines in the query editor (updated on render)
     pub query_viewport_height: usize,
+    /// Viewport offset for the details pane scrolling
+    pub details_viewport_offset: usize,
+    /// Height of the details pane viewport
+    pub details_viewport_height: usize,
 
     // Vim command state
     /// Vim command buffer for :w, :q, etc
@@ -272,6 +276,8 @@ impl UIState {
             current_sql_file: None,
             query_viewport_offset: 0,
             query_viewport_height: 0,
+            details_viewport_offset: 0,
+            details_viewport_height: 0,
             vim_command_buffer: String::new(),
             in_vim_command: false,
             show_add_connection_modal: false,

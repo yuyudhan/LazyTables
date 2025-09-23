@@ -465,18 +465,18 @@ impl SqliteConnection {
                 0
             };
 
-            Ok(TableMetadata {
-                table_name: table_name.to_string(),
-                row_count: row_count as usize,
+            Ok(TableMetadata::basic(
+                table_name.to_string(),
+                row_count as usize,
                 column_count,
-                total_size: size,
-                table_size: size,
-                indexes_size: 0,
+                size,
+                size,
+                0,
                 primary_keys,
                 foreign_keys,
                 indexes,
-                comment: None,
-            })
+                None,
+            ))
         } else {
             Err(LazyTablesError::Connection(
                 "Not connected to database".to_string(),
