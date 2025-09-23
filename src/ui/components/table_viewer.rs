@@ -174,6 +174,47 @@ impl TableTab {
         pk_values
     }
 
+    /// Ensure the selected row is visible within the current viewport
+    pub fn ensure_selection_visible(&mut self) {
+        self.ensure_selection_visible_with_height(20); // More accurate default height estimate
+    }
+
+    /// Ensure the selected row is visible within the viewport with specific height
+    pub fn ensure_selection_visible_with_height(&mut self, viewport_height: usize) {
+        // If selected row is above viewport, scroll up
+        if self.selected_row < self.scroll_offset_y {
+            self.scroll_offset_y = self.selected_row;
+        }
+        // If selected row is below viewport, scroll down
+        else if self.selected_row >= self.scroll_offset_y + viewport_height {
+            self.scroll_offset_y = self.selected_row.saturating_sub(viewport_height) + 1;
+        }
+    }
+
+    /// Update viewport height and adjust scrolling accordingly
+    pub fn update_viewport_height(&mut self, height: usize) {
+        if height <= 4 {
+            return; // Not enough space to display anything meaningful
+        }
+
+        let viewport_height = height.saturating_sub(4); // Account for borders and header
+
+        // Ensure current selection is still visible with new height
+        if self.selected_row >= self.scroll_offset_y + viewport_height {
+            self.scroll_offset_y = self.selected_row.saturating_sub(viewport_height) + 1;
+        }
+
+        // Don't scroll beyond available rows
+        if self.rows.len() > viewport_height {
+            let max_scroll = self.rows.len().saturating_sub(viewport_height);
+            if self.scroll_offset_y > max_scroll {
+                self.scroll_offset_y = max_scroll;
+            }
+        } else {
+            self.scroll_offset_y = 0;
+        }
+    }
+
     /// Navigate to next page
     pub fn next_page(&mut self) -> bool {
         let max_page = (self.total_rows.saturating_sub(1)) / self.rows_per_page;
@@ -211,6 +252,8 @@ impl TableTab {
     pub fn move_up(&mut self) {
         if self.selected_row > 0 {
             self.selected_row -= 1;
+            // Auto-scroll if selection goes beyond viewport
+            self.ensure_selection_visible();
         }
     }
 
@@ -218,6 +261,8 @@ impl TableTab {
     pub fn move_down(&mut self) {
         if self.selected_row < self.rows.len().saturating_sub(1) {
             self.selected_row += 1;
+            // Auto-scroll if selection goes beyond viewport
+            self.ensure_selection_visible();
         }
     }
 
@@ -254,11 +299,13 @@ impl TableTab {
     /// Jump to first row
     pub fn jump_to_first(&mut self) {
         self.selected_row = 0;
+        self.scroll_offset_y = 0;
     }
 
     /// Jump to last row
     pub fn jump_to_last(&mut self) {
         self.selected_row = self.rows.len().saturating_sub(1);
+        self.ensure_selection_visible();
     }
 
     /// Jump to first column
@@ -534,29 +581,37 @@ pub fn render_table_viewer(
         return;
     }
 
-    // Layout: Tabs at top, table content below, help at bottom
-    let chunks = Layout::default()
-        .direction(Direction::Vertical)
-        .constraints([
-            Constraint::Length(3),                                   // Tabs
-            Constraint::Min(10),                                     // Table content
-            Constraint::Length(if state.show_help { 8 } else { 3 }), // Help/status
-        ])
-        .split(area);
+    // Layout: Tabs at top, table content below, optional help overlay
+    let chunks = if state.show_help {
+        Layout::default()
+            .direction(Direction::Vertical)
+            .constraints([
+                Constraint::Length(3),  // Tabs
+                Constraint::Min(10),    // Table content
+                Constraint::Length(8),  // Help
+            ])
+            .split(area)
+    } else {
+        Layout::default()
+            .direction(Direction::Vertical)
+            .constraints([
+                Constraint::Length(3),  // Tabs
+                Constraint::Min(0),     // Table content (takes remaining space)
+            ])
+            .split(area)
+    };
 
     // Render tabs
     render_tabs(f, state, chunks[0], theme, is_focused);
 
     // Render current table
-    if let Some(tab) = state.current_tab() {
+    if let Some(tab) = state.current_tab_mut() {
         render_table_content(f, tab, chunks[1], theme, is_focused);
     }
 
-    // Render help or status
+    // Render help if requested (no persistent status bar)
     if state.show_help {
         render_help(f, chunks[2], theme);
-    } else {
-        render_status_bar(f, state, chunks[2], theme);
     }
 
     // Render delete confirmation dialog if active
@@ -749,7 +804,7 @@ fn render_tabs(
 
 fn render_table_content(
     f: &mut Frame,
-    tab: &TableTab,
+    tab: &mut TableTab,
     area: Rect,
     theme: &Theme,
     is_focused: bool,
@@ -792,7 +847,7 @@ fn render_table_content(
     }
 }
 
-fn render_data_view(f: &mut Frame, tab: &TableTab, area: Rect, theme: &Theme, is_focused: bool) {
+fn render_data_view(f: &mut Frame, tab: &mut TableTab, area: Rect, theme: &Theme, is_focused: bool) {
     // Prepare table headers
     let headers: Vec<TableCell> = tab
         .columns
@@ -826,28 +881,39 @@ fn render_data_view(f: &mut Frame, tab: &TableTab, area: Rect, theme: &Theme, is
         .height(1)
         .bottom_margin(1);
 
-    // Prepare table rows
-    let rows: Vec<Row> = tab
+    // Calculate viewport height for scrolling and update the tab
+    let viewport_height = area.height.saturating_sub(4) as usize; // Account for borders (2) + header (2)
+    tab.update_viewport_height(area.height as usize);
+    tab.ensure_selection_visible_with_height(viewport_height);
+
+    // Prepare table rows - only render visible rows within viewport
+    let visible_rows: Vec<_> = tab
         .rows
         .iter()
         .enumerate()
+        .skip(tab.scroll_offset_y)
+        .take(viewport_height)
+        .collect();
+
+    let rows: Vec<Row> = visible_rows
+        .iter()
         .map(|(row_idx, row_data)| {
             let cells: Vec<TableCell> = row_data
                 .iter()
                 .enumerate()
                 .map(|(col_idx, value)| {
-                    let is_selected = row_idx == tab.selected_row && col_idx == tab.selected_col;
-                    let is_modified = tab.modified_cells.contains_key(&(row_idx, col_idx));
-                    let is_search_match = tab.search_results.contains(&(row_idx, col_idx));
+                    let is_selected = *row_idx == tab.selected_row && col_idx == tab.selected_col;
+                    let is_modified = tab.modified_cells.contains_key(&(*row_idx, col_idx));
+                    let is_search_match = tab.search_results.contains(&(*row_idx, col_idx));
                     let is_current_search = tab.search_results.get(tab.current_search_result)
-                        == Some(&(row_idx, col_idx));
+                        == Some(&(*row_idx, col_idx));
 
                     let display_value = if is_selected && tab.in_edit_mode {
                         format!(" {}▌ ", tab.edit_buffer)
                     } else if is_modified {
                         let val = tab
                             .modified_cells
-                            .get(&(row_idx, col_idx))
+                            .get(&(*row_idx, col_idx))
                             .cloned()
                             .unwrap_or_else(|| value.clone());
                         format!(" {val} ")
@@ -856,7 +922,7 @@ fn render_data_view(f: &mut Frame, tab: &TableTab, area: Rect, theme: &Theme, is
                     };
 
                     // Base style with alternating row background
-                    let base_style = if row_idx % 2 == 0 {
+                    let base_style = if *row_idx % 2 == 0 {
                         Style::default().bg(theme.get_color("row_alternate_bg"))
                     } else {
                         Style::default()
@@ -953,7 +1019,7 @@ fn render_data_view(f: &mut Frame, tab: &TableTab, area: Rect, theme: &Theme, is
     f.render_widget(table, area);
 }
 
-fn render_schema_view(f: &mut Frame, tab: &TableTab, area: Rect, theme: &Theme, is_focused: bool) {
+fn render_schema_view(f: &mut Frame, tab: &mut TableTab, area: Rect, theme: &Theme, is_focused: bool) {
     // Create schema rows showing column information
     let schema_headers = vec![
         TableCell::from(" Column Name ").style(
@@ -983,16 +1049,27 @@ fn render_schema_view(f: &mut Frame, tab: &TableTab, area: Rect, theme: &Theme, 
         .height(1)
         .bottom_margin(1);
 
-    // Create rows for each column showing its schema information
-    let schema_rows: Vec<Row> = tab
+    // Calculate viewport height for scrolling and update the tab
+    let viewport_height = area.height.saturating_sub(4) as usize; // Account for borders (2) + header (2)
+    tab.update_viewport_height(area.height as usize);
+    tab.ensure_selection_visible_with_height(viewport_height);
+
+    // Create rows for each column showing its schema information - only render visible rows
+    let visible_columns: Vec<_> = tab
         .columns
         .iter()
         .enumerate()
+        .skip(tab.scroll_offset_y)
+        .take(viewport_height)
+        .collect();
+
+    let schema_rows: Vec<Row> = visible_columns
+        .iter()
         .map(|(row_idx, col)| {
-            let is_selected = row_idx == tab.selected_row;
+            let is_selected = *row_idx == tab.selected_row;
 
             // Base style with alternating row background
-            let base_style = if row_idx % 2 == 0 {
+            let base_style = if *row_idx % 2 == 0 {
                 Style::default().bg(theme.get_color("row_alternate_bg"))
             } else {
                 Style::default()
@@ -1057,33 +1134,6 @@ fn render_schema_view(f: &mut Frame, tab: &TableTab, area: Rect, theme: &Theme, 
     f.render_widget(table, area);
 }
 
-fn render_status_bar(f: &mut Frame, state: &TableViewerState, area: Rect, theme: &Theme) {
-    let help_text = if let Some(tab) = state.current_tab() {
-        if tab.in_edit_mode {
-            " [ESC/Enter] Save & Exit | [Ctrl+C] Cancel Edit "
-        } else if tab.in_search_mode {
-            " Type to search | [Enter] Confirm | [ESC] Cancel | [n/N] Next/Previous "
-        } else {
-            match tab.view_mode {
-                TableViewMode::Data => " [?] Help | [i] Edit Cell | [/] Search | [t] Schema View | [x] Close Tab | [S/D] Switch Tabs ",
-                TableViewMode::Schema => " [?] Help | [t] Data View | [x] Close Tab | [S/D] Switch Tabs ",
-            }
-        }
-    } else {
-        " [?] Help | Open a table to start "
-    };
-
-    let help = Paragraph::new(help_text)
-        .style(Style::default().fg(theme.get_color("text_muted")))
-        .block(
-            Block::default()
-                .borders(Borders::TOP)
-                .border_style(Style::default().fg(theme.get_color("border_muted"))),
-        )
-        .alignment(Alignment::Center);
-
-    f.render_widget(help, area);
-}
 
 fn render_help(f: &mut Frame, area: Rect, theme: &Theme) {
     let help_text = vec![
