@@ -542,18 +542,18 @@ impl MySqlConnection {
                 Some(comment)
             };
 
-            Ok(TableMetadata {
-                table_name: table_name.to_string(),
-                row_count: row_count as usize,
-                column_count: column_count as usize,
-                total_size: total_size.unwrap_or(0) as i64,
-                table_size: table_size.unwrap_or(0) as i64,
-                indexes_size: indexes_size.unwrap_or(0) as i64,
+            Ok(TableMetadata::basic(
+                table_name.to_string(),
+                row_count as usize,
+                column_count as usize,
+                total_size.unwrap_or(0) as i64,
+                table_size.unwrap_or(0) as i64,
+                indexes_size.unwrap_or(0) as i64,
                 primary_keys,
                 foreign_keys,
                 indexes,
                 comment,
-            })
+            ))
         } else {
             Err(LazyTablesError::Connection(
                 "Not connected to database".to_string(),

@@ -827,27 +827,27 @@ impl PostgresConnection {
             {
                 Ok(row) => row,
                 Err(_) => {
-                    return Ok(TableMetadata {
-                        table_name: table_name.to_string(),
-                        row_count: row_count as usize,
-                        column_count: column_count as usize,
+                    return Ok(TableMetadata::basic(
+                        table_name.to_string(),
+                        row_count as usize,
+                        column_count as usize,
                         total_size,
                         table_size,
                         indexes_size,
                         primary_keys,
                         foreign_keys,
                         indexes,
-                        comment: None,
-                    })
+                        None,
+                    ))
                 }
             };
 
             let comment: Option<String> = comment_row.get("comment");
 
-            Ok(TableMetadata {
-                table_name: table_name.to_string(),
-                row_count: row_count as usize,
-                column_count: column_count as usize,
+            Ok(TableMetadata::basic(
+                table_name.to_string(),
+                row_count as usize,
+                column_count as usize,
                 total_size,
                 table_size,
                 indexes_size,
@@ -855,7 +855,7 @@ impl PostgresConnection {
                 foreign_keys,
                 indexes,
                 comment,
-            })
+            ))
         } else {
             Err(LazyTablesError::Connection(
                 "Not connected to database".to_string(),
@@ -874,7 +874,7 @@ impl PostgresConnection {
                 ("public", table_name)
             };
 
-            crate::debug_log!(
+            crate::log_debug!(
                 "Parsed schema: '{}', table: '{}'",
                 schema,
                 actual_table_name
@@ -903,8 +903,8 @@ impl PostgresConnection {
                 AND c.table_name = $2
                 ORDER BY c.ordinal_position";
 
-            crate::debug_log!("get_table_columns query: {}", query);
-            crate::debug_log!(
+            crate::log_debug!("get_table_columns query: {}", query);
+            crate::log_debug!(
                 "get_table_columns schema: '{}', table: '{}'",
                 schema,
                 actual_table_name
@@ -916,7 +916,7 @@ impl PostgresConnection {
                 .fetch_all(pool)
                 .await?;
 
-            crate::debug_log!("get_table_columns returned {} rows", rows.len());
+            crate::log_debug!("get_table_columns returned {} rows", rows.len());
 
             let columns = rows
                 .iter()

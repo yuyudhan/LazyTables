@@ -444,7 +444,7 @@ impl UI {
         components::render_tables_pane(frame, area, state, &self.theme);
     }
 
-    /// Draw the table details pane
+    /// Draw the enhanced table details pane with comprehensive metadata
     fn draw_details_pane(&self, frame: &mut Frame, area: Rect, state: &AppState) {
         let is_focused = state.ui.focused_pane == FocusedPane::Details;
         let border_style = if is_focused {
@@ -482,168 +482,8 @@ impl UI {
                     Style::default().fg(Color::Yellow),
                 )]),
             ]
-        } else if state.ui.selected_table < state.db.tables.len() {
-            // Get selected table info
-            let selected_table = &state.db.tables[state.ui.selected_table];
-            let mut lines = vec![Line::from(vec![
-                Span::styled("Selected: ", Style::default().fg(Color::Cyan)),
-                Span::styled(
-                    selected_table,
-                    Style::default()
-                        .fg(Color::White)
-                        .add_modifier(Modifier::BOLD),
-                ),
-            ])];
-
-            // Add object type if we have database objects
-            if let Some(ref db_objects) = state.db.database_objects {
-                // Find the object to determine its type
-                let obj_type = if db_objects.tables.iter().any(|o| o.name == *selected_table) {
-                    Some(("Table", Color::Blue))
-                } else if db_objects.views.iter().any(|o| o.name == *selected_table) {
-                    Some(("View", Color::Green))
-                } else if db_objects
-                    .materialized_views
-                    .iter()
-                    .any(|o| o.name == *selected_table)
-                {
-                    Some(("Materialized View", Color::Magenta))
-                } else {
-                    None
-                };
-
-                if let Some((type_name, color)) = obj_type {
-                    lines.push(Line::from(vec![
-                        Span::styled("Type: ", Style::default().fg(Color::Cyan)),
-                        Span::styled(type_name, Style::default().fg(color)),
-                    ]));
-                }
-            }
-
-            // Show metadata if available
-            if let Some(metadata) = &state.db.current_table_metadata {
-                // Show actual table metadata
-                let mut lines = vec![
-                    Line::from(vec![
-                        Span::styled("Table: ", Style::default().fg(Color::Cyan)),
-                        Span::styled(
-                            &metadata.table_name,
-                            Style::default()
-                                .fg(Color::White)
-                                .add_modifier(Modifier::BOLD),
-                        ),
-                    ]),
-                    Line::from(""),
-                    Line::from(vec![
-                        Span::styled("Rows: ", Style::default().fg(Color::Cyan)),
-                        Span::styled(
-                            format!("{}", metadata.row_count),
-                            Style::default().fg(Color::White),
-                        ),
-                    ]),
-                    Line::from(vec![
-                        Span::styled("Columns: ", Style::default().fg(Color::Cyan)),
-                        Span::styled(
-                            metadata.column_count.to_string(),
-                            Style::default().fg(Color::White),
-                        ),
-                    ]),
-                    Line::from(""),
-                    Line::from(vec![
-                        Span::styled("Total Size: ", Style::default().fg(Color::Cyan)),
-                        Span::styled(
-                            format_bytes(metadata.total_size),
-                            Style::default().fg(Color::White),
-                        ),
-                    ]),
-                    Line::from(vec![
-                        Span::styled("Table Size: ", Style::default().fg(Color::Cyan)),
-                        Span::styled(
-                            format_bytes(metadata.table_size),
-                            Style::default().fg(Color::White),
-                        ),
-                    ]),
-                    Line::from(vec![
-                        Span::styled("Indexes Size: ", Style::default().fg(Color::Cyan)),
-                        Span::styled(
-                            format_bytes(metadata.indexes_size),
-                            Style::default().fg(Color::White),
-                        ),
-                    ]),
-                ];
-
-                // Add primary keys summary
-                if !metadata.primary_keys.is_empty() {
-                    lines.push(Line::from(""));
-                    lines.push(Line::from(vec![
-                        Span::styled("PKs: ", Style::default().fg(Color::Yellow)),
-                        Span::styled(
-                            metadata.primary_keys.join(", "),
-                            Style::default().fg(Color::White),
-                        ),
-                    ]));
-                }
-
-                // Add indexes count
-                if !metadata.indexes.is_empty() {
-                    lines.push(Line::from(vec![
-                        Span::styled("Indexes: ", Style::default().fg(Color::Yellow)),
-                        Span::styled(
-                            format!("{} total", metadata.indexes.len()),
-                            Style::default().fg(Color::White),
-                        ),
-                    ]));
-                }
-
-                // Add comment if any
-                if let Some(comment) = &metadata.comment {
-                    lines.push(Line::from(""));
-                    lines.push(Line::from(vec![Span::styled(
-                        "Comment:",
-                        Style::default()
-                            .fg(Color::Yellow)
-                            .add_modifier(Modifier::BOLD),
-                    )]));
-                    lines.push(Line::from(vec![
-                        Span::raw("  "),
-                        Span::styled(
-                            comment,
-                            Style::default()
-                                .fg(Color::Gray)
-                                .add_modifier(Modifier::ITALIC),
-                        ),
-                    ]));
-                }
-            } else {
-                // Table selected but metadata not loaded yet
-                lines.push(Line::from(""));
-                lines.push(Line::from(vec![Span::styled(
-                    "Press Enter to load details",
-                    Style::default().fg(Color::Yellow),
-                )]));
-            }
-
-            // Add keyboard shortcuts
-            lines.push(Line::from(""));
-            lines.push(Line::from(""));
-            lines.push(Line::from(vec![Span::styled(
-                "Actions:",
-                Style::default().fg(Color::DarkGray),
-            )]));
-            lines.push(Line::from(vec![
-                Span::styled("Enter: ", Style::default().fg(Color::Yellow)),
-                Span::styled("View data", Style::default().fg(Color::Gray)),
-            ]));
-            lines.push(Line::from(vec![
-                Span::styled("e: ", Style::default().fg(Color::Yellow)),
-                Span::styled("Edit structure", Style::default().fg(Color::Gray)),
-            ]));
-            lines.push(Line::from(vec![
-                Span::styled("d: ", Style::default().fg(Color::Yellow)),
-                Span::styled("Drop table", Style::default().fg(Color::Gray)),
-            ]));
-
-            lines
+        } else if let Some(selected_table_name) = state.ui.get_selected_table_name() {
+            self.build_comprehensive_table_details(selected_table_name, &state.db, &state.ui)
         } else {
             vec![
                 Line::from(""),
@@ -654,16 +494,244 @@ impl UI {
             ]
         };
 
-        let details = Paragraph::new(details_text)
+        // Apply scrolling if content is too long
+        let content_height = details_text.len();
+        let available_height = area.height.saturating_sub(2) as usize; // Account for borders
+
+        let visible_lines = if content_height > available_height {
+            let start = state.ui.details_viewport_offset.min(content_height.saturating_sub(available_height));
+            let end = (start + available_height).min(content_height);
+            details_text[start..end].to_vec()
+        } else {
+            details_text
+        };
+
+        // Create title with scroll indicator
+        let title = if content_height > available_height {
+            let scroll_info = format!(
+                "Table Details [{}/{}]",
+                state.ui.details_viewport_offset + 1,
+                content_height.saturating_sub(available_height) + 1
+            );
+            scroll_info
+        } else {
+            "Table Details".to_string()
+        };
+
+        let details = Paragraph::new(visible_lines)
             .block(
                 Block::default()
-                    .title(" Table Details ")
+                    .title(title)
                     .borders(Borders::ALL)
                     .border_style(border_style),
             )
             .style(Style::default().fg(self.theme.get_color("text")));
 
         frame.render_widget(details, area);
+    }
+
+    /// Build comprehensive table details with all available metadata
+    fn build_comprehensive_table_details(
+        &self,
+        table_name: String,
+        db_state: &crate::state::DatabaseState,
+        _ui_state: &crate::state::UIState,
+    ) -> Vec<Line<'static>> {
+        let mut lines = Vec::new();
+
+        // === HEADER SECTION ===
+        lines.push(Line::from(vec![
+            Span::styled("Object: ".to_string(), Style::default().fg(Color::Cyan)),
+            Span::styled(
+                table_name.clone(),
+                Style::default()
+                    .fg(Color::White)
+                    .add_modifier(Modifier::BOLD),
+            ),
+        ]));
+
+        // Determine table type
+        let table_type = if let Some(ref db_objects) = db_state.database_objects {
+            if db_objects.tables.iter().any(|t| t.name == table_name || t.qualified_name() == table_name) {
+                "Table"
+            } else if db_objects.views.iter().any(|v| v.name == table_name || v.qualified_name() == table_name) {
+                "View"
+            } else if db_objects.materialized_views.iter().any(|mv| mv.name == table_name || mv.qualified_name() == table_name) {
+                "Materialized View"
+            } else {
+                "Unknown"
+            }
+        } else {
+            "Table"
+        };
+
+        lines.push(Line::from(vec![
+            Span::styled("Type: ".to_string(), Style::default().fg(Color::Cyan)),
+            Span::styled(
+                table_type.to_string(),
+                Style::default().fg(match table_type {
+                    "Table" => Color::Blue,
+                    "View" => Color::Green,
+                    "Materialized View" => Color::Magenta,
+                    _ => Color::Gray,
+                }),
+            ),
+        ]));
+
+        lines.push(Line::from("".to_string()));
+
+        // === METADATA SECTION ===
+        if let Some(metadata) = &db_state.current_table_metadata {
+            // Basic metrics
+            lines.push(Line::from(vec![Span::styled(
+                "📊 Metrics".to_string(),
+                Style::default()
+                    .fg(Color::Yellow)
+                    .add_modifier(Modifier::BOLD),
+            )]));
+
+            lines.push(Line::from(vec![
+                Span::styled("  Rows: ".to_string(), Style::default().fg(Color::Cyan)),
+                Span::styled(
+                    metadata.row_count.to_string(),
+                    Style::default().fg(Color::White),
+                ),
+            ]));
+
+            lines.push(Line::from(vec![
+                Span::styled("  Columns: ".to_string(), Style::default().fg(Color::Cyan)),
+                Span::styled(
+                    metadata.column_count.to_string(),
+                    Style::default().fg(Color::White),
+                ),
+            ]));
+
+            // Storage information
+            lines.push(Line::from("".to_string()));
+            lines.push(Line::from(vec![Span::styled(
+                "💾 Storage".to_string(),
+                Style::default()
+                    .fg(Color::Yellow)
+                    .add_modifier(Modifier::BOLD),
+            )]));
+
+            lines.push(Line::from(vec![
+                Span::styled("  Total Size: ".to_string(), Style::default().fg(Color::Cyan)),
+                Span::styled(
+                    crate::database::TableMetadata::format_size(metadata.total_size),
+                    Style::default().fg(Color::White),
+                ),
+            ]));
+
+            lines.push(Line::from(vec![
+                Span::styled("  Table Size: ".to_string(), Style::default().fg(Color::Cyan)),
+                Span::styled(
+                    crate::database::TableMetadata::format_size(metadata.table_size),
+                    Style::default().fg(Color::White),
+                ),
+            ]));
+
+            lines.push(Line::from(vec![
+                Span::styled("  Indexes Size: ".to_string(), Style::default().fg(Color::Cyan)),
+                Span::styled(
+                    crate::database::TableMetadata::format_size(metadata.indexes_size),
+                    Style::default().fg(Color::White),
+                ),
+            ]));
+
+            // Schema relationships
+            lines.push(Line::from("".to_string()));
+            lines.push(Line::from(vec![Span::styled(
+                "🔗 Relationships".to_string(),
+                Style::default()
+                    .fg(Color::Yellow)
+                    .add_modifier(Modifier::BOLD),
+            )]));
+
+            if !metadata.primary_keys.is_empty() {
+                lines.push(Line::from(vec![
+                    Span::styled("  Primary Keys: ".to_string(), Style::default().fg(Color::Cyan)),
+                    Span::styled(
+                        metadata.primary_keys.join(", "),
+                        Style::default().fg(Color::White),
+                    ),
+                ]));
+            }
+
+            if !metadata.foreign_keys.is_empty() {
+                lines.push(Line::from(vec![
+                    Span::styled("  Foreign Keys: ".to_string(), Style::default().fg(Color::Cyan)),
+                    Span::styled(
+                        format!("{} relationships", metadata.foreign_keys.len()),
+                        Style::default().fg(Color::White),
+                    ),
+                ]));
+            }
+
+            if !metadata.indexes.is_empty() {
+                lines.push(Line::from(vec![
+                    Span::styled("  Indexes: ".to_string(), Style::default().fg(Color::Cyan)),
+                    Span::styled(
+                        format!("{} total", metadata.indexes.len()),
+                        Style::default().fg(Color::White),
+                    ),
+                ]));
+            }
+
+            // Add comment if any
+            if let Some(ref comment) = metadata.comment {
+                lines.push(Line::from("".to_string()));
+                lines.push(Line::from(vec![Span::styled(
+                    "💬 Comment".to_string(),
+                    Style::default()
+                        .fg(Color::Yellow)
+                        .add_modifier(Modifier::BOLD),
+                )]));
+                lines.push(Line::from(vec![
+                    Span::styled("  ".to_string(), Style::default()),
+                    Span::styled(
+                        comment.clone(),
+                        Style::default()
+                            .fg(Color::Gray)
+                            .add_modifier(Modifier::ITALIC),
+                    ),
+                ]));
+            }
+
+        } else {
+            // No metadata loaded yet
+            lines.push(Line::from(vec![Span::styled(
+                "Press Enter to load detailed metadata".to_string(),
+                Style::default().fg(Color::Yellow),
+            )]));
+        }
+
+        // === ACTIONS SECTION ===
+        lines.push(Line::from("".to_string()));
+        lines.push(Line::from("".to_string()));
+        lines.push(Line::from(vec![Span::styled(
+            "⌨️  Actions".to_string(),
+            Style::default()
+                .fg(Color::DarkGray)
+                .add_modifier(Modifier::BOLD),
+        )]));
+
+        let actions = vec![
+            ("Enter", "View/browse table data"),
+            ("r", "Refresh metadata"),
+            ("e", "Edit table structure"),
+            ("d", "Drop table"),
+        ];
+
+        for (key, desc) in actions {
+            lines.push(Line::from(vec![
+                Span::styled("  ".to_string(), Style::default()),
+                Span::styled(format!("{}: ", key), Style::default().fg(Color::Yellow)),
+                Span::styled(desc.to_string(), Style::default().fg(Color::Gray)),
+            ]));
+        }
+
+        lines
     }
 
     /// Draw the tabular output area
@@ -1263,21 +1331,3 @@ impl UI {
     }
 }
 
-/// Format bytes as human-readable size
-fn format_bytes(bytes: i64) -> String {
-    const UNITS: &[&str] = &["B", "KB", "MB", "GB", "TB"];
-    if bytes == 0 {
-        return "0 B".to_string();
-    }
-
-    let bytes = bytes.abs() as f64;
-    let i = (bytes.ln() / 1024_f64.ln()).floor() as usize;
-    let i = i.min(UNITS.len() - 1);
-    let size = bytes / 1024_f64.powi(i as i32);
-
-    if i == 0 {
-        format!("{:.0} {}", size, UNITS[i])
-    } else {
-        format!("{:.2} {}", size, UNITS[i])
-    }
-}
