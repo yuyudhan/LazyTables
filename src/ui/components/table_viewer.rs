@@ -522,9 +522,15 @@ impl Default for TableViewerState {
 }
 
 /// Render the table viewer
-pub fn render_table_viewer(f: &mut Frame, state: &mut TableViewerState, area: Rect, theme: &Theme) {
+pub fn render_table_viewer(
+    f: &mut Frame,
+    state: &mut TableViewerState,
+    area: Rect,
+    theme: &Theme,
+    is_focused: bool,
+) {
     if state.tabs.is_empty() {
-        render_empty_state(f, area, theme);
+        render_empty_state(f, area, theme, is_focused);
         return;
     }
 
@@ -539,11 +545,11 @@ pub fn render_table_viewer(f: &mut Frame, state: &mut TableViewerState, area: Re
         .split(area);
 
     // Render tabs
-    render_tabs(f, state, chunks[0], theme);
+    render_tabs(f, state, chunks[0], theme, is_focused);
 
     // Render current table
     if let Some(tab) = state.current_tab() {
-        render_table_content(f, tab, chunks[1], theme);
+        render_table_content(f, tab, chunks[1], theme, is_focused);
     }
 
     // Render help or status
@@ -663,7 +669,7 @@ fn render_delete_confirmation(
     f.render_widget(paragraph, inner_area);
 }
 
-fn render_empty_state(f: &mut Frame, area: Rect, theme: &Theme) {
+fn render_empty_state(f: &mut Frame, area: Rect, theme: &Theme, is_focused: bool) {
     let text = vec![
         Line::from(""),
         Line::from("No tables open").fg(theme.get_color("text_muted")),
@@ -677,14 +683,24 @@ fn render_empty_state(f: &mut Frame, area: Rect, theme: &Theme) {
             Block::default()
                 .borders(Borders::ALL)
                 .title(" Table Viewer ")
-                .border_style(Style::default().fg(theme.get_color("border_muted"))),
+                .border_style(if is_focused {
+                    Style::default().fg(theme.get_color("active_border"))
+                } else {
+                    Style::default().fg(theme.get_color("border"))
+                }),
         )
         .alignment(Alignment::Center);
 
     f.render_widget(paragraph, area);
 }
 
-fn render_tabs(f: &mut Frame, state: &TableViewerState, area: Rect, theme: &Theme) {
+fn render_tabs(
+    f: &mut Frame,
+    state: &TableViewerState,
+    area: Rect,
+    theme: &Theme,
+    is_focused: bool,
+) {
     let tab_titles: Vec<String> = state
         .tabs
         .iter()
@@ -714,7 +730,11 @@ fn render_tabs(f: &mut Frame, state: &TableViewerState, area: Rect, theme: &Them
             Block::default()
                 .borders(Borders::ALL)
                 .title(" Open Tables ")
-                .border_style(Style::default().fg(theme.get_color("primary_highlight"))),
+                .border_style(if is_focused {
+                    Style::default().fg(theme.get_color("active_border"))
+                } else {
+                    Style::default().fg(theme.get_color("border"))
+                }),
         )
         .select(state.active_tab)
         .style(Style::default().fg(theme.get_color("text_primary")))
@@ -727,7 +747,13 @@ fn render_tabs(f: &mut Frame, state: &TableViewerState, area: Rect, theme: &Them
     f.render_widget(tabs, area);
 }
 
-fn render_table_content(f: &mut Frame, tab: &TableTab, area: Rect, theme: &Theme) {
+fn render_table_content(
+    f: &mut Frame,
+    tab: &TableTab,
+    area: Rect,
+    theme: &Theme,
+    is_focused: bool,
+) {
     if tab.loading {
         let loading_msg = match tab.view_mode {
             TableViewMode::Data => "Loading table data...",
@@ -761,12 +787,12 @@ fn render_table_content(f: &mut Frame, tab: &TableTab, area: Rect, theme: &Theme
 
     // Render based on view mode
     match tab.view_mode {
-        TableViewMode::Data => render_data_view(f, tab, area, theme),
-        TableViewMode::Schema => render_schema_view(f, tab, area, theme),
+        TableViewMode::Data => render_data_view(f, tab, area, theme, is_focused),
+        TableViewMode::Schema => render_schema_view(f, tab, area, theme, is_focused),
     }
 }
 
-fn render_data_view(f: &mut Frame, tab: &TableTab, area: Rect, theme: &Theme) {
+fn render_data_view(f: &mut Frame, tab: &TableTab, area: Rect, theme: &Theme, is_focused: bool) {
     // Prepare table headers
     let headers: Vec<TableCell> = tab
         .columns
@@ -915,8 +941,10 @@ fn render_data_view(f: &mut Frame, tab: &TableTab, area: Rect, theme: &Theme) {
                     Style::default().fg(theme.get_color("edit_mode_border"))
                 } else if tab.in_search_mode {
                     Style::default().fg(theme.get_color("search_mode_border"))
+                } else if is_focused {
+                    Style::default().fg(theme.get_color("active_border"))
                 } else {
-                    Style::default().fg(theme.get_color("primary_highlight"))
+                    Style::default().fg(theme.get_color("border"))
                 }),
         )
         .column_spacing(1)
@@ -925,7 +953,7 @@ fn render_data_view(f: &mut Frame, tab: &TableTab, area: Rect, theme: &Theme) {
     f.render_widget(table, area);
 }
 
-fn render_schema_view(f: &mut Frame, tab: &TableTab, area: Rect, theme: &Theme) {
+fn render_schema_view(f: &mut Frame, tab: &TableTab, area: Rect, theme: &Theme, is_focused: bool) {
     // Create schema rows showing column information
     let schema_headers = vec![
         TableCell::from(" Column Name ").style(
@@ -1017,7 +1045,11 @@ fn render_schema_view(f: &mut Frame, tab: &TableTab, area: Rect, theme: &Theme) 
                     tab.table_name,
                     tab.columns.len()
                 ))
-                .border_style(Style::default().fg(theme.get_color("secondary_highlight"))),
+                .border_style(if is_focused {
+                    Style::default().fg(theme.get_color("active_border"))
+                } else {
+                    Style::default().fg(theme.get_color("border"))
+                }),
         )
         .column_spacing(1)
         .row_highlight_style(Style::default().add_modifier(Modifier::REVERSED));
