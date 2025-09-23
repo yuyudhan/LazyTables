@@ -7,6 +7,7 @@ pub mod config;
 pub mod constants;
 pub mod core;
 pub mod database;
+pub mod debug_log;
 pub mod event;
 pub mod logging;
 pub mod security;
