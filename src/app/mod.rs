@@ -163,12 +163,23 @@ impl App {
                 // TODO: Execute query through database connection
                 self.state.toast_manager.info(format!("Executing: {query}"));
             }
-            CommandAction::ExecuteQueryWithContext { query, database_type, connection_name } => {
+            CommandAction::ExecuteQueryWithContext {
+                query,
+                database_type,
+                connection_name,
+            } => {
                 // Enhanced query execution with database context
-                self.state.toast_manager.info(format!("Executing {} query on {}: {}",
+                self.state.toast_manager.info(format!(
+                    "Executing {} query on {}: {}",
                     database_type.display_name(),
                     connection_name,
-                    query.lines().next().unwrap_or("").chars().take(50).collect::<String>()
+                    query
+                        .lines()
+                        .next()
+                        .unwrap_or("")
+                        .chars()
+                        .take(50)
+                        .collect::<String>()
                 ));
                 // TODO: Execute query through specific database adapter
             }
@@ -197,6 +208,17 @@ impl App {
         {
             self.state.ui.help_mode = crate::app::state::HelpMode::None;
             return Ok(());
+        }
+
+        // Handle ESC to exit table search mode or cancel pending gg command
+        if key.code == KeyCode::Esc {
+            if self.state.ui.tables_search_active {
+                self.state.ui.exit_tables_search();
+                return Ok(());
+            } else if self.state.ui.pending_gg_command {
+                self.state.ui.cancel_pending_gg();
+                return Ok(());
+            }
         }
 
         // Handle '?' key globally for context-aware help (toggle functionality)
@@ -412,6 +434,36 @@ impl App {
             return self.handle_table_editor_key_event(key).await;
         }
 
+        // Handle tables search input
+        if self.state.ui.tables_search_active && self.state.ui.focused_pane == FocusedPane::Tables {
+            match key.code {
+                KeyCode::Backspace => {
+                    self.state.ui.backspace_tables_search();
+                    return Ok(());
+                }
+                KeyCode::Enter => {
+                    // Select the highlighted table and open it for viewing
+                    self.state.open_table_for_viewing().await;
+                    // Exit search mode
+                    self.state.ui.exit_tables_search();
+                    return Ok(());
+                }
+                KeyCode::Down => {
+                    self.state.ui.table_search_selection_down();
+                    return Ok(());
+                }
+                KeyCode::Up => {
+                    self.state.ui.table_search_selection_up();
+                    return Ok(());
+                }
+                KeyCode::Char(c) => {
+                    self.state.ui.add_to_tables_search(c);
+                    return Ok(());
+                }
+                _ => {}
+            }
+        }
+
         match self.mode {
             Mode::Normal => {
                 match (key.modifiers, key.code) {
@@ -422,30 +474,48 @@ impl App {
                     }
                     // Pane navigation with Ctrl+h/j/k/l (directional movement)
                     (KeyModifiers::CONTROL, KeyCode::Char('h')) => {
+                        self.state.ui.cancel_pending_gg();
                         self.state.move_focus_left();
                     }
                     (KeyModifiers::CONTROL, KeyCode::Char('j')) => {
+                        self.state.ui.cancel_pending_gg();
                         self.state.move_focus_down();
                     }
                     (KeyModifiers::CONTROL, KeyCode::Char('k')) => {
+                        self.state.ui.cancel_pending_gg();
                         self.state.move_focus_up();
                     }
                     (KeyModifiers::CONTROL, KeyCode::Char('l')) => {
+                        self.state.ui.cancel_pending_gg();
                         self.state.move_focus_right();
                     }
                     // Tab to cycle through panes
                     (KeyModifiers::NONE, KeyCode::Tab) => {
+                        self.state.ui.cancel_pending_gg();
                         self.state.cycle_focus_forward();
                     }
                     (KeyModifiers::SHIFT, KeyCode::BackTab) => {
+                        self.state.ui.cancel_pending_gg();
                         self.state.cycle_focus_backward();
                     }
                     // Vim-style navigation within panes
                     (KeyModifiers::NONE, KeyCode::Char('j')) => {
-                        self.state.move_down();
+                        if self.state.ui.focused_pane == FocusedPane::Tables && !self.state.ui.tables_search_active {
+                            self.state.ui.table_search_selection_down();
+                            // Cancel any pending gg command
+                            self.state.ui.cancel_pending_gg();
+                        } else {
+                            self.state.move_down();
+                        }
                     }
                     (KeyModifiers::NONE, KeyCode::Char('k')) => {
-                        self.state.move_up();
+                        if self.state.ui.focused_pane == FocusedPane::Tables && !self.state.ui.tables_search_active {
+                            self.state.ui.table_search_selection_up();
+                            // Cancel any pending gg command
+                            self.state.ui.cancel_pending_gg();
+                        } else {
+                            self.state.move_up();
+                        }
                     }
                     (KeyModifiers::NONE, KeyCode::Char('h')) => {
                         self.state.move_left();
@@ -743,15 +813,18 @@ impl App {
                             }
                         }
                     }
-                    // Table viewer specific commands
+                    // Search commands
                     (KeyModifiers::NONE, KeyCode::Char('/')) => {
                         if self.state.ui.focused_pane == FocusedPane::TabularOutput {
-                            // Start search mode
+                            // Start search mode in table viewer
                             if let Some(tab) = self.state.table_viewer_state.current_tab_mut() {
                                 if !tab.in_edit_mode {
                                     tab.start_search();
                                 }
                             }
+                        } else if self.state.ui.focused_pane == FocusedPane::Tables {
+                            // Start search mode in tables pane
+                            self.state.ui.enter_tables_search();
                         }
                     }
                     // Handle uppercase S for previous tab (both with and without SHIFT modifier)
@@ -815,7 +888,7 @@ impl App {
                             }
                         }
                     }
-                    // Jump navigation in table viewer
+                    // Jump navigation in table viewer and tables pane
                     (KeyModifiers::NONE, KeyCode::Char('g')) => {
                         if self.state.ui.focused_pane == FocusedPane::TabularOutput {
                             if self.leader_pressed {
@@ -827,6 +900,8 @@ impl App {
                             } else {
                                 self.leader_pressed = true;
                             }
+                        } else if self.state.ui.focused_pane == FocusedPane::Tables && !self.state.ui.tables_search_active {
+                            self.state.ui.handle_g_key_press();
                         }
                     }
                     (KeyModifiers::NONE, KeyCode::Char('G')) => {
@@ -835,6 +910,8 @@ impl App {
                             if let Some(tab) = self.state.table_viewer_state.current_tab_mut() {
                                 tab.jump_to_last();
                             }
+                        } else if self.state.ui.focused_pane == FocusedPane::Tables && !self.state.ui.tables_search_active {
+                            self.state.ui.table_go_to_last();
                         }
                     }
                     (KeyModifiers::NONE, KeyCode::Char('0')) => {
@@ -1727,8 +1804,8 @@ impl App {
 
     /// Test connection from modal
     async fn test_connection_from_modal(&mut self) {
-        use crate::ui::components::TestConnectionStatus;
         use crate::database::Connection;
+        use crate::ui::components::TestConnectionStatus;
 
         // Set status to testing
         self.state.connection_modal_state.test_status = Some(TestConnectionStatus::Testing);
@@ -1751,17 +1828,22 @@ impl App {
                                 match conn.test_connection().await {
                                     Ok(()) => {
                                         self.state.connection_modal_state.test_status =
-                                            Some(TestConnectionStatus::Success("Connection successful!".to_string()));
+                                            Some(TestConnectionStatus::Success(
+                                                "Connection successful!".to_string(),
+                                            ));
                                     }
                                     Err(e) => {
                                         self.state.connection_modal_state.test_status =
-                                            Some(TestConnectionStatus::Failed(format!("Test failed: {e}")));
+                                            Some(TestConnectionStatus::Failed(format!(
+                                                "Test failed: {e}"
+                                            )));
                                     }
                                 }
                             }
                             Err(e) => {
-                                self.state.connection_modal_state.test_status =
-                                    Some(TestConnectionStatus::Failed(format!("Connection failed: {e}")));
+                                self.state.connection_modal_state.test_status = Some(
+                                    TestConnectionStatus::Failed(format!("Connection failed: {e}")),
+                                );
                             }
                         }
                     }
@@ -1770,21 +1852,23 @@ impl App {
                         let mut conn = MySqlConnection::new(config);
 
                         match conn.connect().await {
-                            Ok(()) => {
-                                match conn.test_connection().await {
-                                    Ok(()) => {
-                                        self.state.connection_modal_state.test_status =
-                                            Some(TestConnectionStatus::Success("Connection successful!".to_string()));
-                                    }
-                                    Err(e) => {
-                                        self.state.connection_modal_state.test_status =
-                                            Some(TestConnectionStatus::Failed(format!("Test failed: {e}")));
-                                    }
+                            Ok(()) => match conn.test_connection().await {
+                                Ok(()) => {
+                                    self.state.connection_modal_state.test_status =
+                                        Some(TestConnectionStatus::Success(
+                                            "Connection successful!".to_string(),
+                                        ));
                                 }
-                            }
+                                Err(e) => {
+                                    self.state.connection_modal_state.test_status = Some(
+                                        TestConnectionStatus::Failed(format!("Test failed: {e}")),
+                                    );
+                                }
+                            },
                             Err(e) => {
-                                self.state.connection_modal_state.test_status =
-                                    Some(TestConnectionStatus::Failed(format!("Connection failed: {e}")));
+                                self.state.connection_modal_state.test_status = Some(
+                                    TestConnectionStatus::Failed(format!("Connection failed: {e}")),
+                                );
                             }
                         }
                     }
@@ -1793,33 +1877,38 @@ impl App {
                         let mut conn = SqliteConnection::new(config);
 
                         match conn.connect().await {
-                            Ok(()) => {
-                                match conn.test_connection().await {
-                                    Ok(()) => {
-                                        self.state.connection_modal_state.test_status =
-                                            Some(TestConnectionStatus::Success("Connection successful!".to_string()));
-                                    }
-                                    Err(e) => {
-                                        self.state.connection_modal_state.test_status =
-                                            Some(TestConnectionStatus::Failed(format!("Test failed: {e}")));
-                                    }
+                            Ok(()) => match conn.test_connection().await {
+                                Ok(()) => {
+                                    self.state.connection_modal_state.test_status =
+                                        Some(TestConnectionStatus::Success(
+                                            "Connection successful!".to_string(),
+                                        ));
                                 }
-                            }
+                                Err(e) => {
+                                    self.state.connection_modal_state.test_status = Some(
+                                        TestConnectionStatus::Failed(format!("Test failed: {e}")),
+                                    );
+                                }
+                            },
                             Err(e) => {
-                                self.state.connection_modal_state.test_status =
-                                    Some(TestConnectionStatus::Failed(format!("Connection failed: {e}")));
+                                self.state.connection_modal_state.test_status = Some(
+                                    TestConnectionStatus::Failed(format!("Connection failed: {e}")),
+                                );
                             }
                         }
                     }
                     _ => {
                         self.state.connection_modal_state.test_status =
-                            Some(TestConnectionStatus::Failed("Database type not yet supported".to_string()));
+                            Some(TestConnectionStatus::Failed(
+                                "Database type not yet supported".to_string(),
+                            ));
                     }
                 }
             }
             Err(e) => {
-                self.state.connection_modal_state.test_status =
-                    Some(TestConnectionStatus::Failed(format!("Invalid configuration: {e}")));
+                self.state.connection_modal_state.test_status = Some(TestConnectionStatus::Failed(
+                    format!("Invalid configuration: {e}"),
+                ));
             }
         }
     }

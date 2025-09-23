@@ -2,8 +2,8 @@
 
 use crate::{
     database::{
-        connection::ConnectionStorage, ConnectionConfig, ConnectionStatus, DatabaseType,
-        DatabaseObjectList, TableMetadata,
+        connection::ConnectionStorage, ConnectionConfig, ConnectionStatus, DatabaseObjectList,
+        DatabaseType, TableMetadata,
     },
     ui::components::{
         table_viewer::{CellUpdate, ColumnInfo, DeleteConfirmation},
@@ -470,13 +470,17 @@ impl DatabaseState {
                 self.database_objects = Some(objects.clone());
 
                 // Update legacy tables list with qualified names for non-public schemas
-                self.tables = objects.tables.iter().map(|t| {
-                    if t.schema.as_deref() == Some("public") || t.schema.is_none() {
-                        t.name.clone()
-                    } else {
-                        t.qualified_name()
-                    }
-                }).collect();
+                self.tables = objects
+                    .tables
+                    .iter()
+                    .map(|t| {
+                        if t.schema.as_deref() == Some("public") || t.schema.is_none() {
+                            t.name.clone()
+                        } else {
+                            t.qualified_name()
+                        }
+                    })
+                    .collect();
 
                 // Also add views and materialized views to the tables list
                 for view in &objects.views {
@@ -565,12 +569,10 @@ impl DatabaseState {
 
                 Ok(objects)
             }
-            _ => {
-                Err(format!(
-                    "Database type {} not yet supported",
-                    connection.database_type.display_name()
-                ))
-            }
+            _ => Err(format!(
+                "Database type {} not yet supported",
+                connection.database_type.display_name()
+            )),
         }
     }
 

@@ -5,6 +5,87 @@ use serde::{Deserialize, Serialize};
 use std::fs;
 use std::path::PathBuf;
 
+/// Check if a string contains all characters from query in sequence
+fn matches_sequence(text: &str, query: &str) -> bool {
+    if query.is_empty() {
+        return true;
+    }
+
+    let mut query_chars = query.chars();
+    let mut current_char = query_chars.next();
+
+    for text_char in text.chars() {
+        if let Some(q_char) = current_char {
+            if text_char == q_char {
+                current_char = query_chars.next();
+                if current_char.is_none() {
+                    return true; // All query characters found in sequence
+                }
+            }
+        }
+    }
+
+    false
+}
+
+/// Represents a selectable item in the tables pane
+#[derive(Debug, Clone)]
+pub struct SelectableTableItem {
+    /// The display name of the item
+    pub display_name: String,
+    /// The actual table/view name for database operations
+    pub object_name: String,
+    /// The schema this object belongs to (if any)
+    pub schema: Option<String>,
+    /// Type of database object
+    pub object_type: crate::database::objects::DatabaseObjectType,
+    /// Whether this item is selectable (false for headers)
+    pub is_selectable: bool,
+    /// The index of this item in the display list
+    pub display_index: usize,
+}
+
+impl SelectableTableItem {
+    /// Create a new selectable table item
+    pub fn new_selectable(
+        display_name: String,
+        object_name: String,
+        schema: Option<String>,
+        object_type: crate::database::objects::DatabaseObjectType,
+        display_index: usize,
+    ) -> Self {
+        Self {
+            display_name,
+            object_name,
+            schema,
+            object_type,
+            is_selectable: true,
+            display_index,
+        }
+    }
+
+    /// Create a non-selectable header item
+    pub fn new_header(display_name: String, display_index: usize) -> Self {
+        Self {
+            display_name,
+            object_name: String::new(),
+            schema: None,
+            object_type: crate::database::objects::DatabaseObjectType::Table,
+            is_selectable: false,
+            display_index,
+        }
+    }
+
+    /// Get the qualified name for database operations
+    pub fn qualified_name(&self) -> String {
+        if let Some(ref schema) = self.schema {
+            format!("{}.{}", schema, self.object_name)
+        } else {
+            self.object_name.clone()
+        }
+    }
+}
+
 /// Which pane currently has focus
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub enum FocusedPane {
@@ -141,6 +222,27 @@ pub struct UIState {
     /// Expanded object type groups (Tables, Views, etc.)
     pub expanded_object_groups: std::collections::HashSet<String>,
 
+    // Table selection system
+    /// Flat list of selectable table items for navigation
+    #[serde(skip)]
+    pub selectable_table_items: Vec<SelectableTableItem>,
+    /// Index of currently selected table in the selectable items list
+    pub selected_table_item_index: usize,
+
+    // Table search state
+    /// Whether search mode is active in tables pane
+    pub tables_search_active: bool,
+    /// Current search query for tables
+    pub tables_search_query: String,
+    /// Filtered table items based on search
+    #[serde(skip)]
+    pub filtered_table_items: Vec<SelectableTableItem>,
+
+    // Vim navigation state
+    /// Whether 'g' key was pressed and we're waiting for the second 'g' for gg command
+    #[serde(skip)]
+    pub pending_gg_command: bool,
+
     // List UI states (not serialized)
     #[serde(skip)]
     pub connections_list_state: ListState,
@@ -178,7 +280,18 @@ impl UIState {
             show_table_editor: false,
             confirmation_modal: None,
             expanded_schemas: std::collections::HashSet::new(),
-            expanded_object_groups: std::collections::HashSet::new(),
+            expanded_object_groups: {
+                let mut groups = std::collections::HashSet::new();
+                groups.insert("Tables".to_string());
+                groups.insert("Views".to_string());
+                groups
+            },
+            selectable_table_items: Vec::new(),
+            selected_table_item_index: 0,
+            tables_search_active: false,
+            tables_search_query: String::new(),
+            filtered_table_items: Vec::new(),
+            pending_gg_command: false,
             connections_list_state,
             tables_list_state: ListState::default(),
         }
@@ -453,10 +566,615 @@ impl UIState {
     pub fn is_object_group_expanded(&self, group_name: &str) -> bool {
         self.expanded_object_groups.contains(group_name)
     }
+
+    /// Build the selectable table items list from database objects
+    pub fn build_selectable_table_items(
+        &mut self,
+        db_objects: &Option<crate::database::objects::DatabaseObjectList>,
+    ) {
+        self.selectable_table_items.clear();
+
+        if let Some(ref objects) = db_objects {
+            let mut display_index = 0;
+
+            // Add tables section
+            if !objects.tables.is_empty() {
+                let is_expanded = self.is_object_group_expanded("Tables");
+                self.selectable_table_items
+                    .push(SelectableTableItem::new_header(
+                        format!("▼ Tables ({})", objects.tables.len()),
+                        display_index,
+                    ));
+                display_index += 1;
+
+                if is_expanded {
+                    for table in &objects.tables {
+                        self.selectable_table_items
+                            .push(SelectableTableItem::new_selectable(
+                                format!("  📋 {}", table.name),
+                                table.name.clone(),
+                                table.schema.clone(),
+                                table.object_type.clone(),
+                                display_index,
+                            ));
+                        display_index += 1;
+                    }
+                }
+            }
+
+            // Add views section
+            if !objects.views.is_empty() {
+                if !self.selectable_table_items.is_empty() {
+                    self.selectable_table_items
+                        .push(SelectableTableItem::new_header(
+                            "".to_string(),
+                            display_index,
+                        ));
+                    display_index += 1;
+                }
+
+                let is_expanded = self.is_object_group_expanded("Views");
+                self.selectable_table_items
+                    .push(SelectableTableItem::new_header(
+                        format!("▼ Views ({})", objects.views.len()),
+                        display_index,
+                    ));
+                display_index += 1;
+
+                if is_expanded {
+                    for view in &objects.views {
+                        self.selectable_table_items
+                            .push(SelectableTableItem::new_selectable(
+                                format!("  👁️ {}", view.name),
+                                view.name.clone(),
+                                view.schema.clone(),
+                                view.object_type.clone(),
+                                display_index,
+                            ));
+                        display_index += 1;
+                    }
+                }
+            }
+
+            // Add materialized views section
+            if !objects.materialized_views.is_empty() {
+                if !self.selectable_table_items.is_empty() {
+                    self.selectable_table_items
+                        .push(SelectableTableItem::new_header(
+                            "".to_string(),
+                            display_index,
+                        ));
+                    display_index += 1;
+                }
+
+                let is_expanded = self.is_object_group_expanded("Materialized Views");
+                self.selectable_table_items
+                    .push(SelectableTableItem::new_header(
+                        format!(
+                            "▼ Materialized Views ({})",
+                            objects.materialized_views.len()
+                        ),
+                        display_index,
+                    ));
+                display_index += 1;
+
+                if is_expanded {
+                    for mv in &objects.materialized_views {
+                        self.selectable_table_items
+                            .push(SelectableTableItem::new_selectable(
+                                format!("  🔄 {}", mv.name),
+                                mv.name.clone(),
+                                mv.schema.clone(),
+                                mv.object_type.clone(),
+                                display_index,
+                            ));
+                        display_index += 1;
+                    }
+                }
+            }
+
+            // Add foreign tables section
+            if !objects.foreign_tables.is_empty() {
+                if !self.selectable_table_items.is_empty() {
+                    self.selectable_table_items
+                        .push(SelectableTableItem::new_header(
+                            "".to_string(),
+                            display_index,
+                        ));
+                    display_index += 1;
+                }
+
+                let is_expanded = self.is_object_group_expanded("Foreign Tables");
+                self.selectable_table_items
+                    .push(SelectableTableItem::new_header(
+                        format!("▼ Foreign Tables ({})", objects.foreign_tables.len()),
+                        display_index,
+                    ));
+                display_index += 1;
+
+                if is_expanded {
+                    for ft in &objects.foreign_tables {
+                        self.selectable_table_items
+                            .push(SelectableTableItem::new_selectable(
+                                format!("  🔗 {}", ft.name),
+                                ft.name.clone(),
+                                ft.schema.clone(),
+                                ft.object_type.clone(),
+                                display_index,
+                            ));
+                        display_index += 1;
+                    }
+                }
+            }
+        }
+
+        // Reset selection to first selectable item
+        self.selected_table_item_index = self.find_first_selectable_index();
+        self.update_tables_list_state_selection();
+    }
+
+    /// Find the index of the first selectable item
+    fn find_first_selectable_index(&self) -> usize {
+        for (idx, item) in self.selectable_table_items.iter().enumerate() {
+            if item.is_selectable {
+                return idx;
+            }
+        }
+        0
+    }
+
+    /// Move table selection down (j key)
+    pub fn table_selection_down(&mut self) {
+        if self.selectable_table_items.is_empty() {
+            return;
+        }
+
+        let mut next_index = self.selected_table_item_index + 1;
+
+        // Find next selectable item
+        while next_index < self.selectable_table_items.len() {
+            if self.selectable_table_items[next_index].is_selectable {
+                self.selected_table_item_index = next_index;
+                self.update_tables_list_state_selection();
+                return;
+            }
+            next_index += 1;
+        }
+
+        // If we reached the end, wrap to first selectable item
+        self.selected_table_item_index = self.find_first_selectable_index();
+        self.update_tables_list_state_selection();
+    }
+
+    /// Move table selection up (k key)
+    pub fn table_selection_up(&mut self) {
+        if self.selectable_table_items.is_empty() {
+            return;
+        }
+
+        if self.selected_table_item_index == 0 {
+            // Wrap to last selectable item
+            for i in (0..self.selectable_table_items.len()).rev() {
+                if self.selectable_table_items[i].is_selectable {
+                    self.selected_table_item_index = i;
+                    self.update_tables_list_state_selection();
+                    return;
+                }
+            }
+        } else {
+            // Find previous selectable item
+            let mut prev_index = self.selected_table_item_index - 1;
+            loop {
+                if self.selectable_table_items[prev_index].is_selectable {
+                    self.selected_table_item_index = prev_index;
+                    self.update_tables_list_state_selection();
+                    return;
+                }
+                if prev_index == 0 {
+                    break;
+                }
+                prev_index -= 1;
+            }
+        }
+    }
+
+    /// Update the tables list state selection to match our internal selection
+    fn update_tables_list_state_selection(&mut self) {
+        if !self.selectable_table_items.is_empty()
+            && self.selected_table_item_index < self.selectable_table_items.len()
+        {
+            self.tables_list_state
+                .select(Some(self.selected_table_item_index));
+        } else {
+            self.tables_list_state.select(None);
+        }
+    }
+
+    /// Get the currently selected table item
+    pub fn get_selected_table_item(&self) -> Option<&SelectableTableItem> {
+        let items = self.get_display_table_items();
+        if self.selected_table_item_index < items.len() {
+            let item = &items[self.selected_table_item_index];
+            if item.is_selectable {
+                return Some(item);
+            }
+        }
+        None
+    }
+
+    /// Get the currently selected table name for database operations
+    pub fn get_selected_table_name(&self) -> Option<String> {
+        self.get_selected_table_item()
+            .map(|item| item.qualified_name())
+    }
+
+    /// Enter search mode for tables pane
+    pub fn enter_tables_search(&mut self) {
+        self.tables_search_active = true;
+        self.tables_search_query.clear();
+        self.update_filtered_table_items();
+    }
+
+    /// Exit search mode for tables pane
+    pub fn exit_tables_search(&mut self) {
+        self.tables_search_active = false;
+        self.tables_search_query.clear();
+        self.filtered_table_items.clear();
+        // Reset selection to the main list
+        self.selected_table_item_index = self.find_first_selectable_index();
+        self.update_tables_list_state_selection();
+    }
+
+    /// Add character to search query
+    pub fn add_to_tables_search(&mut self, ch: char) {
+        if self.tables_search_active {
+            self.tables_search_query.push(ch);
+            self.update_filtered_table_items();
+        }
+    }
+
+    /// Remove character from search query
+    pub fn backspace_tables_search(&mut self) {
+        if self.tables_search_active && !self.tables_search_query.is_empty() {
+            self.tables_search_query.pop();
+            self.update_filtered_table_items();
+        }
+    }
+
+    /// Update filtered table items based on search query
+    fn update_filtered_table_items(&mut self) {
+        if !self.tables_search_active || self.tables_search_query.is_empty() {
+            self.filtered_table_items.clear();
+            return;
+        }
+
+        let query = self.tables_search_query.to_lowercase();
+        self.filtered_table_items.clear();
+
+        for item in &self.selectable_table_items {
+            if item.is_selectable {
+                // Check if the table name contains the search query characters in sequence
+                let table_name = item.object_name.to_lowercase();
+                if matches_sequence(&table_name, &query) {
+                    self.filtered_table_items.push(item.clone());
+                }
+            }
+        }
+
+        // Reset selection to first filtered item
+        self.selected_table_item_index = 0;
+        self.update_tables_list_state_selection();
+    }
+
+    /// Get the items to display (either filtered or all)
+    pub fn get_display_table_items(&self) -> &[SelectableTableItem] {
+        if self.tables_search_active && !self.filtered_table_items.is_empty() {
+            &self.filtered_table_items
+        } else {
+            &self.selectable_table_items
+        }
+    }
+
+    /// Navigate down in search results or main list
+    pub fn table_search_selection_down(&mut self) {
+        let items = if self.tables_search_active && !self.filtered_table_items.is_empty() {
+            &self.filtered_table_items
+        } else {
+            &self.selectable_table_items
+        };
+
+        if items.is_empty() {
+            return;
+        }
+
+        if self.tables_search_active && !self.filtered_table_items.is_empty() {
+            // Navigate through filtered results
+            self.selected_table_item_index = (self.selected_table_item_index + 1) % items.len();
+        } else {
+            // Use existing navigation logic for main list
+            self.table_selection_down();
+            return;
+        }
+
+        self.update_tables_list_state_selection();
+    }
+
+    /// Navigate up in search results or main list
+    pub fn table_search_selection_up(&mut self) {
+        let items = if self.tables_search_active && !self.filtered_table_items.is_empty() {
+            &self.filtered_table_items
+        } else {
+            &self.selectable_table_items
+        };
+
+        if items.is_empty() {
+            return;
+        }
+
+        if self.tables_search_active && !self.filtered_table_items.is_empty() {
+            // Navigate through filtered results
+            self.selected_table_item_index = if self.selected_table_item_index > 0 {
+                self.selected_table_item_index - 1
+            } else {
+                items.len() - 1
+            };
+        } else {
+            // Use existing navigation logic for main list
+            self.table_selection_up();
+            return;
+        }
+
+        self.update_tables_list_state_selection();
+    }
+
+    /// Go to first selectable table (vim gg command)
+    pub fn table_go_to_first(&mut self) {
+        self.selected_table_item_index = self.find_first_selectable_index();
+        self.update_tables_list_state_selection();
+        self.pending_gg_command = false;
+    }
+
+    /// Go to last selectable table (vim G command)
+    pub fn table_go_to_last(&mut self) {
+        let items = self.get_display_table_items();
+        if !items.is_empty() {
+            // Find the last selectable item
+            for i in (0..items.len()).rev() {
+                if items[i].is_selectable {
+                    self.selected_table_item_index = i;
+                    break;
+                }
+            }
+        }
+        self.update_tables_list_state_selection();
+    }
+
+    /// Handle 'g' key press for vim navigation
+    pub fn handle_g_key_press(&mut self) {
+        if self.pending_gg_command {
+            // Second 'g' pressed - execute gg command (go to top)
+            self.table_go_to_first();
+        } else {
+            // First 'g' pressed - wait for second 'g'
+            self.pending_gg_command = true;
+        }
+    }
+
+    /// Cancel pending gg command
+    pub fn cancel_pending_gg(&mut self) {
+        self.pending_gg_command = false;
+    }
 }
 
 impl Default for UIState {
     fn default() -> Self {
         Self::new()
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_matches_sequence() {
+        assert!(matches_sequence("users", "usr"));
+        assert!(matches_sequence("user_profiles", "upr"));
+        assert!(matches_sequence("customer_orders", "co"));
+        assert!(matches_sequence("employees", "emp"));
+        assert!(!matches_sequence("users", "xyz"));
+        assert!(!matches_sequence("short", "longquery"));
+        assert!(matches_sequence("anything", ""));
+
+        // Debug specific cases
+        assert!(matches_sequence("users", "users"));
+        assert!(matches_sequence("accounts", "u")); // accounts DOES match 'u' at position 5
+        assert!(matches_sequence("orders", "o")); // orders should match 'o'
+
+        // Test that we can search for 'j' and 'k' characters
+        assert!(matches_sequence("projects", "j")); // should match 'j' in "projects"
+        assert!(matches_sequence("tasks", "k")); // should match 'k' in "tasks"
+    }
+
+    #[test]
+    fn test_tables_search_functionality() {
+        let mut ui_state = UIState::new();
+
+        // Add some mock table items
+        ui_state.selectable_table_items = vec![
+            SelectableTableItem::new_selectable(
+                "users".to_string(),
+                "users".to_string(),
+                None,
+                crate::database::objects::DatabaseObjectType::Table,
+                0,
+            ),
+            SelectableTableItem::new_selectable(
+                "accounts".to_string(),
+                "accounts".to_string(),
+                None,
+                crate::database::objects::DatabaseObjectType::Table,
+                1,
+            ),
+            SelectableTableItem::new_selectable(
+                "orders".to_string(),
+                "orders".to_string(),
+                None,
+                crate::database::objects::DatabaseObjectType::Table,
+                2,
+            ),
+        ];
+
+        // Test entering search mode
+        ui_state.enter_tables_search();
+        assert!(ui_state.tables_search_active);
+        assert!(ui_state.tables_search_query.is_empty());
+
+        // Test adding search query
+        ui_state.add_to_tables_search('u');
+        assert_eq!(ui_state.tables_search_query, "u");
+        assert_eq!(ui_state.filtered_table_items.len(), 2); // "users" and "accounts" both match "u"
+
+        ui_state.add_to_tables_search('s');
+        assert_eq!(ui_state.tables_search_query, "us");
+        assert_eq!(ui_state.filtered_table_items.len(), 2); // both "users" and "accounts" match "us" sequence (u, s)
+
+        ui_state.add_to_tables_search('e');
+        assert_eq!(ui_state.tables_search_query, "use");
+        assert_eq!(ui_state.filtered_table_items.len(), 1); // only "users" matches "use" sequence
+
+        ui_state.add_to_tables_search('r');
+        assert_eq!(ui_state.tables_search_query, "user");
+        assert_eq!(ui_state.filtered_table_items.len(), 1); // only "users" matches "user" sequence
+
+        ui_state.add_to_tables_search('s');
+        assert_eq!(ui_state.tables_search_query, "users");
+        assert_eq!(ui_state.filtered_table_items.len(), 1); // only "users" matches "users" completely
+
+        // Test backspace
+        ui_state.backspace_tables_search(); // remove 's'
+        assert_eq!(ui_state.tables_search_query, "user");
+        assert_eq!(ui_state.filtered_table_items.len(), 1);
+
+        // Test exiting search
+        ui_state.exit_tables_search();
+        assert!(!ui_state.tables_search_active);
+        assert!(ui_state.tables_search_query.is_empty());
+        assert!(ui_state.filtered_table_items.is_empty());
+    }
+
+    #[test]
+    fn test_tables_search_with_j_k_characters() {
+        let mut ui_state = UIState::new();
+
+        // Add mock table items that contain 'j' and 'k' characters
+        ui_state.selectable_table_items = vec![
+            SelectableTableItem::new_selectable(
+                "projects".to_string(),
+                "projects".to_string(),
+                None,
+                crate::database::objects::DatabaseObjectType::Table,
+                0,
+            ),
+            SelectableTableItem::new_selectable(
+                "tasks".to_string(),
+                "tasks".to_string(),
+                None,
+                crate::database::objects::DatabaseObjectType::Table,
+                1,
+            ),
+            SelectableTableItem::new_selectable(
+                "events".to_string(),
+                "events".to_string(),
+                None,
+                crate::database::objects::DatabaseObjectType::Table,
+                2,
+            ),
+        ];
+
+        // Test entering search mode and searching for 'j'
+        ui_state.enter_tables_search();
+        ui_state.add_to_tables_search('j');
+        assert_eq!(ui_state.tables_search_query, "j");
+        assert_eq!(ui_state.filtered_table_items.len(), 1); // only "projects" contains 'j'
+        assert_eq!(ui_state.filtered_table_items[0].object_name, "projects");
+
+        // Clear and test searching for 'k'
+        ui_state.exit_tables_search();
+        ui_state.enter_tables_search();
+        ui_state.add_to_tables_search('k');
+        assert_eq!(ui_state.tables_search_query, "k");
+        assert_eq!(ui_state.filtered_table_items.len(), 1); // only "tasks" contains 'k'
+        assert_eq!(ui_state.filtered_table_items[0].object_name, "tasks");
+    }
+
+    #[test]
+    fn test_vim_navigation_commands() {
+        let mut ui_state = UIState::new();
+
+        // Add mock table items
+        ui_state.selectable_table_items = vec![
+            SelectableTableItem::new_header("▼ Tables (3)".to_string(), 0),
+            SelectableTableItem::new_selectable(
+                "first_table".to_string(),
+                "first_table".to_string(),
+                None,
+                crate::database::objects::DatabaseObjectType::Table,
+                1,
+            ),
+            SelectableTableItem::new_selectable(
+                "middle_table".to_string(),
+                "middle_table".to_string(),
+                None,
+                crate::database::objects::DatabaseObjectType::Table,
+                2,
+            ),
+            SelectableTableItem::new_selectable(
+                "last_table".to_string(),
+                "last_table".to_string(),
+                None,
+                crate::database::objects::DatabaseObjectType::Table,
+                3,
+            ),
+        ];
+
+        // Start at middle
+        ui_state.selected_table_item_index = 2;
+
+        // Test G command (go to last)
+        ui_state.table_go_to_last();
+        assert_eq!(ui_state.selected_table_item_index, 3);
+        if let Some(item) = ui_state.get_selected_table_item() {
+            assert_eq!(item.object_name, "last_table");
+        }
+
+        // Test gg command (go to first)
+        ui_state.table_go_to_first();
+        assert_eq!(ui_state.selected_table_item_index, 1); // First selectable item (skipping header)
+        if let Some(item) = ui_state.get_selected_table_item() {
+            assert_eq!(item.object_name, "first_table");
+        }
+
+        // Test gg command sequence
+        ui_state.selected_table_item_index = 2; // Start at middle
+        assert!(!ui_state.pending_gg_command);
+
+        // First 'g' press
+        ui_state.handle_g_key_press();
+        assert!(ui_state.pending_gg_command);
+        assert_eq!(ui_state.selected_table_item_index, 2); // Should not move yet
+
+        // Second 'g' press
+        ui_state.handle_g_key_press();
+        assert!(!ui_state.pending_gg_command); // Should be reset
+        assert_eq!(ui_state.selected_table_item_index, 1); // Should move to first
+
+        // Test canceling pending gg
+        ui_state.selected_table_item_index = 2;
+        ui_state.handle_g_key_press(); // First 'g'
+        assert!(ui_state.pending_gg_command);
+        ui_state.cancel_pending_gg();
+        assert!(!ui_state.pending_gg_command);
+        assert_eq!(ui_state.selected_table_item_index, 2); // Should stay in place
     }
 }
