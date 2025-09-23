@@ -355,10 +355,18 @@ pub trait Connection: Send + Sync {
     async fn get_table_metadata(&self, table_name: &str) -> Result<crate::database::TableMetadata>;
 
     /// Get column information for a table
-    async fn get_table_columns(&self, table_name: &str) -> Result<Vec<crate::database::TableColumn>>;
+    async fn get_table_columns(
+        &self,
+        table_name: &str,
+    ) -> Result<Vec<crate::database::TableColumn>>;
 
     /// Get table data with pagination
-    async fn get_table_data(&self, table_name: &str, limit: usize, offset: usize) -> Result<Vec<Vec<String>>>;
+    async fn get_table_data(
+        &self,
+        table_name: &str,
+        limit: usize,
+        offset: usize,
+    ) -> Result<Vec<Vec<String>>>;
 
     // Database-specific capabilities (AC1 & AC2 requirement)
     /// Get database-specific capabilities and features

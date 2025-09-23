@@ -51,8 +51,24 @@ impl Config {
 
         if config_path.exists() {
             let contents = fs::read_to_string(&config_path)?;
-            let config: Config = toml::from_str(&contents)?;
-            Ok(config)
+
+            // Try to parse as new format first
+            match toml::from_str::<Config>(&contents) {
+                Ok(config) => Ok(config),
+                Err(_) => {
+                    // If parsing fails, it might be an old format - create default and backup old
+                    eprintln!("Warning: Config file format is outdated. Creating new config and backing up old one.");
+
+                    // Backup old config
+                    let backup_path = config_path.with_extension("toml.backup");
+                    let _ = fs::copy(&config_path, &backup_path);
+
+                    // Create new default config
+                    let config = Self::default();
+                    let _ = config.save(&config_path);
+                    Ok(config)
+                }
+            }
         } else {
             let config = Self::default();
             // Try to save default config

@@ -98,11 +98,19 @@ impl Connection for PostgresConnection {
         PostgresConnection::get_table_metadata(self, table_name).await
     }
 
-    async fn get_table_columns(&self, table_name: &str) -> Result<Vec<crate::database::TableColumn>> {
+    async fn get_table_columns(
+        &self,
+        table_name: &str,
+    ) -> Result<Vec<crate::database::TableColumn>> {
         PostgresConnection::get_table_columns(self, table_name).await
     }
 
-    async fn get_table_data(&self, table_name: &str, limit: usize, offset: usize) -> Result<Vec<Vec<String>>> {
+    async fn get_table_data(
+        &self,
+        table_name: &str,
+        limit: usize,
+        offset: usize,
+    ) -> Result<Vec<Vec<String>>> {
         PostgresConnection::get_table_data(self, table_name, limit, offset).await
     }
 
@@ -121,7 +129,7 @@ impl Connection for PostgresConnection {
             supports_window_functions: true,
             supports_cte: true,
             max_identifier_length: 63, // PostgreSQL identifier limit
-            max_query_length: None, // No specific limit
+            max_query_length: None,    // No specific limit
             supported_isolation_levels: vec![
                 "READ UNCOMMITTED".to_string(),
                 "READ COMMITTED".to_string(),
@@ -145,21 +153,19 @@ impl Connection for PostgresConnection {
                         last_error: None,
                         database_version: None, // TODO: Get version
                         active_connections: pool.size(),
-                        max_connections: 5, // Hard-coded from pool config
+                        max_connections: 5,   // Hard-coded from pool config
                         uptime_seconds: None, // TODO: Get uptime
                     })
                 }
-                Err(e) => {
-                    Ok(crate::database::HealthStatus {
-                        is_healthy: false,
-                        response_time_ms: start.elapsed().as_millis() as u64,
-                        last_error: Some(e.to_string()),
-                        database_version: None,
-                        active_connections: 0,
-                        max_connections: 0,
-                        uptime_seconds: None,
-                    })
-                }
+                Err(e) => Ok(crate::database::HealthStatus {
+                    is_healthy: false,
+                    response_time_ms: start.elapsed().as_millis() as u64,
+                    last_error: Some(e.to_string()),
+                    database_version: None,
+                    active_connections: 0,
+                    max_connections: 0,
+                    uptime_seconds: None,
+                }),
             }
         } else {
             Ok(crate::database::HealthStatus {
@@ -181,13 +187,15 @@ impl Connection for PostgresConnection {
                 build_info: None,
                 server_name: Some("PostgreSQL".to_string()),
                 charset: Some("UTF8".to_string()),
-                timezone: None, // TODO: Get timezone
+                timezone: None,       // TODO: Get timezone
                 uptime_seconds: None, // TODO: Get uptime
                 current_database: self.config.database.clone(),
                 current_user: Some(self.config.username.clone()),
             })
         } else {
-            Err(LazyTablesError::Connection("No active connection".to_string()))
+            Err(LazyTablesError::Connection(
+                "No active connection".to_string(),
+            ))
         }
     }
 
@@ -223,17 +231,22 @@ impl Connection for PostgresConnection {
         let mut is_syntax_error = false;
         let mut is_permission_error = false;
 
-        let user_message = if error_lower.contains("permission denied") || error_lower.contains("authentication failed") {
+        let user_message = if error_lower.contains("permission denied")
+            || error_lower.contains("authentication failed")
+        {
             is_permission_error = true;
             recovery_suggestions.push("Check username and password".to_string());
-            recovery_suggestions.push("Verify user has permission to access the database".to_string());
+            recovery_suggestions
+                .push("Verify user has permission to access the database".to_string());
             "Access denied. Please check your credentials."
         } else if error_lower.contains("database") && error_lower.contains("does not exist") {
             is_connection_error = true;
             recovery_suggestions.push("Check database name spelling".to_string());
             recovery_suggestions.push("Ensure database exists on the server".to_string());
             "Database not found. Please verify the database name."
-        } else if error_lower.contains("connection refused") || error_lower.contains("could not connect") {
+        } else if error_lower.contains("connection refused")
+            || error_lower.contains("could not connect")
+        {
             is_connection_error = true;
             recovery_suggestions.push("Check if PostgreSQL server is running".to_string());
             recovery_suggestions.push("Verify host and port are correct".to_string());
@@ -242,7 +255,8 @@ impl Connection for PostgresConnection {
         } else if error_lower.contains("syntax error") {
             is_syntax_error = true;
             recovery_suggestions.push("Check SQL syntax for typos".to_string());
-            recovery_suggestions.push("Refer to PostgreSQL documentation for correct syntax".to_string());
+            recovery_suggestions
+                .push("Refer to PostgreSQL documentation for correct syntax".to_string());
             "SQL syntax error. Please check your query for syntax mistakes."
         } else if error_lower.contains("relation") && error_lower.contains("does not exist") {
             recovery_suggestions.push("Check table name spelling".to_string());
@@ -267,24 +281,64 @@ impl Connection for PostgresConnection {
 
     fn get_keywords(&self) -> Vec<String> {
         vec![
-            "SELECT".to_string(), "FROM".to_string(), "WHERE".to_string(), "INSERT".to_string(),
-            "UPDATE".to_string(), "DELETE".to_string(), "CREATE".to_string(), "DROP".to_string(),
-            "ALTER".to_string(), "TABLE".to_string(), "INDEX".to_string(), "VIEW".to_string(),
-            "DATABASE".to_string(), "SCHEMA".to_string(), "PROCEDURE".to_string(), "FUNCTION".to_string(),
-            "TRIGGER".to_string(), "SEQUENCE".to_string(), "PRIMARY".to_string(), "KEY".to_string(),
-            "FOREIGN".to_string(), "REFERENCES".to_string(), "UNIQUE".to_string(), "SERIAL".to_string(),
-            "BIGSERIAL".to_string(), "ARRAY".to_string(), "JSONB".to_string(), "EXPLAIN".to_string(),
+            "SELECT".to_string(),
+            "FROM".to_string(),
+            "WHERE".to_string(),
+            "INSERT".to_string(),
+            "UPDATE".to_string(),
+            "DELETE".to_string(),
+            "CREATE".to_string(),
+            "DROP".to_string(),
+            "ALTER".to_string(),
+            "TABLE".to_string(),
+            "INDEX".to_string(),
+            "VIEW".to_string(),
+            "DATABASE".to_string(),
+            "SCHEMA".to_string(),
+            "PROCEDURE".to_string(),
+            "FUNCTION".to_string(),
+            "TRIGGER".to_string(),
+            "SEQUENCE".to_string(),
+            "PRIMARY".to_string(),
+            "KEY".to_string(),
+            "FOREIGN".to_string(),
+            "REFERENCES".to_string(),
+            "UNIQUE".to_string(),
+            "SERIAL".to_string(),
+            "BIGSERIAL".to_string(),
+            "ARRAY".to_string(),
+            "JSONB".to_string(),
+            "EXPLAIN".to_string(),
         ]
     }
 
     fn get_functions(&self) -> Vec<String> {
         vec![
-            "COUNT".to_string(), "SUM".to_string(), "AVG".to_string(), "MIN".to_string(), "MAX".to_string(),
-            "CONCAT".to_string(), "SUBSTRING".to_string(), "LENGTH".to_string(), "UPPER".to_string(), "LOWER".to_string(),
-            "NOW".to_string(), "CURRENT_DATE".to_string(), "CURRENT_TIME".to_string(), "DATE_TRUNC".to_string(),
-            "EXTRACT".to_string(), "AGE".to_string(), "COALESCE".to_string(), "NULLIF".to_string(),
-            "ARRAY_AGG".to_string(), "STRING_AGG".to_string(), "GENERATE_SERIES".to_string(),
-            "RANDOM".to_string(), "ROUND".to_string(), "FLOOR".to_string(), "CEIL".to_string(),
+            "COUNT".to_string(),
+            "SUM".to_string(),
+            "AVG".to_string(),
+            "MIN".to_string(),
+            "MAX".to_string(),
+            "CONCAT".to_string(),
+            "SUBSTRING".to_string(),
+            "LENGTH".to_string(),
+            "UPPER".to_string(),
+            "LOWER".to_string(),
+            "NOW".to_string(),
+            "CURRENT_DATE".to_string(),
+            "CURRENT_TIME".to_string(),
+            "DATE_TRUNC".to_string(),
+            "EXTRACT".to_string(),
+            "AGE".to_string(),
+            "COALESCE".to_string(),
+            "NULLIF".to_string(),
+            "ARRAY_AGG".to_string(),
+            "STRING_AGG".to_string(),
+            "GENERATE_SERIES".to_string(),
+            "RANDOM".to_string(),
+            "ROUND".to_string(),
+            "FLOOR".to_string(),
+            "CEIL".to_string(),
         ]
     }
 }
@@ -428,9 +482,11 @@ impl PostgresConnection {
                         match object_type {
                             DatabaseObjectType::Table => result.tables.push(obj),
                             DatabaseObjectType::View => result.views.push(obj),
-                            DatabaseObjectType::MaterializedView => result.materialized_views.push(obj),
+                            DatabaseObjectType::MaterializedView => {
+                                result.materialized_views.push(obj)
+                            }
                             DatabaseObjectType::ForeignTable => result.foreign_tables.push(obj),
-                            _ => {},
+                            _ => {}
                         }
                     }
 
@@ -442,8 +498,11 @@ impl PostgresConnection {
                 Err(e) => {
                     // Check for permission errors
                     let error_msg = e.to_string();
-                    if error_msg.contains("permission denied") || error_msg.contains("insufficient privilege") {
-                        result.error = Some("Insufficient permissions to list database objects".to_string());
+                    if error_msg.contains("permission denied")
+                        || error_msg.contains("insufficient privilege")
+                    {
+                        result.error =
+                            Some("Insufficient permissions to list database objects".to_string());
                     } else {
                         result.error = Some(format!("Failed to list objects: {}", e));
                     }
@@ -470,10 +529,12 @@ impl PostgresConnection {
                 ORDER BY nspname
             ";
 
-            let rows = sqlx::query(query).fetch_all(pool).await
-                .map_err(|e| LazyTablesError::Connection(format!("Failed to list schemas: {}", e)))?;
+            let rows = sqlx::query(query).fetch_all(pool).await.map_err(|e| {
+                LazyTablesError::Connection(format!("Failed to list schemas: {}", e))
+            })?;
 
-            let schemas = rows.iter()
+            let schemas = rows
+                .iter()
                 .map(|row| row.get::<String, _>("schema_name"))
                 .collect();
 
@@ -486,7 +547,10 @@ impl PostgresConnection {
     }
 
     /// List database objects filtered by schema
-    pub async fn list_database_objects_in_schema(&self, schema_name: Option<&str>) -> Result<crate::database::DatabaseObjectList> {
+    pub async fn list_database_objects_in_schema(
+        &self,
+        schema_name: Option<&str>,
+    ) -> Result<crate::database::DatabaseObjectList> {
         use crate::database::{DatabaseObject, DatabaseObjectList, DatabaseObjectType};
 
         if let Some(pool) = &self.pool {
@@ -498,10 +562,12 @@ impl PostgresConnection {
             } else {
                 "AND n.nspname NOT IN ('pg_catalog', 'information_schema')
                  AND n.nspname NOT LIKE 'pg_toast%'
-                 AND n.nspname NOT LIKE 'pg_temp%'".to_string()
+                 AND n.nspname NOT LIKE 'pg_temp%'"
+                    .to_string()
             };
 
-            let query = format!("
+            let query = format!(
+                "
                 WITH object_info AS (
                     SELECT
                         n.nspname AS schema_name,
@@ -528,7 +594,9 @@ impl PostgresConnection {
                 )
                 SELECT * FROM object_info
                 ORDER BY schema_name, object_type, object_name
-            ", schema_filter);
+            ",
+                schema_filter
+            );
 
             match sqlx::query(&query).fetch_all(pool).await {
                 Ok(rows) => {
@@ -561,9 +629,11 @@ impl PostgresConnection {
                         match object_type {
                             DatabaseObjectType::Table => result.tables.push(obj),
                             DatabaseObjectType::View => result.views.push(obj),
-                            DatabaseObjectType::MaterializedView => result.materialized_views.push(obj),
+                            DatabaseObjectType::MaterializedView => {
+                                result.materialized_views.push(obj)
+                            }
                             DatabaseObjectType::ForeignTable => result.foreign_tables.push(obj),
-                            _ => {},
+                            _ => {}
                         }
                     }
 
@@ -575,8 +645,11 @@ impl PostgresConnection {
                 Err(e) => {
                     // Check for permission errors
                     let error_msg = e.to_string();
-                    if error_msg.contains("permission denied") || error_msg.contains("insufficient privilege") {
-                        result.error = Some("Insufficient permissions to list database objects".to_string());
+                    if error_msg.contains("permission denied")
+                        || error_msg.contains("insufficient privilege")
+                    {
+                        result.error =
+                            Some("Insufficient permissions to list database objects".to_string());
                     } else {
                         result.error = Some(format!("Failed to list objects: {}", e));
                     }
@@ -603,7 +676,7 @@ impl PostgresConnection {
             };
 
             // First, determine the object type
-            let type_query = "SELECT c.relkind
+            let type_query = "SELECT c.relkind::text as relkind
                 FROM pg_catalog.pg_class c
                 JOIN pg_catalog.pg_namespace n ON n.oid = c.relnamespace
                 WHERE n.nspname = $1 AND c.relname = $2";
@@ -623,9 +696,11 @@ impl PostgresConnection {
 
             // Get row count (skip for regular views)
             let row_count = if !is_view {
-                let count_query = format!("SELECT COUNT(*) FROM {}.{}",
+                let count_query = format!(
+                    "SELECT COUNT(*) FROM {}.{}",
                     schema.replace("'", "''"),
-                    table.replace("'", "''"));
+                    table.replace("'", "''")
+                );
                 match sqlx::query(&count_query).fetch_one(pool).await {
                     Ok(row) => row.get::<i64, _>(0),
                     Err(_) => 0, // Default to 0 if we can't get count
@@ -655,25 +730,24 @@ impl PostgresConnection {
 
             // Get size (skip for regular views as they don't have physical storage)
             let (total_size, table_size, indexes_size) = if !is_view {
-                let qualified_name = format!("{}.{}",
-                    schema.replace("'", "''"),
-                    table.replace("'", "''"));
+                let qualified_name =
+                    format!("{}.{}", schema.replace("'", "''"), table.replace("'", "''"));
 
                 match sqlx::query(size_query)
                     .bind(&qualified_name)
                     .fetch_one(pool)
-                    .await {
+                    .await
+                {
                     Ok(row) => (
                         row.get::<i64, _>("total_bytes"),
                         row.get::<i64, _>("table_bytes"),
-                        row.get::<i64, _>("index_bytes")
+                        row.get::<i64, _>("index_bytes"),
                     ),
-                    Err(_) => (0, 0, 0) // Default to 0 if size query fails
+                    Err(_) => (0, 0, 0), // Default to 0 if size query fails
                 }
             } else {
                 (0, 0, 0) // Views don't have physical storage
             };
-
 
             // Get primary keys
             let pk_query = "SELECT a.attname 
@@ -683,14 +757,14 @@ impl PostgresConnection {
                            WHERE i.indrelid = $1::regclass
                            AND i.indisprimary";
 
-            let qualified_name = format!("{}.{}",
-                schema.replace("'", "''"),
-                table.replace("'", "''"));
+            let qualified_name =
+                format!("{}.{}", schema.replace("'", "''"), table.replace("'", "''"));
 
             let pk_rows: Vec<sqlx::postgres::PgRow> = sqlx::query(pk_query)
                 .bind(&qualified_name)
                 .fetch_all(pool)
-                .await.unwrap_or_default();
+                .await
+                .unwrap_or_default();
 
             let primary_keys: Vec<String> = pk_rows
                 .iter()
@@ -716,7 +790,8 @@ impl PostgresConnection {
                 .bind(table)
                 .bind(schema)
                 .fetch_all(pool)
-                .await.unwrap_or_default();
+                .await
+                .unwrap_or_default();
 
             let foreign_keys: Vec<String> = fk_rows
                 .iter()
@@ -734,7 +809,8 @@ impl PostgresConnection {
                 .bind(table)
                 .bind(schema)
                 .fetch_all(pool)
-                .await.unwrap_or_default();
+                .await
+                .unwrap_or_default();
 
             let indexes: Vec<String> = index_rows
                 .iter()
@@ -747,20 +823,23 @@ impl PostgresConnection {
             let comment_row = match sqlx::query(comment_query)
                 .bind(&qualified_name)
                 .fetch_one(pool)
-                .await {
+                .await
+            {
                 Ok(row) => row,
-                Err(_) => return Ok(TableMetadata {
-                    table_name: table_name.to_string(),
-                    row_count: row_count as usize,
-                    column_count: column_count as usize,
-                    total_size,
-                    table_size,
-                    indexes_size,
-                    primary_keys,
-                    foreign_keys,
-                    indexes,
-                    comment: None,
-                })
+                Err(_) => {
+                    return Ok(TableMetadata {
+                        table_name: table_name.to_string(),
+                        row_count: row_count as usize,
+                        column_count: column_count as usize,
+                        total_size,
+                        table_size,
+                        indexes_size,
+                        primary_keys,
+                        foreign_keys,
+                        indexes,
+                        comment: None,
+                    })
+                }
             };
 
             let comment: Option<String> = comment_row.get("comment");
@@ -843,7 +922,14 @@ impl PostgresConnection {
     /// Get the row count for a table
     pub async fn get_table_row_count(&self, table_name: &str) -> Result<usize> {
         if let Some(pool) = &self.pool {
-            let query = format!("SELECT COUNT(*) FROM \"{table_name}\"");
+            // Use the same qualified name logic as get_table_data
+            let qualified_name = if table_name.contains('.') {
+                table_name.to_string()
+            } else {
+                format!("public.{}", table_name)
+            };
+
+            let query = format!("SELECT COUNT(*) FROM {qualified_name}");
             let row = sqlx::query(&query).fetch_one(pool).await?;
             let count: i64 = row.get(0);
             Ok(count as usize)

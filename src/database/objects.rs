@@ -107,5 +107,3 @@ impl DatabaseObjectList {
             && self.foreign_tables.is_empty()
     }
 }
-
-
