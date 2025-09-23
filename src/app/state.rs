@@ -135,7 +135,10 @@ impl AppState {
                     }
                 }
             }
-            _ => {}
+            FocusedPane::Details => {
+                // Scroll up in details pane
+                self.ui.details_viewport_offset = self.ui.details_viewport_offset.saturating_sub(1);
+            }
         }
     }
 
@@ -181,59 +184,62 @@ impl AppState {
                     }
                 }
             }
-            _ => {}
+            FocusedPane::Details => {
+                // Scroll down in details pane - will be bounded by UI logic
+                self.ui.details_viewport_offset += 1;
+            }
         }
     }
 
     /// Move selection left based on current focus
     pub fn move_left(&mut self) {
-        crate::debug_log!(
+        crate::log_debug!(
             "AppState::move_left called, focused_pane: {:?}",
             self.ui.focused_pane
         );
         match self.ui.focused_pane {
             FocusedPane::TabularOutput => {
-                crate::debug_log!("In TabularOutput branch");
+                crate::log_debug!("In TabularOutput branch");
                 if let Some(tab) = self.table_viewer_state.current_tab_mut() {
-                    crate::debug_log!("Got current tab, in_edit_mode: {}", tab.in_edit_mode);
+                    crate::log_debug!("Got current tab, in_edit_mode: {}", tab.in_edit_mode);
                     if !tab.in_edit_mode {
-                        crate::debug_log!("Calling tab.move_left()");
+                        crate::log_debug!("Calling tab.move_left()");
                         tab.move_left();
                     } else {
-                        crate::debug_log!("Skipping because in edit mode");
+                        crate::log_debug!("Skipping because in edit mode");
                     }
                 } else {
-                    crate::debug_log!("No current tab available");
+                    crate::log_debug!("No current tab available");
                 }
             }
             FocusedPane::QueryWindow => {
                 self.ui.query_cursor_column = self.ui.query_cursor_column.saturating_sub(1);
             }
             _ => {
-                crate::debug_log!("Not in TabularOutput or QueryWindow pane");
+                crate::log_debug!("Not in TabularOutput or QueryWindow pane");
             }
         }
     }
 
     /// Move selection right based on current focus
     pub fn move_right(&mut self) {
-        crate::debug_log!(
+        crate::log_debug!(
             "AppState::move_right called, focused_pane: {:?}",
             self.ui.focused_pane
         );
         match self.ui.focused_pane {
             FocusedPane::TabularOutput => {
-                crate::debug_log!("In TabularOutput branch");
+                crate::log_debug!("In TabularOutput branch");
                 if let Some(tab) = self.table_viewer_state.current_tab_mut() {
-                    crate::debug_log!("Got current tab, in_edit_mode: {}", tab.in_edit_mode);
+                    crate::log_debug!("Got current tab, in_edit_mode: {}", tab.in_edit_mode);
                     if !tab.in_edit_mode {
-                        crate::debug_log!("Calling tab.move_right()");
+                        crate::log_debug!("Calling tab.move_right()");
                         tab.move_right();
                     } else {
-                        crate::debug_log!("Skipping because in edit mode");
+                        crate::log_debug!("Skipping because in edit mode");
                     }
                 } else {
-                    crate::debug_log!("No current tab available");
+                    crate::log_debug!("No current tab available");
                 }
             }
             FocusedPane::QueryWindow => {
@@ -246,7 +252,7 @@ impl AppState {
                 }
             }
             _ => {
-                crate::debug_log!("Not in TabularOutput or QueryWindow pane");
+                crate::log_debug!("Not in TabularOutput or QueryWindow pane");
             }
         }
     }
@@ -380,6 +386,8 @@ impl AppState {
         self.ui.table_selection_down();
         // Clear metadata when selection changes (will load when Enter is pressed)
         self.db.current_table_metadata = None;
+        // Reset details pane scroll position for new table
+        self.ui.details_viewport_offset = 0;
     }
 
     /// Move table selection up
@@ -387,6 +395,8 @@ impl AppState {
         self.ui.table_selection_up();
         // Clear metadata when selection changes (will load when Enter is pressed)
         self.db.current_table_metadata = None;
+        // Reset details pane scroll position for new table
+        self.ui.details_viewport_offset = 0;
     }
 
     /// Update table list state when tables change

@@ -857,15 +857,34 @@ impl App {
                         }
                     }
                     (KeyModifiers::NONE, KeyCode::Char('r')) => {
-                        if self.state.ui.focused_pane == FocusedPane::TabularOutput {
-                            // Reload current table
-                            if let Err(e) = self.state.reload_current_table_tab().await {
-                                self.state
-                                    .toast_manager
-                                    .error(format!("Failed to reload table: {e}"));
-                            } else {
-                                self.state.toast_manager.info("Table data refreshed");
+                        match self.state.ui.focused_pane {
+                            FocusedPane::TabularOutput => {
+                                // Reload current table
+                                if let Err(e) = self.state.reload_current_table_tab().await {
+                                    self.state
+                                        .toast_manager
+                                        .error(format!("Failed to reload table: {e}"));
+                                } else {
+                                    self.state.toast_manager.info("Table data refreshed");
+                                }
                             }
+                            FocusedPane::Details => {
+                                // Refresh table metadata
+                                if let Some(table_name) = self.state.ui.get_selected_table_name() {
+                                    if let Err(e) = self.state.load_table_metadata(&table_name).await {
+                                        self.state
+                                            .toast_manager
+                                            .error(format!("Failed to refresh metadata: {e}"));
+                                    } else {
+                                        self.state.toast_manager.info("Table metadata refreshed");
+                                        // Reset scroll position to show the new data
+                                        self.state.ui.details_viewport_offset = 0;
+                                    }
+                                } else {
+                                    self.state.toast_manager.warning("No table selected");
+                                }
+                            }
+                            _ => {}
                         }
                     }
                     (KeyModifiers::NONE, KeyCode::Char('t')) => {
