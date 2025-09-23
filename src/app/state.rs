@@ -2,7 +2,7 @@
 
 use crate::{
     config::Config,
-    database::{ConnectionConfig, ConnectionStatus, DatabaseType},
+    database::{AppStateDb, ConnectionConfig, ConnectionStatus, DatabaseType},
     state::{ui::UIState, DatabaseState},
     ui::components::{
         ConnectionModalState, QueryEditor, TableCreatorState, TableEditorState, TableViewerState,
@@ -45,6 +45,8 @@ pub struct AppState {
     pub toast_manager: ToastManager,
     /// Query editor component
     pub query_editor: QueryEditor,
+    /// Application state database
+    pub app_state_db: AppStateDb,
 }
 
 impl AppState {
@@ -54,7 +56,7 @@ impl AppState {
         let _ = crate::config::Config::ensure_directories();
 
         let db = DatabaseState::new();
-        let saved_sql_files = Vec::new(); // Will be loaded when connection is selected
+        let saved_sql_files = Vec::new(); // Will be loaded only when a connection is connected
 
         // Load or create UI state
         let mut ui = UIState::load().unwrap_or_default();
@@ -73,12 +75,24 @@ impl AppState {
             table_viewer_state: TableViewerState::new(),
             toast_manager: ToastManager::new(),
             query_editor: QueryEditor::new(),
+            app_state_db: AppStateDb::new(),
         };
 
         // Load SQL files during initialization
         app_state.refresh_sql_files();
 
         app_state
+    }
+
+    /// Initialize the application state database asynchronously
+    pub async fn initialize_app_db(&mut self) -> Result<(), String> {
+        match AppStateDb::initialize().await {
+            Ok(app_db) => {
+                self.app_state_db = app_db;
+                Ok(())
+            }
+            Err(e) => Err(format!("Failed to initialize application database: {}", e)),
+        }
     }
 
     /// Cycle focus to the next pane
@@ -506,6 +520,21 @@ impl AppState {
                 self.update_table_selection();
                 self.toast_manager
                     .success(format!("Connected to {connection_name}"));
+
+                // Update active connection in app state database
+                if let Some(conn) = self.get_selected_connection() {
+                    let _ = self
+                        .app_state_db
+                        .set_active_connection(
+                            &conn.id,
+                            &conn.name,
+                            conn.database_type.display_name(),
+                        )
+                        .await;
+                }
+
+                // Refresh SQL files to show connection-specific files
+                self.refresh_sql_files();
             }
 
             // Save updated connection status
@@ -522,7 +551,18 @@ impl AppState {
     }
 
     /// Disconnect from current database
-    pub fn disconnect_from_database(&mut self) {
+    pub async fn disconnect_from_database(&mut self) {
+        self.disconnect_from_database_sync();
+
+        // Clear active connection in app state database
+        let _ = self.app_state_db.clear_active_connection().await;
+
+        // Refresh SQL files to clear the list (no connection = no files)
+        self.refresh_sql_files();
+    }
+
+    /// Disconnect from current database (synchronous part only)
+    pub fn disconnect_from_database_sync(&mut self) {
         if let Some(connection) = self
             .db
             .connections
@@ -543,8 +583,13 @@ impl AppState {
             // Clear table metadata
             self.db.current_table_metadata = None;
 
+            // Note: App state database clearing is handled in the async version
+
             // Save updated connection status
             let _ = self.db.connections.save();
+
+            // Refresh SQL files to clear the list (no connection = no files)
+            self.refresh_sql_files();
         }
     }
 
@@ -574,54 +619,45 @@ impl AppState {
         }
     }
 
-    /// Load list of saved SQL files for current project
+    /// Load list of saved SQL files for current connection (only if connection is active)
     fn load_sql_files_for_connection(&self) -> Vec<String> {
         use std::fs;
 
         let mut files = Vec::new();
 
-        // Get connection-specific directory
-        let connection_name = if let Some(connection) = self
+        // Only load files if we have an active connected connection
+        if let Some(connection) = self
             .db
             .connections
             .connections
             .get(self.ui.selected_connection)
         {
-            connection.name.clone()
-        } else {
-            "default".to_string()
-        };
-
-        // Try connection-specific directory first
-        let connection_dir = Config::sql_files_dir().join(&connection_name);
-        if let Ok(entries) = fs::read_dir(&connection_dir) {
-            for entry in entries.flatten() {
-                let path = entry.path();
-                if path.is_file() && path.extension().is_some_and(|ext| ext == "sql") {
-                    if let Some(name) = path.file_stem().and_then(|name| name.to_str()) {
-                        files.push(name.to_string());
-                    }
-                }
+            // Only show files if connection is actually connected
+            if !connection.is_connected() {
+                return files; // Return empty if not connected
             }
-        }
 
-        // Also load from root sql_files directory
-        let sql_dir = Config::sql_files_dir();
-        if let Ok(entries) = fs::read_dir(&sql_dir) {
-            for entry in entries.flatten() {
-                let path = entry.path();
-                // Skip subdirectories, only get files in root
-                if path.is_file() && path.extension().is_some_and(|ext| ext == "sql") {
-                    if let Some(name) = path.file_stem().and_then(|name| name.to_str()) {
-                        if !files.contains(&name.to_string()) {
-                            files.push(format!("../{name}"));
+            let connection_name = &connection.name;
+
+            // Try connection-specific directory first
+            let connection_dir = Config::sql_files_dir().join(connection_name);
+            if let Ok(entries) = fs::read_dir(&connection_dir) {
+                for entry in entries.flatten() {
+                    let path = entry.path();
+                    if path.is_file() && path.extension().is_some_and(|ext| ext == "sql") {
+                        if let Some(name) = path.file_stem().and_then(|name| name.to_str()) {
+                            files.push(name.to_string());
                         }
                     }
                 }
             }
+
+            // Only load connection-specific files, no shared files
+            // Each connection should only see its own SQL files
+
+            files.sort();
         }
 
-        files.sort();
         files
     }
 
@@ -629,27 +665,34 @@ impl AppState {
     pub fn refresh_sql_files(&mut self) {
         self.saved_sql_files = self.load_sql_files_for_connection();
         self.clamp_sql_file_selection();
+
+        // Update UI state to reflect the new file count
+        self.ui
+            .update_sql_file_selection(self.saved_sql_files.len());
     }
 
-    /// Save current query content to a file
+    /// Save current query content to a file (only if connection is active)
     pub fn save_query_as(&mut self, filename: &str) -> Result<(), Box<dyn std::error::Error>> {
         use crate::config::Config;
         use std::fs;
 
-        // Get connection-specific directory
-        let connection_name = if let Some(connection) = self
+        // Get connection-specific directory - require active connection
+        let connection = self
             .db
             .connections
             .connections
             .get(self.ui.selected_connection)
-        {
-            connection.name.clone()
-        } else {
-            "default".to_string()
-        };
+            .ok_or("No connection selected")?;
+
+        // Only allow saving if connection is active
+        if !connection.is_connected() {
+            return Err("Cannot save SQL file: No active connection".into());
+        }
+
+        let connection_name = &connection.name;
 
         // Save to connection-specific directory
-        let sql_dir = Config::sql_files_dir().join(&connection_name);
+        let sql_dir = Config::sql_files_dir().join(connection_name);
         fs::create_dir_all(&sql_dir)?;
 
         let file_path = sql_dir.join(format!("{filename}.sql"));
@@ -671,32 +714,29 @@ impl AppState {
         }
     }
 
-    /// Load a SQL file into the query editor
+    /// Load a SQL file into the query editor (only if connection is active)
     pub fn load_query_file(&mut self, filename: &str) -> Result<(), Box<dyn std::error::Error>> {
         use std::fs;
 
-        // Get connection-specific directory
-        let connection_name = if let Some(connection) = self
+        // Get connection-specific directory - require active connection
+        let connection = self
             .db
             .connections
             .connections
             .get(self.ui.selected_connection)
-        {
-            connection.name.clone()
-        } else {
-            "default".to_string()
-        };
+            .ok_or("No connection selected")?;
 
-        let file_path = if filename.starts_with("../") {
-            // File from root sql_files directory
-            let clean_name = filename.trim_start_matches("../");
-            Config::sql_files_dir().join(format!("{clean_name}.sql"))
-        } else {
-            // File from connection-specific directory
-            Config::sql_files_dir()
-                .join(&connection_name)
-                .join(format!("{filename}.sql"))
-        };
+        // Only allow loading if connection is active
+        if !connection.is_connected() {
+            return Err("Cannot load SQL file: No active connection".into());
+        }
+
+        let connection_name = &connection.name;
+
+        // All files are connection-specific now
+        let file_path = Config::sql_files_dir()
+            .join(connection_name)
+            .join(format!("{filename}.sql"));
 
         let content = fs::read_to_string(&file_path)?;
         self.query_content = content;
@@ -710,8 +750,22 @@ impl AppState {
         Ok(())
     }
 
-    /// Create a new SQL file
+    /// Create a new SQL file (only if connection is active)
     pub fn new_query_file(&mut self, filename: &str) -> Result<(), Box<dyn std::error::Error>> {
+        // Check if connection is active before creating new file
+        if let Some(connection) = self
+            .db
+            .connections
+            .connections
+            .get(self.ui.selected_connection)
+        {
+            if !connection.is_connected() {
+                return Err("Cannot create SQL file: No active connection".into());
+            }
+        } else {
+            return Err("No connection selected".into());
+        }
+
         self.query_content.clear();
         self.ui.current_sql_file = Some(filename.to_string());
         self.ui.query_modified = false;
@@ -720,6 +774,51 @@ impl AppState {
 
         // Save the empty file
         self.save_query_as(filename)
+    }
+
+    /// Record SQL file activity when a file is opened
+    pub async fn record_sql_file_activity(&self, filename: &str, file_path: &str) {
+        if let Some(connection) = self
+            .db
+            .connections
+            .connections
+            .get(self.ui.selected_connection)
+        {
+            if connection.is_connected() {
+                let _ = self
+                    .app_state_db
+                    .record_sql_file_activity(&connection.id, file_path, filename)
+                    .await;
+            }
+        }
+    }
+
+    /// Load a SQL file and record activity
+    pub async fn load_sql_file_with_activity(
+        &mut self,
+        filename: &str,
+    ) -> Result<(), Box<dyn std::error::Error>> {
+        // Load the file first
+        self.load_query_file(filename)?;
+
+        // Record activity - all files are connection-specific now
+        let file_path = if let Some(connection) = self
+            .db
+            .connections
+            .connections
+            .get(self.ui.selected_connection)
+        {
+            Config::sql_files_dir()
+                .join(&connection.name)
+                .join(format!("{filename}.sql"))
+                .to_string_lossy()
+                .to_string()
+        } else {
+            return Err("No connection selected".into());
+        };
+
+        self.record_sql_file_activity(filename, &file_path).await;
+        Ok(())
     }
 
     /// Insert character at current cursor position in query editor
