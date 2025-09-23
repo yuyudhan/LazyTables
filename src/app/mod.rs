@@ -871,7 +871,9 @@ impl App {
                             FocusedPane::Details => {
                                 // Refresh table metadata
                                 if let Some(table_name) = self.state.ui.get_selected_table_name() {
-                                    if let Err(e) = self.state.load_table_metadata(&table_name).await {
+                                    if let Err(e) =
+                                        self.state.load_table_metadata(&table_name).await
+                                    {
                                         self.state
                                             .toast_manager
                                             .error(format!("Failed to refresh metadata: {e}"));
