@@ -317,7 +317,11 @@ impl TableMetadata {
         if !self.indexes.is_empty() {
             let unique_count = self.indexes.iter().filter(|idx| idx.is_unique).count();
             if unique_count > 0 {
-                parts.push(format!("{} idx ({} unique)", self.indexes.len(), unique_count));
+                parts.push(format!(
+                    "{} idx ({} unique)",
+                    self.indexes.len(),
+                    unique_count
+                ));
             } else {
                 parts.push(format!("{} idx", self.indexes.len()));
             }

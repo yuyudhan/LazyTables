@@ -165,7 +165,7 @@ impl HelpSystem {
                 Self::add_overview_command(lines, "e", "Edit", key_style, desc_style);
             }
             HelpMode::Details => {
-                Self::add_overview_command(lines, "Enter", "Load metadata", key_style, desc_style);
+                Self::add_overview_command(lines, "r", "Refresh metadata", key_style, desc_style);
             }
             HelpMode::TabularOutput => {
                 Self::add_overview_command(lines, "i", "Edit", key_style, desc_style);
@@ -243,7 +243,7 @@ impl HelpSystem {
     }
 
     fn add_details_commands(lines: &mut Vec<Line<'static>>) {
-        Self::add_command(lines, "Enter", "Load metadata");
+        Self::add_command(lines, "r", "Refresh metadata");
         lines.push(Line::from(""));
         lines.push(Line::from(Span::styled(
             "Displays:",
