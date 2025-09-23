@@ -50,15 +50,23 @@ impl Command for ExecuteQueryCommand {
         context.state.toast_manager.info(format!(
             "Executing {} query: {}",
             database_type.display_name(),
-            query.lines().next().unwrap_or("").chars().take(50).collect::<String>()
+            query
+                .lines()
+                .next()
+                .unwrap_or("")
+                .chars()
+                .take(50)
+                .collect::<String>()
         ));
 
         // Create enhanced action with database context
-        Ok(CommandResult::Action(CommandAction::ExecuteQueryWithContext {
-            query,
-            database_type,
-            connection_name: connection_config.name.clone(),
-        }))
+        Ok(CommandResult::Action(
+            CommandAction::ExecuteQueryWithContext {
+                query,
+                database_type,
+                connection_name: connection_config.name.clone(),
+            },
+        ))
     }
 
     fn description(&self) -> &str {
@@ -161,17 +169,25 @@ impl Command for SaveQueryCommand {
 }
 
 /// Validate SQL query syntax for specific database types
-fn validate_query_syntax(query: &str, database_type: &DatabaseType) -> std::result::Result<(), String> {
+fn validate_query_syntax(
+    query: &str,
+    database_type: &DatabaseType,
+) -> std::result::Result<(), String> {
     let query_upper = query.to_uppercase();
 
     match database_type {
         DatabaseType::MySQL | DatabaseType::MariaDB => {
             // MySQL-specific validation
             if query_upper.contains("RETURNING") && !query_upper.contains("INSERT") {
-                return Err("RETURNING clause is not supported in MySQL for this statement type".to_string());
+                return Err(
+                    "RETURNING clause is not supported in MySQL for this statement type"
+                        .to_string(),
+                );
             }
             if query_upper.contains("SERIAL") {
-                return Err("SERIAL type is not supported in MySQL. Use AUTO_INCREMENT instead".to_string());
+                return Err(
+                    "SERIAL type is not supported in MySQL. Use AUTO_INCREMENT instead".to_string(),
+                );
             }
             if query_upper.contains("BOOLEAN") && query_upper.contains("CREATE TABLE") {
                 return Ok(()); // MySQL supports BOOLEAN as alias for TINYINT(1)
@@ -180,10 +196,15 @@ fn validate_query_syntax(query: &str, database_type: &DatabaseType) -> std::resu
         DatabaseType::PostgreSQL => {
             // PostgreSQL-specific validation
             if query_upper.contains("AUTO_INCREMENT") {
-                return Err("AUTO_INCREMENT is not supported in PostgreSQL. Use SERIAL or IDENTITY instead".to_string());
+                return Err(
+                    "AUTO_INCREMENT is not supported in PostgreSQL. Use SERIAL or IDENTITY instead"
+                        .to_string(),
+                );
             }
             if query_upper.contains("ENGINE=") {
-                return Err("ENGINE clause is MySQL-specific, not supported in PostgreSQL".to_string());
+                return Err(
+                    "ENGINE clause is MySQL-specific, not supported in PostgreSQL".to_string(),
+                );
             }
             if query_upper.contains("UNSIGNED") {
                 return Err("UNSIGNED modifier is not supported in PostgreSQL".to_string());

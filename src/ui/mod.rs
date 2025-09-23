@@ -279,10 +279,21 @@ impl UI {
                 let db_type_name = connection.database_type.display_name();
 
                 let line = Line::from(vec![
-                    Span::styled(format!("{} ", db_type_icon), Style::default().fg(Color::Cyan)),
+                    Span::styled(
+                        format!("{} ", db_type_icon),
+                        Style::default().fg(Color::Cyan),
+                    ),
                     Span::styled(format!("{} ", connection.status_symbol()), symbol_style),
-                    Span::styled(&connection.name, Style::default().fg(Color::White).add_modifier(Modifier::BOLD)),
-                    Span::styled(format!(" ({})", db_type_name), Style::default().fg(Color::Blue)),
+                    Span::styled(
+                        &connection.name,
+                        Style::default()
+                            .fg(Color::White)
+                            .add_modifier(Modifier::BOLD),
+                    ),
+                    Span::styled(
+                        format!(" ({})", db_type_name),
+                        Style::default().fg(Color::Blue),
+                    ),
                     Span::styled(" [DB: ", Style::default().fg(Color::DarkGray)),
                     Span::styled(db_name, Style::default().fg(Color::Cyan)),
                     Span::styled("] ", Style::default().fg(Color::DarkGray)),
@@ -474,17 +485,15 @@ impl UI {
         } else if state.ui.selected_table < state.db.tables.len() {
             // Get selected table info
             let selected_table = &state.db.tables[state.ui.selected_table];
-            let mut lines = vec![
-                Line::from(vec![
-                    Span::styled("Selected: ", Style::default().fg(Color::Cyan)),
-                    Span::styled(
-                        selected_table,
-                        Style::default()
-                            .fg(Color::White)
-                            .add_modifier(Modifier::BOLD),
-                    ),
-                ]),
-            ];
+            let mut lines = vec![Line::from(vec![
+                Span::styled("Selected: ", Style::default().fg(Color::Cyan)),
+                Span::styled(
+                    selected_table,
+                    Style::default()
+                        .fg(Color::White)
+                        .add_modifier(Modifier::BOLD),
+                ),
+            ])];
 
             // Add object type if we have database objects
             if let Some(ref db_objects) = state.db.database_objects {
@@ -493,7 +502,11 @@ impl UI {
                     Some(("Table", Color::Blue))
                 } else if db_objects.views.iter().any(|o| o.name == *selected_table) {
                     Some(("View", Color::Green))
-                } else if db_objects.materialized_views.iter().any(|o| o.name == *selected_table) {
+                } else if db_objects
+                    .materialized_views
+                    .iter()
+                    .any(|o| o.name == *selected_table)
+                {
                     Some(("Materialized View", Color::Magenta))
                 } else {
                     None
@@ -509,99 +522,98 @@ impl UI {
 
             // Show metadata if available
             if let Some(metadata) = &state.db.current_table_metadata {
-            // Show actual table metadata
-            let mut lines = vec![
-                Line::from(vec![
-                    Span::styled("Table: ", Style::default().fg(Color::Cyan)),
-                    Span::styled(
-                        &metadata.table_name,
+                // Show actual table metadata
+                let mut lines = vec![
+                    Line::from(vec![
+                        Span::styled("Table: ", Style::default().fg(Color::Cyan)),
+                        Span::styled(
+                            &metadata.table_name,
+                            Style::default()
+                                .fg(Color::White)
+                                .add_modifier(Modifier::BOLD),
+                        ),
+                    ]),
+                    Line::from(""),
+                    Line::from(vec![
+                        Span::styled("Rows: ", Style::default().fg(Color::Cyan)),
+                        Span::styled(
+                            format!("{}", metadata.row_count),
+                            Style::default().fg(Color::White),
+                        ),
+                    ]),
+                    Line::from(vec![
+                        Span::styled("Columns: ", Style::default().fg(Color::Cyan)),
+                        Span::styled(
+                            metadata.column_count.to_string(),
+                            Style::default().fg(Color::White),
+                        ),
+                    ]),
+                    Line::from(""),
+                    Line::from(vec![
+                        Span::styled("Total Size: ", Style::default().fg(Color::Cyan)),
+                        Span::styled(
+                            format_bytes(metadata.total_size),
+                            Style::default().fg(Color::White),
+                        ),
+                    ]),
+                    Line::from(vec![
+                        Span::styled("Table Size: ", Style::default().fg(Color::Cyan)),
+                        Span::styled(
+                            format_bytes(metadata.table_size),
+                            Style::default().fg(Color::White),
+                        ),
+                    ]),
+                    Line::from(vec![
+                        Span::styled("Indexes Size: ", Style::default().fg(Color::Cyan)),
+                        Span::styled(
+                            format_bytes(metadata.indexes_size),
+                            Style::default().fg(Color::White),
+                        ),
+                    ]),
+                ];
+
+                // Add primary keys summary
+                if !metadata.primary_keys.is_empty() {
+                    lines.push(Line::from(""));
+                    lines.push(Line::from(vec![
+                        Span::styled("PKs: ", Style::default().fg(Color::Yellow)),
+                        Span::styled(
+                            metadata.primary_keys.join(", "),
+                            Style::default().fg(Color::White),
+                        ),
+                    ]));
+                }
+
+                // Add indexes count
+                if !metadata.indexes.is_empty() {
+                    lines.push(Line::from(vec![
+                        Span::styled("Indexes: ", Style::default().fg(Color::Yellow)),
+                        Span::styled(
+                            format!("{} total", metadata.indexes.len()),
+                            Style::default().fg(Color::White),
+                        ),
+                    ]));
+                }
+
+                // Add comment if any
+                if let Some(comment) = &metadata.comment {
+                    lines.push(Line::from(""));
+                    lines.push(Line::from(vec![Span::styled(
+                        "Comment:",
                         Style::default()
-                            .fg(Color::White)
+                            .fg(Color::Yellow)
                             .add_modifier(Modifier::BOLD),
-                    ),
-                ]),
-                Line::from(""),
-                Line::from(vec![
-                    Span::styled("Rows: ", Style::default().fg(Color::Cyan)),
-                    Span::styled(
-                        format!("{}", metadata.row_count),
-                        Style::default().fg(Color::White),
-                    ),
-                ]),
-                Line::from(vec![
-                    Span::styled("Columns: ", Style::default().fg(Color::Cyan)),
-                    Span::styled(
-                        metadata.column_count.to_string(),
-                        Style::default().fg(Color::White),
-                    ),
-                ]),
-                Line::from(""),
-                Line::from(vec![
-                    Span::styled("Total Size: ", Style::default().fg(Color::Cyan)),
-                    Span::styled(
-                        format_bytes(metadata.total_size),
-                        Style::default().fg(Color::White),
-                    ),
-                ]),
-                Line::from(vec![
-                    Span::styled("Table Size: ", Style::default().fg(Color::Cyan)),
-                    Span::styled(
-                        format_bytes(metadata.table_size),
-                        Style::default().fg(Color::White),
-                    ),
-                ]),
-                Line::from(vec![
-                    Span::styled("Indexes Size: ", Style::default().fg(Color::Cyan)),
-                    Span::styled(
-                        format_bytes(metadata.indexes_size),
-                        Style::default().fg(Color::White),
-                    ),
-                ]),
-            ];
-
-            // Add primary keys summary
-            if !metadata.primary_keys.is_empty() {
-                lines.push(Line::from(""));
-                lines.push(Line::from(vec![
-                    Span::styled("PKs: ", Style::default().fg(Color::Yellow)),
-                    Span::styled(
-                        metadata.primary_keys.join(", "),
-                        Style::default().fg(Color::White),
-                    ),
-                ]));
-            }
-
-            // Add indexes count
-            if !metadata.indexes.is_empty() {
-                lines.push(Line::from(vec![
-                    Span::styled("Indexes: ", Style::default().fg(Color::Yellow)),
-                    Span::styled(
-                        format!("{} total", metadata.indexes.len()),
-                        Style::default().fg(Color::White),
-                    ),
-                ]));
-            }
-
-            // Add comment if any
-            if let Some(comment) = &metadata.comment {
-                lines.push(Line::from(""));
-                lines.push(Line::from(vec![Span::styled(
-                    "Comment:",
-                    Style::default()
-                        .fg(Color::Yellow)
-                        .add_modifier(Modifier::BOLD),
-                )]));
-                lines.push(Line::from(vec![
-                    Span::raw("  "),
-                    Span::styled(
-                        comment,
-                        Style::default()
-                            .fg(Color::Gray)
-                            .add_modifier(Modifier::ITALIC),
-                    ),
-                ]));
-            }
-
+                    )]));
+                    lines.push(Line::from(vec![
+                        Span::raw("  "),
+                        Span::styled(
+                            comment,
+                            Style::default()
+                                .fg(Color::Gray)
+                                .add_modifier(Modifier::ITALIC),
+                        ),
+                    ]));
+                }
             } else {
                 // Table selected but metadata not loaded yet
                 lines.push(Line::from(""));
@@ -976,7 +988,9 @@ impl UI {
                     // Add line numbers for better navigation visibility
                     let line_number = format!("{:>4} ", actual_line_idx + 1);
                     let line_number_style = if actual_line_idx == state.ui.query_cursor_line {
-                        Style::default().fg(Color::Yellow).add_modifier(Modifier::BOLD)
+                        Style::default()
+                            .fg(Color::Yellow)
+                            .add_modifier(Modifier::BOLD)
                     } else {
                         Style::default().fg(Color::DarkGray)
                     };
@@ -986,7 +1000,9 @@ impl UI {
                     // Render the line content with cursor if needed
                     if actual_line_idx == state.ui.query_cursor_line && is_focused {
                         // Highlight current line with cursor
-                        if state.ui.query_cursor_column > 0 && state.ui.query_cursor_column <= line.len() {
+                        if state.ui.query_cursor_column > 0
+                            && state.ui.query_cursor_column <= line.len()
+                        {
                             spans.push(Span::raw(&line[..state.ui.query_cursor_column]));
                         }
 
@@ -997,7 +1013,9 @@ impl UI {
                             " "
                         };
 
-                        let cursor_style = if state.ui.query_edit_mode == crate::app::state::QueryEditMode::Insert {
+                        let cursor_style = if state.ui.query_edit_mode
+                            == crate::app::state::QueryEditMode::Insert
+                        {
                             Style::default().bg(Color::Green).fg(Color::Black)
                         } else {
                             Style::default().bg(Color::Gray).fg(Color::Black)
@@ -1007,7 +1025,9 @@ impl UI {
 
                         if state.ui.query_cursor_column + 1 < line.len() {
                             spans.push(Span::raw(&line[state.ui.query_cursor_column + 1..]));
-                        } else if state.ui.query_cursor_column > 0 && state.ui.query_cursor_column == line.len() {
+                        } else if state.ui.query_cursor_column > 0
+                            && state.ui.query_cursor_column == line.len()
+                        {
                             // Cursor is at end of line - already handled above
                         }
                     } else {
@@ -1099,11 +1119,19 @@ impl UI {
         let title = if total_lines > 0 {
             let current_line = state.ui.query_cursor_line + 1;
             let scroll_percent = if total_lines > 1 {
-                ((state.ui.query_viewport_offset as f32 / (total_lines.saturating_sub(available_height).max(1)) as f32) * 100.0) as u32
+                ((state.ui.query_viewport_offset as f32
+                    / (total_lines.saturating_sub(available_height).max(1)) as f32)
+                    * 100.0) as u32
             } else {
                 0
             };
-            format!(" SQL Query Editor [{}:{}/{}] {}% ", current_line, state.ui.query_cursor_column + 1, total_lines, scroll_percent)
+            format!(
+                " SQL Query Editor [{}:{}/{}] {}% ",
+                current_line,
+                state.ui.query_cursor_column + 1,
+                total_lines,
+                scroll_percent
+            )
         } else {
             " SQL Query Editor ".to_string()
         };

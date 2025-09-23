@@ -1,5 +1,6 @@
 // FilePath: src/ui/components/query_editor.rs
 
+use crate::database::DatabaseType;
 use ratatui::{
     layout::Rect,
     style::{Color, Modifier, Style},
@@ -10,10 +11,9 @@ use ratatui::{
 use syntect::{
     easy::HighlightLines,
     highlighting::ThemeSet,
-    parsing::{SyntaxSet, SyntaxReference},
+    parsing::{SyntaxReference, SyntaxSet},
     util::LinesWithEndings,
 };
-use crate::database::DatabaseType;
 
 #[derive(Debug)]
 pub struct QueryEditor {
@@ -265,7 +265,7 @@ impl QueryEditor {
             end_line += 1;
         }
 
-        let statement_lines: Vec<&str> = lines[start_line..=end_line].iter().copied().collect();
+        let statement_lines: Vec<&str> = lines[start_line..=end_line].to_vec();
         let statement = statement_lines.join("\n").trim().to_string();
 
         if statement.is_empty() {
@@ -294,18 +294,18 @@ impl QueryEditor {
 
     fn get_syntax(&self) -> &SyntaxReference {
         match self.database_type {
-            Some(DatabaseType::MySQL) => {
-                self.syntax_set.find_syntax_by_extension("sql")
-                    .unwrap_or_else(|| self.syntax_set.find_syntax_plain_text())
-            }
-            Some(DatabaseType::PostgreSQL) => {
-                self.syntax_set.find_syntax_by_extension("sql")
-                    .unwrap_or_else(|| self.syntax_set.find_syntax_plain_text())
-            }
-            Some(DatabaseType::SQLite) => {
-                self.syntax_set.find_syntax_by_extension("sql")
-                    .unwrap_or_else(|| self.syntax_set.find_syntax_plain_text())
-            }
+            Some(DatabaseType::MySQL) => self
+                .syntax_set
+                .find_syntax_by_extension("sql")
+                .unwrap_or_else(|| self.syntax_set.find_syntax_plain_text()),
+            Some(DatabaseType::PostgreSQL) => self
+                .syntax_set
+                .find_syntax_by_extension("sql")
+                .unwrap_or_else(|| self.syntax_set.find_syntax_plain_text()),
+            Some(DatabaseType::SQLite) => self
+                .syntax_set
+                .find_syntax_by_extension("sql")
+                .unwrap_or_else(|| self.syntax_set.find_syntax_plain_text()),
             _ => self.syntax_set.find_syntax_plain_text(),
         }
     }
@@ -326,13 +326,22 @@ impl QueryEditor {
                     let color = Color::Rgb(fg_color.r, fg_color.g, fg_color.b);
 
                     let mut ratatui_style = Style::default().fg(color);
-                    if style.font_style.contains(syntect::highlighting::FontStyle::BOLD) {
+                    if style
+                        .font_style
+                        .contains(syntect::highlighting::FontStyle::BOLD)
+                    {
                         ratatui_style = ratatui_style.add_modifier(Modifier::BOLD);
                     }
-                    if style.font_style.contains(syntect::highlighting::FontStyle::ITALIC) {
+                    if style
+                        .font_style
+                        .contains(syntect::highlighting::FontStyle::ITALIC)
+                    {
                         ratatui_style = ratatui_style.add_modifier(Modifier::ITALIC);
                     }
-                    if style.font_style.contains(syntect::highlighting::FontStyle::UNDERLINE) {
+                    if style
+                        .font_style
+                        .contains(syntect::highlighting::FontStyle::UNDERLINE)
+                    {
                         ratatui_style = ratatui_style.add_modifier(Modifier::UNDERLINED);
                     }
 
@@ -353,15 +362,18 @@ impl QueryEditor {
             .title(format!(
                 "SQL Query Editor{}{}",
                 if let Some(ref db_type) = self.database_type {
-                    format!(" ({})", match db_type {
-                        DatabaseType::PostgreSQL => "PostgreSQL",
-                        DatabaseType::MySQL => "MySQL",
-                        DatabaseType::MariaDB => "MariaDB",
-                        DatabaseType::SQLite => "SQLite",
-                        DatabaseType::Oracle => "Oracle",
-                        DatabaseType::Redis => "Redis",
-                        DatabaseType::MongoDB => "MongoDB",
-                    })
+                    format!(
+                        " ({})",
+                        match db_type {
+                            DatabaseType::PostgreSQL => "PostgreSQL",
+                            DatabaseType::MySQL => "MySQL",
+                            DatabaseType::MariaDB => "MariaDB",
+                            DatabaseType::SQLite => "SQLite",
+                            DatabaseType::Oracle => "Oracle",
+                            DatabaseType::Redis => "Redis",
+                            DatabaseType::MongoDB => "MongoDB",
+                        }
+                    )
                 } else {
                     String::new()
                 },
