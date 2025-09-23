@@ -225,10 +225,17 @@ fn add_navigation_help(items: &mut Vec<ListItem<'static>>) {
 fn add_search_help(items: &mut Vec<ListItem<'static>>, search_query: &str) {
     items.push(ListItem::new(""));
     items.push(ListItem::new(Line::from(vec![
-        Span::styled("Search: ", Style::default().fg(Color::Cyan).add_modifier(Modifier::BOLD)),
+        Span::styled(
+            "Search: ",
+            Style::default()
+                .fg(Color::Cyan)
+                .add_modifier(Modifier::BOLD),
+        ),
         Span::styled(
             format!("{}_", search_query),
-            Style::default().fg(Color::White).add_modifier(Modifier::UNDERLINED),
+            Style::default()
+                .fg(Color::White)
+                .add_modifier(Modifier::UNDERLINED),
         ),
     ])));
     items.push(ListItem::new(""));
@@ -297,7 +304,12 @@ fn get_adaptive_title(
         // Add search indicator if search is active
         if ui_state.tables_search_active {
             let filter_count = ui_state.filtered_table_items.len();
-            format!("{} [Search: {} result{}]", base_title.trim(), filter_count, if filter_count == 1 { "" } else { "s" })
+            format!(
+                "{} [Search: {} result{}]",
+                base_title.trim(),
+                filter_count,
+                if filter_count == 1 { "" } else { "s" }
+            )
         } else {
             base_title
         }
@@ -375,15 +387,13 @@ mod tests {
 
     #[test]
     fn test_get_selectable_items_list_with_focus() {
-        let selectable_items = vec![
-            SelectableTableItem::new_selectable(
-                "  📋 users".to_string(),
-                "users".to_string(),
-                None,
-                DatabaseObjectType::Table,
-                0,
-            ),
-        ];
+        let selectable_items = vec![SelectableTableItem::new_selectable(
+            "  📋 users".to_string(),
+            "users".to_string(),
+            None,
+            DatabaseObjectType::Table,
+            0,
+        )];
 
         let ui_state = crate::state::ui::UIState::new();
         let items = get_selectable_items_list(&selectable_items, true, &ui_state);
