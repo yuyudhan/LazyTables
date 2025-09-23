@@ -1,6 +1,10 @@
-Answer to your first question on enhancement, New feature addition, majore features are to be delivered.
+In the table data viewing pane, I am able to press the J and K key to go down and up in the first column, but the L and H key are not working, so that I can go to the cells in the other columns. Can you handle this properly?
 
-I see moderate impact, to major impact as well. we have a lot of features to be delivered.
+=======================================
+=======================================
+=======================================
+=======================================
+=======================================
+=======================================
 
-We also want to do a proper UI UX improvements.
 

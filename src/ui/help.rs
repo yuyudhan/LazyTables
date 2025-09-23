@@ -294,6 +294,10 @@ impl HelpSystem {
             return;
         }
 
+        // First, render a full-screen solid black overlay to eliminate transparency
+        let fullscreen_overlay = Block::default().style(Style::default().bg(Color::Rgb(8, 10, 12)));
+        f.render_widget(fullscreen_overlay, f.area());
+
         // Create a larger, more spacious modal
         let area = centered_rect(78, 65, f.area());
 
@@ -308,11 +312,11 @@ impl HelpSystem {
             HelpMode::None => "LazyTables",
         };
 
-        // Create a solid dark overlay for better readability
+        // Create a solid dark overlay for the modal area (slightly lighter than the background)
         let overlay_block = Block::default().style(Style::default().bg(Color::Rgb(15, 18, 22)));
         f.render_widget(overlay_block, area);
 
-        // Main block with elegant styling
+        // Main block with elegant solid styling
         let main_block = Block::default()
             .title(format!(" ❓ Help Guide • {} ", pane_name))
             .title_alignment(Alignment::Center)
@@ -323,7 +327,7 @@ impl HelpSystem {
                     .add_modifier(Modifier::BOLD),
             )
             .border_type(ratatui::widgets::BorderType::Rounded)
-            .style(Style::default().bg(Color::Rgb(20, 25, 30)));
+            .style(Style::default().bg(Color::Rgb(12, 15, 18)));
 
         let inner_area = main_block.inner(area);
         f.render_widget(main_block, area);
@@ -357,7 +361,7 @@ impl HelpSystem {
                     .borders(Borders::ALL)
                     .border_type(ratatui::widgets::BorderType::Rounded)
                     .border_style(Style::default().fg(Color::Rgb(80, 100, 150)))
-                    .style(Style::default().bg(Color::Rgb(25, 30, 35))),
+                    .style(Style::default().bg(Color::Rgb(18, 22, 26))),
             );
 
         f.render_widget(left_widget, columns[0]);
@@ -372,7 +376,7 @@ impl HelpSystem {
                     .borders(Borders::ALL)
                     .border_type(ratatui::widgets::BorderType::Rounded)
                     .border_style(Style::default().fg(Color::Rgb(80, 100, 150)))
-                    .style(Style::default().bg(Color::Rgb(25, 30, 35))),
+                    .style(Style::default().bg(Color::Rgb(18, 22, 26))),
             );
 
         f.render_widget(right_widget, columns[2]);
@@ -397,7 +401,7 @@ impl HelpSystem {
                 Block::default()
                     .borders(Borders::TOP)
                     .border_style(Style::default().fg(Color::Rgb(80, 100, 150)))
-                    .style(Style::default().bg(Color::Rgb(20, 25, 30))),
+                    .style(Style::default().bg(Color::Rgb(12, 15, 18))),
             );
 
         f.render_widget(footer, main_layout[2]);

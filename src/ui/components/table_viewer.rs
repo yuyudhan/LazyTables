@@ -203,15 +203,23 @@ impl TableTab {
 
     /// Move selection left
     pub fn move_left(&mut self) {
+        eprintln!("DEBUG: TableTab::move_left called, selected_col: {}, columns.len(): {}", self.selected_col, self.columns.len());
         if self.selected_col > 0 {
             self.selected_col -= 1;
+            eprintln!("DEBUG: Moved left to column: {}", self.selected_col);
+        } else {
+            eprintln!("DEBUG: Already at leftmost column");
         }
     }
 
     /// Move selection right
     pub fn move_right(&mut self) {
+        eprintln!("DEBUG: TableTab::move_right called, selected_col: {}, columns.len(): {}", self.selected_col, self.columns.len());
         if self.selected_col < self.columns.len().saturating_sub(1) {
             self.selected_col += 1;
+            eprintln!("DEBUG: Moved right to column: {}", self.selected_col);
+        } else {
+            eprintln!("DEBUG: Already at rightmost column");
         }
     }
 
