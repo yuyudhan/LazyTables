@@ -125,6 +125,8 @@ impl DatabaseState {
             .await
             .map_err(|e| format!("Failed to retrieve columns: {e}"))?;
 
+        crate::debug_log!("Retrieved {} columns for table {}", columns.len(), table_name);
+
         // Get total row count
         let total_rows = pg_connection
             .get_table_row_count(table_name)
@@ -150,6 +152,8 @@ impl DatabaseState {
                     max_display_width: col.name.len().max(15),
                 })
                 .collect();
+
+            crate::debug_log!("Assigned {} ColumnInfo structs to tab", tab.columns.len());
 
             // Find primary key columns
             tab.primary_key_columns = columns

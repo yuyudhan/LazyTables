@@ -866,14 +866,23 @@ impl PostgresConnection {
     /// Get column information for a table
     pub async fn get_table_columns(&self, table_name: &str) -> Result<Vec<TableColumn>> {
         if let Some(pool) = &self.pool {
-            let query = "SELECT 
+            // Parse schema and table name
+            let (schema, actual_table_name) = if table_name.contains('.') {
+                let parts: Vec<&str> = table_name.splitn(2, '.').collect();
+                (parts[0], parts[1])
+            } else {
+                ("public", table_name)
+            };
+
+            crate::debug_log!("Parsed schema: '{}', table: '{}'", schema, actual_table_name);
+            let query = "SELECT
                 c.column_name,
                 c.data_type,
                 c.is_nullable,
                 c.column_default,
-                CASE 
-                    WHEN pk.column_name IS NOT NULL THEN true 
-                    ELSE false 
+                CASE
+                    WHEN pk.column_name IS NOT NULL THEN true
+                    ELSE false
                 END as is_primary_key
                 FROM information_schema.columns c
                 LEFT JOIN (
@@ -883,14 +892,19 @@ impl PostgresConnection {
                         ON tc.constraint_name = kcu.constraint_name
                         AND tc.table_schema = kcu.table_schema
                     WHERE tc.constraint_type = 'PRIMARY KEY'
-                        AND tc.table_name = $1
-                        AND tc.table_schema = 'public'
+                        AND tc.table_name = $2
+                        AND tc.table_schema = $1
                 ) pk ON c.column_name = pk.column_name
-                WHERE c.table_schema = 'public' 
-                AND c.table_name = $1
+                WHERE c.table_schema = $1
+                AND c.table_name = $2
                 ORDER BY c.ordinal_position";
 
-            let rows = sqlx::query(query).bind(table_name).fetch_all(pool).await?;
+            crate::debug_log!("get_table_columns query: {}", query);
+            crate::debug_log!("get_table_columns schema: '{}', table: '{}'", schema, actual_table_name);
+
+            let rows = sqlx::query(query).bind(schema).bind(actual_table_name).fetch_all(pool).await?;
+
+            crate::debug_log!("get_table_columns returned {} rows", rows.len());
 
             let columns = rows
                 .iter()
