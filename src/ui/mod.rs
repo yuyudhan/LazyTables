@@ -1173,19 +1173,19 @@ impl UI {
             "No connection selected".to_string()
         };
 
-        // Get real position/context info
+        // Get real position/context info with explicit pane name
         let position_text = match state.ui.focused_pane {
             FocusedPane::Connections => format!(
-                "Connection {}/{}",
+                "[CONNECTIONS] Connection {}/{}",
                 state.ui.selected_connection + 1,
                 state.db.connections.connections.len()
             ),
             FocusedPane::Tables => {
                 if state.db.tables.is_empty() {
-                    "No tables".to_string()
+                    "[TABLES] No tables".to_string()
                 } else {
                     format!(
-                        "Table {}/{}",
+                        "[TABLES] Table {}/{}",
                         state.ui.selected_table + 1,
                         state.db.tables.len()
                     )
@@ -1194,7 +1194,7 @@ impl UI {
             FocusedPane::TabularOutput => {
                 if let Some(tab) = state.table_viewer_state.current_tab() {
                     format!(
-                        "Row {} Col {} | {}",
+                        "[TABLE_VIEWER] Row {} Col {} | {}",
                         tab.selected_row + 1,
                         tab.selected_col + 1,
                         if tab.in_edit_mode {
@@ -1204,12 +1204,12 @@ impl UI {
                         }
                     )
                 } else {
-                    "No table open".to_string()
+                    "[TABLE_VIEWER] No table open".to_string()
                 }
             }
-            FocusedPane::QueryWindow => "Query Editor".to_string(),
-            FocusedPane::SqlFiles => format!("SQL Files: {}", state.saved_sql_files.len()),
-            FocusedPane::Details => "Table Details".to_string(),
+            FocusedPane::QueryWindow => "[QUERY_EDITOR] Active".to_string(),
+            FocusedPane::SqlFiles => format!("[SQL_FILES] {} files", state.saved_sql_files.len()),
+            FocusedPane::Details => "[DETAILS] Table Details".to_string(),
         };
 
         // Get current date and time
