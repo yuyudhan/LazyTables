@@ -175,7 +175,8 @@ impl HelpSystem {
             }
             HelpMode::SqlFiles => {
                 Self::add_overview_command(lines, "Enter", "Load file", key_style, desc_style);
-                Self::add_overview_command(lines, "C-s", "Save", key_style, desc_style);
+                Self::add_overview_command(lines, "C-o", "Refresh", key_style, desc_style);
+                Self::add_overview_command(lines, "C-n", "New file", key_style, desc_style);
             }
             HelpMode::QueryWindow => {
                 Self::add_overview_command(lines, "i", "Edit mode", key_style, desc_style);
@@ -231,7 +232,6 @@ impl HelpSystem {
         Self::add_command(lines, "a", "Add connection");
         Self::add_command(lines, "e", "Edit connection");
         Self::add_command(lines, "d", "Delete connection");
-        Self::add_command(lines, "C-r", "Refresh status");
     }
 
     fn add_tables_commands(lines: &mut Vec<Line<'static>>) {
@@ -239,13 +239,10 @@ impl HelpSystem {
         Self::add_command(lines, "Enter", "Open table");
         Self::add_command(lines, "n", "Create table");
         Self::add_command(lines, "e", "Edit structure");
-        Self::add_command(lines, "d", "Drop table");
-        Self::add_command(lines, "r", "Refresh list");
     }
 
     fn add_details_commands(lines: &mut Vec<Line<'static>>) {
         Self::add_command(lines, "Enter", "Load metadata");
-        Self::add_command(lines, "r", "Refresh");
         lines.push(Line::from(""));
         lines.push(Line::from(Span::styled(
             "Displays:",
@@ -277,8 +274,8 @@ impl HelpSystem {
     fn add_sql_files_commands(lines: &mut Vec<Line<'static>>) {
         Self::add_command(lines, "j/k", "Navigate files");
         Self::add_command(lines, "Enter", "Load file");
-        Self::add_command(lines, "d", "Delete file");
-        Self::add_command(lines, "r", "Refresh list");
+        Self::add_command(lines, "C-o", "Refresh list");
+        Self::add_command(lines, "C-n", "New query file");
     }
 
     fn add_query_window_commands(lines: &mut Vec<Line<'static>>) {

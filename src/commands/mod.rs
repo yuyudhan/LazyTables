@@ -399,6 +399,7 @@ impl CommandRegistry {
         // Register basic commands
         self.register(Box::new(basic::QuitCommand));
         self.register(Box::new(basic::HelpCommand));
+        self.register(Box::new(basic::ToggleHelpCommand));
         self.register(Box::new(basic::SaveCommand));
 
         // Register connection commands

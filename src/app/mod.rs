@@ -199,9 +199,9 @@ impl App {
             return Ok(());
         }
 
-        // Handle '?' key globally for context-aware help
+        // Handle '?' key globally for context-aware help (toggle functionality)
         if key.code == KeyCode::Char('?') && key.modifiers == KeyModifiers::NONE {
-            self.execute_command(CommandId::Help)?;
+            self.execute_command(CommandId::ToggleHelp)?;
             return Ok(());
         }
 
