@@ -18,6 +18,23 @@ I want you to implement the search functionality in the connection screen. The s
 =======================================
 I want you to focus on the SQL files pane so the SQL files pane I press control and it shows a lot of SQL files that were created. We want to allow creating the SQL files that is okay. First of all I want you to validate if the SQL files pane focus only on that does what functionalities does it miss right now that need to be created few that I can think is changing the name of the SQL file another can be renaming of the SQL file.
 =======================================
+Actually I want a change of feature. SPL file should be related to some connections. So only after the connection is stored or sorry I actually when as soon as the connection is connected only then the SPL files corresponding to that connection shall show. I think this will also require the change in the SQLite DB of this application by default like which connection is connected. So can you do all of these changes? This is required in the SQL files pane. Review the code as well as implement myask and implement it properly.
+=======================================
+
+> Actually, still it is not happening. What I want to do
+  is that in the SQL files pane, as soon as the
+  connection is connected, show the SQL files relevant to
+   that connection. And when the connection is
+  disconnected, SQL files pane should reset to the state
+  in which it shows no connection, which is the initial
+  state. Also, every connection should have its SQL files
+   and each SQL file should belong to a particular
+  connection without connection or SQL file. And when the
+   connection is connected, only the SQL files
+  corresponding to that connection should show.
+=======================================
+=======================================
+=======================================
 =======================================
 DONE:
 THIS WILL NEED TO BE DONE AGAIN AND AGAIN
