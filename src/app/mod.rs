@@ -70,6 +70,12 @@ impl App {
 
     /// Run the application main loop
     pub async fn run(&mut self, mut terminal: DefaultTerminal) -> Result<()> {
+        // Initialize the application state database
+        if let Err(e) = self.state.initialize_app_db().await {
+            eprintln!("Warning: Failed to initialize application database: {}", e);
+            eprintln!("Some features may not work correctly.");
+        }
+
         self.event_handler.start()?;
 
         while !self.should_quit {
@@ -812,7 +818,7 @@ impl App {
                         match self.state.ui.focused_pane {
                             FocusedPane::Connections => {
                                 // Disconnect current connection
-                                self.state.disconnect_from_database();
+                                self.state.disconnect_from_database().await;
                                 self.state.toast_manager.info("Connection disconnected");
                             }
                             FocusedPane::TabularOutput => {

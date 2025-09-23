@@ -262,8 +262,8 @@ pub struct DisconnectCommand;
 
 impl Command for DisconnectCommand {
     fn execute(&self, context: &mut CommandContext) -> Result<CommandResult> {
-        // Perform actual disconnection
-        context.state.disconnect_from_database();
+        // Perform actual disconnection (sync version only - async cleanup handled elsewhere)
+        context.state.disconnect_from_database_sync();
 
         context
             .state
