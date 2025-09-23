@@ -1,10 +1,19 @@
-In the table data viewing pane, I am able to press the J and K key to go down and up in the first column, but the L and H key are not working, so that I can go to the cells in the other columns. Can you handle this properly?
 
 =======================================
 =======================================
 =======================================
 =======================================
 =======================================
+There is a table details view pane where we see the tabular data and the schema. I think there is something wrong with the pane because like for other panes, when we focus on that pane only, then it is shown in blue color in a highlighted manner. But the details of the table, I mean the data of the table and the table schema, the pane this is always showing to be highlighted in blue color. Can you resolve this particular problem?
 =======================================
 
+the table data viewer so basically we are showing 20 rows but one problem I am seeing when all the 20 rows are not coming within the panes allotted size in the screen what is happening is while pressing J it is going down but I don't think the scrolling is happening properly can you please validate and see if this is the problem and if you can resolve it please
+
+=======================================
+Can you check the help modal that opens when pressing question mark? It should align with all the panes, current options that are there. So it should not show anything different from what options are available in each of the panes.
+
+=======================================
+When I press Q, it basically closes the application. So if accidentally somebody presses Q, then the application will get closed and their connection will get lost and they have to again open the app. So when Q is pressed, can you ensure to ask a confirmation from the user in the confirmation? When you're asking for the confirmation, you should basically tell the connection will be closed. And do you want to confirm that you want to exit the application? Make a proper message and get that confirmation, please. You can try and identify the right key bindings for the confirmation box. In the confirmation box, you should show a proper message.The buttons that are shown should have a key binding of them their own.
+=======================================
+=======================================
 
