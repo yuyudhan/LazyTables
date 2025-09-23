@@ -24,41 +24,67 @@ impl Command for ConnectCommand {
             if let Some(connection) = context.state.db.connections.connections.get_mut(selected) {
                 // Check if already connected
                 if connection.is_connected() {
-                    return Ok(CommandResult::Error(
-                        format!("Already connected to {}", connection.name)
-                    ));
+                    return Ok(CommandResult::Error(format!(
+                        "Already connected to {}",
+                        connection.name
+                    )));
                 }
 
                 // Set status to connecting
                 connection.status = crate::database::ConnectionStatus::Connecting;
-                context.state.toast_manager.info(format!("Connecting to {}...", connection.name));
+                context
+                    .state
+                    .toast_manager
+                    .info(format!("Connecting to {}...", connection.name));
 
                 // Spawn async connection task
                 let connection_config = connection.clone();
                 let result = tokio::runtime::Handle::current().block_on(async {
-                    context.state.db.try_connect_to_database(&connection_config).await
+                    context
+                        .state
+                        .db
+                        .try_connect_to_database(&connection_config)
+                        .await
                 });
 
                 match result {
                     Ok(_database_objects) => {
                         // Update connection status to connected
-                        if let Some(conn) = context.state.db.connections.connections.get_mut(selected) {
+                        if let Some(conn) =
+                            context.state.db.connections.connections.get_mut(selected)
+                        {
                             conn.status = crate::database::ConnectionStatus::Connected;
                         }
-                        context.state.toast_manager.success(format!("Connected to {}", connection_config.name));
-                        Ok(CommandResult::SuccessWithMessage(format!("Connected to {}", connection_config.name)))
+                        context
+                            .state
+                            .toast_manager
+                            .success(format!("Connected to {}", connection_config.name));
+                        Ok(CommandResult::SuccessWithMessage(format!(
+                            "Connected to {}",
+                            connection_config.name
+                        )))
                     }
                     Err(error) => {
                         // Update connection status to failed
-                        if let Some(conn) = context.state.db.connections.connections.get_mut(selected) {
+                        if let Some(conn) =
+                            context.state.db.connections.connections.get_mut(selected)
+                        {
                             conn.status = crate::database::ConnectionStatus::Failed(error.clone());
                         }
-                        context.state.toast_manager.error(format!("Connection failed: {}", error));
-                        Ok(CommandResult::Error(format!("Connection failed: {}", error)))
+                        context
+                            .state
+                            .toast_manager
+                            .error(format!("Connection failed: {}", error));
+                        Ok(CommandResult::Error(format!(
+                            "Connection failed: {}",
+                            error
+                        )))
                     }
                 }
             } else {
-                Ok(CommandResult::Error("Invalid connection selection".to_string()))
+                Ok(CommandResult::Error(
+                    "Invalid connection selection".to_string(),
+                ))
             }
         } else {
             Ok(CommandResult::Error("No connections available".to_string()))
@@ -159,10 +185,13 @@ impl Command for EditConnectionCommand {
                 context.state.ui.show_edit_connection_modal = true;
 
                 Ok(CommandResult::SuccessWithMessage(format!(
-                    "Editing connection: {}", connection.name
+                    "Editing connection: {}",
+                    connection.name
                 )))
             } else {
-                Ok(CommandResult::Error("Invalid connection selection".to_string()))
+                Ok(CommandResult::Error(
+                    "Invalid connection selection".to_string(),
+                ))
             }
         } else {
             Ok(CommandResult::Error("No connections available".to_string()))
@@ -277,7 +306,10 @@ impl Command for RefreshConnectionsCommand {
                 }
 
                 let message = if new_count != old_count {
-                    format!("Connections refreshed: {} connections (was {})", new_count, old_count)
+                    format!(
+                        "Connections refreshed: {} connections (was {})",
+                        new_count, old_count
+                    )
                 } else {
                     format!("Connections refreshed: {} connections", new_count)
                 };
@@ -319,14 +351,21 @@ impl Command for TestConnectionCommand {
             let selected = context.state.ui.selected_connection;
 
             if let Some(connection) = context.state.db.connections.connections.get(selected) {
-                context.state.toast_manager.info(format!("Testing connection to {}...", connection.name));
+                context
+                    .state
+                    .toast_manager
+                    .info(format!("Testing connection to {}...", connection.name));
 
                 // Perform connection test using try_connect_to_database
                 let connection_config = connection.clone();
                 let start_time = std::time::Instant::now();
 
                 let result = tokio::runtime::Handle::current().block_on(async {
-                    context.state.db.try_connect_to_database(&connection_config).await
+                    context
+                        .state
+                        .db
+                        .try_connect_to_database(&connection_config)
+                        .await
                 });
 
                 let test_duration = start_time.elapsed();
@@ -374,7 +413,9 @@ impl Command for TestConnectionCommand {
                     }
                 }
             } else {
-                Ok(CommandResult::Error("Invalid connection selection".to_string()))
+                Ok(CommandResult::Error(
+                    "Invalid connection selection".to_string(),
+                ))
             }
         } else {
             Ok(CommandResult::Error("No connections available".to_string()))
