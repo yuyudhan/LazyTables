@@ -586,17 +586,17 @@ pub fn render_table_viewer(
         Layout::default()
             .direction(Direction::Vertical)
             .constraints([
-                Constraint::Length(3),  // Tabs
-                Constraint::Min(10),    // Table content
-                Constraint::Length(8),  // Help
+                Constraint::Length(3), // Tabs
+                Constraint::Min(10),   // Table content
+                Constraint::Length(8), // Help
             ])
             .split(area)
     } else {
         Layout::default()
             .direction(Direction::Vertical)
             .constraints([
-                Constraint::Length(3),  // Tabs
-                Constraint::Min(0),     // Table content (takes remaining space)
+                Constraint::Length(3), // Tabs
+                Constraint::Min(0),    // Table content (takes remaining space)
             ])
             .split(area)
     };
@@ -847,7 +847,13 @@ fn render_table_content(
     }
 }
 
-fn render_data_view(f: &mut Frame, tab: &mut TableTab, area: Rect, theme: &Theme, is_focused: bool) {
+fn render_data_view(
+    f: &mut Frame,
+    tab: &mut TableTab,
+    area: Rect,
+    theme: &Theme,
+    is_focused: bool,
+) {
     // Prepare table headers
     let headers: Vec<TableCell> = tab
         .columns
@@ -1019,7 +1025,13 @@ fn render_data_view(f: &mut Frame, tab: &mut TableTab, area: Rect, theme: &Theme
     f.render_widget(table, area);
 }
 
-fn render_schema_view(f: &mut Frame, tab: &mut TableTab, area: Rect, theme: &Theme, is_focused: bool) {
+fn render_schema_view(
+    f: &mut Frame,
+    tab: &mut TableTab,
+    area: Rect,
+    theme: &Theme,
+    is_focused: bool,
+) {
     // Create schema rows showing column information
     let schema_headers = vec![
         TableCell::from(" Column Name ").style(
@@ -1133,7 +1145,6 @@ fn render_schema_view(f: &mut Frame, tab: &mut TableTab, area: Rect, theme: &The
 
     f.render_widget(table, area);
 }
-
 
 fn render_help(f: &mut Frame, area: Rect, theme: &Theme) {
     let help_text = vec![
