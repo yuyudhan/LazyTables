@@ -187,29 +187,45 @@ impl AppState {
 
     /// Move selection left based on current focus
     pub fn move_left(&mut self) {
+        eprintln!("DEBUG: move_left called with focused_pane: {:?}", self.ui.focused_pane);
         match self.ui.focused_pane {
             FocusedPane::TabularOutput => {
+                eprintln!("DEBUG: In TabularOutput branch");
                 if let Some(tab) = self.table_viewer_state.current_tab_mut() {
+                    eprintln!("DEBUG: Found tab, in_edit_mode: {}, columns: {}", tab.in_edit_mode, tab.columns.len());
                     if !tab.in_edit_mode {
+                        eprintln!("DEBUG: Calling tab.move_left(), current selected_col: {}", tab.selected_col);
                         tab.move_left();
+                        eprintln!("DEBUG: After move_left, selected_col: {}", tab.selected_col);
                     }
+                } else {
+                    eprintln!("DEBUG: No current tab found");
                 }
             }
             FocusedPane::QueryWindow => {
                 self.ui.query_cursor_column = self.ui.query_cursor_column.saturating_sub(1);
             }
-            _ => {}
+            _ => {
+                eprintln!("DEBUG: In other pane: {:?}", self.ui.focused_pane);
+            }
         }
     }
 
     /// Move selection right based on current focus
     pub fn move_right(&mut self) {
+        eprintln!("DEBUG: move_right called with focused_pane: {:?}", self.ui.focused_pane);
         match self.ui.focused_pane {
             FocusedPane::TabularOutput => {
+                eprintln!("DEBUG: In TabularOutput branch");
                 if let Some(tab) = self.table_viewer_state.current_tab_mut() {
+                    eprintln!("DEBUG: Found tab, in_edit_mode: {}, columns: {}", tab.in_edit_mode, tab.columns.len());
                     if !tab.in_edit_mode {
+                        eprintln!("DEBUG: Calling tab.move_right(), current selected_col: {}", tab.selected_col);
                         tab.move_right();
+                        eprintln!("DEBUG: After move_right, selected_col: {}", tab.selected_col);
                     }
+                } else {
+                    eprintln!("DEBUG: No current tab found");
                 }
             }
             FocusedPane::QueryWindow => {
@@ -409,6 +425,12 @@ impl AppState {
             self.db.tables.clear();
             self.db.table_load_error = None;
 
+            // Reset table viewer state when switching connections
+            self.table_viewer_state = TableViewerState::new();
+
+            // Clear table metadata
+            self.db.current_table_metadata = None;
+
             // Attempt connection based on database type
             let connection_name = connection.name.clone();
             let result = self.try_connect_to_database(&connection).await;
@@ -441,6 +463,13 @@ impl AppState {
                         self.db.tables.clear();
                         // Clear the selectable table items list
                         self.ui.build_selectable_table_items(&None);
+
+                        // Reset table viewer state when connection fails
+                        self.table_viewer_state = TableViewerState::new();
+
+                        // Clear table metadata
+                        self.db.current_table_metadata = None;
+
                         self.toast_manager
                             .error(format!("Connection failed: {error_msg}"));
                     }
@@ -482,6 +511,12 @@ impl AppState {
             // Clear the selectable table items list
             self.ui.build_selectable_table_items(&None);
             self.update_table_selection();
+
+            // Reset table viewer state - close all tabs and reset to initial state
+            self.table_viewer_state = TableViewerState::new();
+
+            // Clear table metadata
+            self.db.current_table_metadata = None;
 
             // Save updated connection status
             let _ = self.db.connections.save();

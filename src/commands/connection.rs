@@ -177,7 +177,9 @@ pub struct DisconnectCommand;
 
 impl Command for DisconnectCommand {
     fn execute(&self, context: &mut CommandContext) -> Result<CommandResult> {
-        // TODO: Implement actual disconnection logic
+        // Perform actual disconnection
+        context.state.disconnect_from_database();
+
         context
             .state
             .toast_manager

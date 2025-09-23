@@ -87,7 +87,11 @@ impl DatabaseState {
                             )),
                         }
                     }
-                    _ => Err("No active database connection".to_string()),
+                    ConnectionStatus::Connecting => {
+                        Err("Connection is still in progress".to_string())
+                    }
+                    ConnectionStatus::Disconnected => Err("Connection is disconnected".to_string()),
+                    ConnectionStatus::Failed(error) => Err(format!("Connection failed: {}", error)),
                 }
             } else {
                 Err("No connection selected".to_string())
@@ -111,10 +115,9 @@ impl DatabaseState {
         use crate::database::Connection;
 
         let mut pg_connection = PostgresConnection::new(connection.clone());
-        pg_connection
-            .connect()
-            .await
-            .map_err(|e| format!("Connection failed: {e}"))?;
+        pg_connection.connect().await.map_err(|e| {
+            format!("Failed to establish database connection for table loading: {e}")
+        })?;
 
         // Get table columns
         let columns = pg_connection
