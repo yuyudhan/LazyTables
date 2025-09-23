@@ -404,9 +404,16 @@ impl App {
                             return Ok(());
                         }
                         KeyCode::Char(c) => {
-                            tab.search_query.push(c);
-                            tab.update_search(&tab.search_query.clone());
-                            return Ok(());
+                            // Don't treat navigation keys as search input
+                            if c == 'h' || c == 'l' || c == 'j' || c == 'k' {
+                                // Exit search mode and let the key be handled as navigation
+                                tab.in_search_mode = false;
+                                // Don't return early - let the key be processed normally
+                            } else {
+                                tab.search_query.push(c);
+                                tab.update_search(&tab.search_query.clone());
+                                return Ok(());
+                            }
                         }
                         KeyCode::Backspace => {
                             tab.search_query.pop();
@@ -522,11 +529,9 @@ impl App {
                         }
                     }
                     (KeyModifiers::NONE, KeyCode::Char('h')) => {
-                        eprintln!("DEBUG: H key pressed, focused_pane: {:?}", self.state.ui.focused_pane);
                         self.state.move_left();
                     }
                     (KeyModifiers::NONE, KeyCode::Char('l')) => {
-                        eprintln!("DEBUG: L key pressed, focused_pane: {:?}", self.state.ui.focused_pane);
                         self.state.move_right();
                     }
                     // Enter insert mode (or Query mode for query window, or edit cell in table viewer)
