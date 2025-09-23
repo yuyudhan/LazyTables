@@ -123,6 +123,11 @@ impl Config {
         Self::data_dir().join("backups")
     }
 
+    /// Get application state database path
+    pub fn app_state_db_path() -> PathBuf {
+        Self::data_dir().join("app_state.db")
+    }
+
     /// Ensure all necessary directories exist
     pub fn ensure_directories() -> Result<()> {
         let data_dir = Self::data_dir();

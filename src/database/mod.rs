@@ -1,6 +1,7 @@
 // FilePath: src/database/mod.rs
 
 // Database adapter modules
+pub mod app_state;
 pub mod connection;
 pub mod factory;
 pub mod mysql;
@@ -25,6 +26,9 @@ pub use objects::{DatabaseObject, DatabaseObjectList, DatabaseObjectType};
 
 // Re-export query history types
 pub use query_history::{QueryHistoryEntry, QueryHistoryManager};
+
+// Re-export app state types
+pub use app_state::{ActiveConnectionState, AppStateDb, ConnectionSession, SqlFileActivity};
 
 // Note: Table metadata types are defined below in this module
 
@@ -222,6 +226,7 @@ pub enum DatabaseSpecificMetadata {
 
 impl TableMetadata {
     /// Create a basic TableMetadata with minimal information for backward compatibility
+    #[allow(clippy::too_many_arguments)]
     pub fn basic(
         table_name: String,
         row_count: usize,
