@@ -30,6 +30,9 @@ async fn main() -> color_eyre::Result<()> {
     let terminal = lazytables::terminal::init()
         .map_err(|e| color_eyre::eyre::eyre!("Failed to init terminal: {}", e))?;
 
+    // Install panic hook to restore terminal on panic
+    lazytables::terminal::install_panic_hook();
+
     // Create and run the application
     let mut app =
         App::new(config).map_err(|e| color_eyre::eyre::eyre!("Failed to create app: {}", e))?;
