@@ -4,7 +4,7 @@ use ratatui::{
     layout::{Alignment, Constraint, Direction, Layout, Rect},
     style::{Color, Modifier, Style},
     text::{Line, Span},
-    widgets::{Block, Borders, Paragraph, Wrap},
+    widgets::{Block, Borders, Clear, Paragraph, Wrap},
     Frame,
 };
 
@@ -294,7 +294,10 @@ impl HelpSystem {
             return;
         }
 
-        // First, render a full-screen solid black overlay to eliminate transparency
+        // First, clear the entire screen to eliminate any transparency
+        f.render_widget(Clear, f.area());
+
+        // Then render a full-screen solid black background
         let fullscreen_overlay = Block::default().style(Style::default().bg(Color::Rgb(8, 10, 12)));
         f.render_widget(fullscreen_overlay, f.area());
 
