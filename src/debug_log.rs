@@ -9,11 +9,7 @@ pub fn debug_log(message: &str) {
         .unwrap_or_else(|_| std::env::temp_dir())
         .join("lazytables_debug.log");
 
-    if let Ok(mut file) = OpenOptions::new()
-        .create(true)
-        .append(true)
-        .open(&log_path)
-    {
+    if let Ok(mut file) = OpenOptions::new().create(true).append(true).open(&log_path) {
         let timestamp = chrono::Local::now().format("%H:%M:%S%.3f");
         let _ = writeln!(file, "[{}] {}", timestamp, message);
     }

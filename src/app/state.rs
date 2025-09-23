@@ -187,7 +187,10 @@ impl AppState {
 
     /// Move selection left based on current focus
     pub fn move_left(&mut self) {
-        crate::debug_log!("AppState::move_left called, focused_pane: {:?}", self.ui.focused_pane);
+        crate::debug_log!(
+            "AppState::move_left called, focused_pane: {:?}",
+            self.ui.focused_pane
+        );
         match self.ui.focused_pane {
             FocusedPane::TabularOutput => {
                 crate::debug_log!("In TabularOutput branch");
@@ -214,7 +217,10 @@ impl AppState {
 
     /// Move selection right based on current focus
     pub fn move_right(&mut self) {
-        crate::debug_log!("AppState::move_right called, focused_pane: {:?}", self.ui.focused_pane);
+        crate::debug_log!(
+            "AppState::move_right called, focused_pane: {:?}",
+            self.ui.focused_pane
+        );
         match self.ui.focused_pane {
             FocusedPane::TabularOutput => {
                 crate::debug_log!("In TabularOutput branch");
