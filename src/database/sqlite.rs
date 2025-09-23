@@ -114,11 +114,19 @@ impl Connection for SqliteConnection {
         SqliteConnection::get_table_metadata(self, table_name).await
     }
 
-    async fn get_table_columns(&self, table_name: &str) -> Result<Vec<crate::database::TableColumn>> {
+    async fn get_table_columns(
+        &self,
+        table_name: &str,
+    ) -> Result<Vec<crate::database::TableColumn>> {
         SqliteConnection::get_table_columns(self, table_name).await
     }
 
-    async fn get_table_data(&self, table_name: &str, limit: usize, offset: usize) -> Result<Vec<Vec<String>>> {
+    async fn get_table_data(
+        &self,
+        table_name: &str,
+        limit: usize,
+        offset: usize,
+    ) -> Result<Vec<Vec<String>>> {
         SqliteConnection::get_table_data(self, table_name, limit, offset).await
     }
 
@@ -159,22 +167,20 @@ impl Connection for SqliteConnection {
                         response_time_ms: response_time,
                         last_error: None,
                         database_version: None, // TODO: Get SQLite version
-                        active_connections: 1, // SQLite is single connection
+                        active_connections: 1,  // SQLite is single connection
                         max_connections: 1,
                         uptime_seconds: None, // SQLite doesn't have uptime
                     })
                 }
-                Err(e) => {
-                    Ok(crate::database::HealthStatus {
-                        is_healthy: false,
-                        response_time_ms: start.elapsed().as_millis() as u64,
-                        last_error: Some(e.to_string()),
-                        database_version: None,
-                        active_connections: 0,
-                        max_connections: 1,
-                        uptime_seconds: None,
-                    })
-                }
+                Err(e) => Ok(crate::database::HealthStatus {
+                    is_healthy: false,
+                    response_time_ms: start.elapsed().as_millis() as u64,
+                    last_error: Some(e.to_string()),
+                    database_version: None,
+                    active_connections: 0,
+                    max_connections: 1,
+                    uptime_seconds: None,
+                }),
             }
         } else {
             Ok(crate::database::HealthStatus {
@@ -196,13 +202,15 @@ impl Connection for SqliteConnection {
                 build_info: None,
                 server_name: Some("SQLite".to_string()),
                 charset: Some("UTF-8".to_string()),
-                timezone: None, // SQLite doesn't have timezone
+                timezone: None,       // SQLite doesn't have timezone
                 uptime_seconds: None, // SQLite doesn't have uptime
                 current_database: self.config.database.clone(),
                 current_user: None, // SQLite doesn't have users
             })
         } else {
-            Err(LazyTablesError::Connection("No active connection".to_string()))
+            Err(LazyTablesError::Connection(
+                "No active connection".to_string(),
+            ))
         }
     }
 
@@ -223,7 +231,11 @@ impl Connection for SqliteConnection {
     }
 
     fn active_connections(&self) -> u32 {
-        if self.pool.is_some() { 1 } else { 0 }
+        if self.pool.is_some() {
+            1
+        } else {
+            0
+        }
     }
 
     // Database-specific error handling (AC5 requirement)
@@ -241,7 +253,8 @@ impl Connection for SqliteConnection {
         } else if error_lower.contains("syntax error") {
             is_syntax_error = true;
             recovery_suggestions.push("Check SQL syntax for typos".to_string());
-            recovery_suggestions.push("Refer to SQLite documentation for correct syntax".to_string());
+            recovery_suggestions
+                .push("Refer to SQLite documentation for correct syntax".to_string());
             "SQL syntax error. Please check your query for syntax mistakes."
         } else if error_lower.contains("database is locked") {
             is_connection_error = true;
@@ -271,22 +284,56 @@ impl Connection for SqliteConnection {
 
     fn get_keywords(&self) -> Vec<String> {
         vec![
-            "SELECT".to_string(), "FROM".to_string(), "WHERE".to_string(), "INSERT".to_string(),
-            "UPDATE".to_string(), "DELETE".to_string(), "CREATE".to_string(), "DROP".to_string(),
-            "ALTER".to_string(), "TABLE".to_string(), "INDEX".to_string(), "VIEW".to_string(),
-            "DATABASE".to_string(), "TRIGGER".to_string(), "PRIMARY".to_string(), "KEY".to_string(),
-            "FOREIGN".to_string(), "REFERENCES".to_string(), "UNIQUE".to_string(), "AUTOINCREMENT".to_string(),
-            "PRAGMA".to_string(), "EXPLAIN".to_string(), "ANALYZE".to_string(), "VACUUM".to_string(),
+            "SELECT".to_string(),
+            "FROM".to_string(),
+            "WHERE".to_string(),
+            "INSERT".to_string(),
+            "UPDATE".to_string(),
+            "DELETE".to_string(),
+            "CREATE".to_string(),
+            "DROP".to_string(),
+            "ALTER".to_string(),
+            "TABLE".to_string(),
+            "INDEX".to_string(),
+            "VIEW".to_string(),
+            "DATABASE".to_string(),
+            "TRIGGER".to_string(),
+            "PRIMARY".to_string(),
+            "KEY".to_string(),
+            "FOREIGN".to_string(),
+            "REFERENCES".to_string(),
+            "UNIQUE".to_string(),
+            "AUTOINCREMENT".to_string(),
+            "PRAGMA".to_string(),
+            "EXPLAIN".to_string(),
+            "ANALYZE".to_string(),
+            "VACUUM".to_string(),
         ]
     }
 
     fn get_functions(&self) -> Vec<String> {
         vec![
-            "COUNT".to_string(), "SUM".to_string(), "AVG".to_string(), "MIN".to_string(), "MAX".to_string(),
-            "LENGTH".to_string(), "SUBSTR".to_string(), "UPPER".to_string(), "LOWER".to_string(),
-            "DATETIME".to_string(), "DATE".to_string(), "TIME".to_string(), "STRFTIME".to_string(),
-            "COALESCE".to_string(), "IFNULL".to_string(), "NULLIF".to_string(), "CASE".to_string(),
-            "RANDOM".to_string(), "ROUND".to_string(), "ABS".to_string(), "TRIM".to_string(),
+            "COUNT".to_string(),
+            "SUM".to_string(),
+            "AVG".to_string(),
+            "MIN".to_string(),
+            "MAX".to_string(),
+            "LENGTH".to_string(),
+            "SUBSTR".to_string(),
+            "UPPER".to_string(),
+            "LOWER".to_string(),
+            "DATETIME".to_string(),
+            "DATE".to_string(),
+            "TIME".to_string(),
+            "STRFTIME".to_string(),
+            "COALESCE".to_string(),
+            "IFNULL".to_string(),
+            "NULLIF".to_string(),
+            "CASE".to_string(),
+            "RANDOM".to_string(),
+            "ROUND".to_string(),
+            "ABS".to_string(),
+            "TRIM".to_string(),
         ]
     }
 }

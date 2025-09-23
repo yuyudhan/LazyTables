@@ -2,10 +2,8 @@
 
 use crate::core::error::{LazyTablesError, Result};
 use crate::database::{
-    Connection, ConnectionConfig, DatabaseType,
-    mysql::MySqlConnection,
-    postgres::PostgresConnection,
-    sqlite::SqliteConnection,
+    mysql::MySqlConnection, postgres::PostgresConnection, sqlite::SqliteConnection, Connection,
+    ConnectionConfig, DatabaseType,
 };
 
 /// Factory for creating database adapter connections (AC3 requirement)
@@ -16,30 +14,20 @@ impl AdapterFactory {
     /// Implements automatic adapter selection per AC3: "Database type detection and adapter selection works automatically"
     pub fn create_connection(config: ConnectionConfig) -> Result<Box<dyn Connection>> {
         match config.database_type {
-            DatabaseType::PostgreSQL => {
-                Ok(Box::new(PostgresConnection::new(config)))
-            }
+            DatabaseType::PostgreSQL => Ok(Box::new(PostgresConnection::new(config))),
             DatabaseType::MySQL | DatabaseType::MariaDB => {
                 Ok(Box::new(MySqlConnection::new(config)))
             }
-            DatabaseType::SQLite => {
-                Ok(Box::new(SqliteConnection::new(config)))
-            }
-            DatabaseType::Oracle => {
-                Err(LazyTablesError::Unsupported(
-                    "Oracle support not yet implemented".to_string()
-                ))
-            }
-            DatabaseType::Redis => {
-                Err(LazyTablesError::Unsupported(
-                    "Redis support not yet implemented".to_string()
-                ))
-            }
-            DatabaseType::MongoDB => {
-                Err(LazyTablesError::Unsupported(
-                    "MongoDB support not yet implemented".to_string()
-                ))
-            }
+            DatabaseType::SQLite => Ok(Box::new(SqliteConnection::new(config))),
+            DatabaseType::Oracle => Err(LazyTablesError::Unsupported(
+                "Oracle support not yet implemented".to_string(),
+            )),
+            DatabaseType::Redis => Err(LazyTablesError::Unsupported(
+                "Redis support not yet implemented".to_string(),
+            )),
+            DatabaseType::MongoDB => Err(LazyTablesError::Unsupported(
+                "MongoDB support not yet implemented".to_string(),
+            )),
         }
     }
 
@@ -54,7 +42,10 @@ impl AdapterFactory {
             Ok(DatabaseType::MySQL)
         } else if lower.starts_with("mariadb://") {
             Ok(DatabaseType::MariaDB)
-        } else if lower.starts_with("sqlite://") || lower.ends_with(".db") || lower.ends_with(".sqlite") {
+        } else if lower.starts_with("sqlite://")
+            || lower.ends_with(".db")
+            || lower.ends_with(".sqlite")
+        {
             Ok(DatabaseType::SQLite)
         } else if lower.starts_with("oracle://") {
             Ok(DatabaseType::Oracle)
@@ -64,7 +55,7 @@ impl AdapterFactory {
             Ok(DatabaseType::MongoDB)
         } else {
             Err(LazyTablesError::InvalidConnectionString(
-                "Cannot detect database type from connection string".to_string()
+                "Cannot detect database type from connection string".to_string(),
             ))
         }
     }
@@ -102,7 +93,7 @@ impl AdapterFactory {
             let parts: Vec<&str> = url.splitn(2, "://").collect();
             if parts.len() != 2 {
                 return Err(LazyTablesError::InvalidConnectionString(
-                    "Invalid connection string format".to_string()
+                    "Invalid connection string format".to_string(),
                 ));
             }
 
@@ -130,10 +121,9 @@ impl AdapterFactory {
                 let port_str = parts[0];
                 let host_str = parts[1];
 
-                let port_num = port_str.parse::<u16>()
-                    .map_err(|_| LazyTablesError::InvalidConnectionString(
-                        "Invalid port number".to_string()
-                    ))?;
+                let port_num = port_str.parse::<u16>().map_err(|_| {
+                    LazyTablesError::InvalidConnectionString("Invalid port number".to_string())
+                })?;
 
                 (host_str.to_string(), port_num)
             } else {
@@ -171,7 +161,8 @@ impl AdapterFactory {
             Ok(config)
         } else {
             Err(LazyTablesError::InvalidConnectionString(
-                "Connection string must include protocol (e.g., postgresql://, mysql://)".to_string()
+                "Connection string must include protocol (e.g., postgresql://, mysql://)"
+                    .to_string(),
             ))
         }
     }
@@ -207,7 +198,8 @@ mod tests {
             "postgresql://user:pass@localhost:5432/testdb",
             "test".to_string(),
             DatabaseType::PostgreSQL,
-        ).unwrap();
+        )
+        .unwrap();
 
         assert_eq!(config.database_type, DatabaseType::PostgreSQL);
         assert_eq!(config.host, "localhost");
@@ -290,7 +282,8 @@ mod tests {
             "mysql://user:pass@localhost:3306/testdb",
             "test".to_string(),
             DatabaseType::MySQL,
-        ).unwrap();
+        )
+        .unwrap();
 
         assert_eq!(config.database_type, DatabaseType::MySQL);
         assert_eq!(config.host, "localhost");
@@ -305,7 +298,8 @@ mod tests {
             "postgresql://user@localhost/testdb",
             "test".to_string(),
             DatabaseType::PostgreSQL,
-        ).unwrap();
+        )
+        .unwrap();
 
         assert_eq!(config.port, 5432); // Default PostgreSQL port
     }

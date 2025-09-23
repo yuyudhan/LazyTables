@@ -49,8 +49,12 @@ impl QueryHistoryManager {
     pub async fn initialize(&mut self) -> Result<()> {
         let database_url = format!("sqlite:{}", self.db_path.display());
 
-        let pool = SqlitePool::connect(&database_url).await
-            .map_err(|e| LazyTablesError::Config(format!("Failed to connect to query history database: {}", e)))?;
+        let pool = SqlitePool::connect(&database_url).await.map_err(|e| {
+            LazyTablesError::Config(format!(
+                "Failed to connect to query history database: {}",
+                e
+            ))
+        })?;
 
         // Create the query_history table with database context
         sqlx::query(
@@ -69,7 +73,9 @@ impl QueryHistoryManager {
         )
         .execute(&pool)
         .await
-        .map_err(|e| LazyTablesError::Config(format!("Failed to create query_history table: {}", e)))?;
+        .map_err(|e| {
+            LazyTablesError::Config(format!("Failed to create query_history table: {}", e))
+        })?;
 
         // Create index for efficient querying by database type
         sqlx::query(
@@ -146,10 +152,9 @@ impl QueryHistoryManager {
             query_builder = query_builder.bind(param);
         }
 
-        let rows = query_builder
-            .fetch_all(pool)
-            .await
-            .map_err(|e| LazyTablesError::Config(format!("Failed to fetch query history: {}", e)))?;
+        let rows = query_builder.fetch_all(pool).await.map_err(|e| {
+            LazyTablesError::Config(format!("Failed to fetch query history: {}", e))
+        })?;
 
         let mut entries = Vec::new();
         for row in rows {
@@ -167,7 +172,10 @@ impl QueryHistoryManager {
 
             let executed_at_str: String = row.get("executed_at");
             let executed_at = DateTime::parse_from_rfc3339(&executed_at_str)
-                .unwrap_or_else(|_| DateTime::parse_from_str(&executed_at_str, "%Y-%m-%d %H:%M:%S%.f").unwrap_or_default())
+                .unwrap_or_else(|_| {
+                    DateTime::parse_from_str(&executed_at_str, "%Y-%m-%d %H:%M:%S%.f")
+                        .unwrap_or_default()
+                })
                 .with_timezone(&Utc);
 
             entries.push(QueryHistoryEntry {
@@ -229,10 +237,9 @@ impl QueryHistoryManager {
             query_builder = query_builder.bind(param);
         }
 
-        let rows = query_builder
-            .fetch_all(pool)
-            .await
-            .map_err(|e| LazyTablesError::Config(format!("Failed to search query history: {}", e)))?;
+        let rows = query_builder.fetch_all(pool).await.map_err(|e| {
+            LazyTablesError::Config(format!("Failed to search query history: {}", e))
+        })?;
 
         let mut entries = Vec::new();
         for row in rows {
@@ -250,7 +257,10 @@ impl QueryHistoryManager {
 
             let executed_at_str: String = row.get("executed_at");
             let executed_at = DateTime::parse_from_rfc3339(&executed_at_str)
-                .unwrap_or_else(|_| DateTime::parse_from_str(&executed_at_str, "%Y-%m-%d %H:%M:%S%.f").unwrap_or_default())
+                .unwrap_or_else(|_| {
+                    DateTime::parse_from_str(&executed_at_str, "%Y-%m-%d %H:%M:%S%.f")
+                        .unwrap_or_default()
+                })
                 .with_timezone(&Utc);
 
             entries.push(QueryHistoryEntry {
@@ -342,14 +352,16 @@ mod tests {
 
         manager.initialize().await?;
 
-        let id = manager.add_query(
-            "SELECT * FROM users",
-            DatabaseType::PostgreSQL,
-            Some("test_db"),
-            Some(150),
-            true,
-            None,
-        ).await?;
+        let id = manager
+            .add_query(
+                "SELECT * FROM users",
+                DatabaseType::PostgreSQL,
+                Some("test_db"),
+                Some(150),
+                true,
+                None,
+            )
+            .await?;
 
         assert!(id > 0);
 
@@ -375,30 +387,38 @@ mod tests {
         manager.initialize().await?;
 
         // Add queries for different database types
-        manager.add_query(
-            "SELECT * FROM postgres_table",
-            DatabaseType::PostgreSQL,
-            Some("pg_db"),
-            Some(100),
-            true,
-            None,
-        ).await?;
+        manager
+            .add_query(
+                "SELECT * FROM postgres_table",
+                DatabaseType::PostgreSQL,
+                Some("pg_db"),
+                Some(100),
+                true,
+                None,
+            )
+            .await?;
 
-        manager.add_query(
-            "SELECT * FROM mysql_table",
-            DatabaseType::MySQL,
-            Some("mysql_db"),
-            Some(200),
-            true,
-            None,
-        ).await?;
+        manager
+            .add_query(
+                "SELECT * FROM mysql_table",
+                DatabaseType::MySQL,
+                Some("mysql_db"),
+                Some(200),
+                true,
+                None,
+            )
+            .await?;
 
         // Test filtering
-        let pg_history = manager.get_history(Some(DatabaseType::PostgreSQL), Some(10)).await?;
+        let pg_history = manager
+            .get_history(Some(DatabaseType::PostgreSQL), Some(10))
+            .await?;
         assert_eq!(pg_history.len(), 1);
         assert_eq!(pg_history[0].database_type, DatabaseType::PostgreSQL);
 
-        let mysql_history = manager.get_history(Some(DatabaseType::MySQL), Some(10)).await?;
+        let mysql_history = manager
+            .get_history(Some(DatabaseType::MySQL), Some(10))
+            .await?;
         assert_eq!(mysql_history.len(), 1);
         assert_eq!(mysql_history[0].database_type, DatabaseType::MySQL);
 

@@ -112,11 +112,19 @@ impl Connection for MySqlConnection {
         MySqlConnection::get_table_metadata(self, table_name).await
     }
 
-    async fn get_table_columns(&self, table_name: &str) -> Result<Vec<crate::database::TableColumn>> {
+    async fn get_table_columns(
+        &self,
+        table_name: &str,
+    ) -> Result<Vec<crate::database::TableColumn>> {
         MySqlConnection::get_table_columns(self, table_name).await
     }
 
-    async fn get_table_data(&self, table_name: &str, limit: usize, offset: usize) -> Result<Vec<Vec<String>>> {
+    async fn get_table_data(
+        &self,
+        table_name: &str,
+        limit: usize,
+        offset: usize,
+    ) -> Result<Vec<Vec<String>>> {
         MySqlConnection::get_table_data(self, table_name, limit, offset).await
     }
 
@@ -134,7 +142,7 @@ impl Connection for MySqlConnection {
             supports_materialized_views: false, // MySQL doesn't have materialized views
             supports_window_functions: true,
             supports_cte: true,
-            max_identifier_length: 64, // MySQL identifier limit
+            max_identifier_length: 64,         // MySQL identifier limit
             max_query_length: Some(1_048_576), // 1MB default max_allowed_packet
             supported_isolation_levels: vec![
                 "READ UNCOMMITTED".to_string(),
@@ -167,17 +175,15 @@ impl Connection for MySqlConnection {
                         uptime_seconds: self.get_uptime().await.ok(),
                     })
                 }
-                Err(e) => {
-                    Ok(crate::database::HealthStatus {
-                        is_healthy: false,
-                        response_time_ms: start.elapsed().as_millis() as u64,
-                        last_error: Some(e.to_string()),
-                        database_version: None,
-                        active_connections: 0,
-                        max_connections: 0,
-                        uptime_seconds: None,
-                    })
-                }
+                Err(e) => Ok(crate::database::HealthStatus {
+                    is_healthy: false,
+                    response_time_ms: start.elapsed().as_millis() as u64,
+                    last_error: Some(e.to_string()),
+                    database_version: None,
+                    active_connections: 0,
+                    max_connections: 0,
+                    uptime_seconds: None,
+                }),
             }
         } else {
             Ok(crate::database::HealthStatus {
@@ -212,7 +218,9 @@ impl Connection for MySqlConnection {
                 current_user,
             })
         } else {
-            Err(LazyTablesError::Connection("No active connection".to_string()))
+            Err(LazyTablesError::Connection(
+                "No active connection".to_string(),
+            ))
         }
     }
 
@@ -252,24 +260,30 @@ impl Connection for MySqlConnection {
         let user_message = if error_lower.contains("access denied") {
             is_permission_error = true;
             recovery_suggestions.push("Check username and password".to_string());
-            recovery_suggestions.push("Verify user has permission to access the database".to_string());
+            recovery_suggestions
+                .push("Verify user has permission to access the database".to_string());
             "Access denied. Please check your credentials."
         } else if error_lower.contains("unknown database") {
             is_connection_error = true;
             recovery_suggestions.push("Check database name spelling".to_string());
             recovery_suggestions.push("Ensure database exists on the server".to_string());
             "Database not found. Please verify the database name."
-        } else if error_lower.contains("can't connect") || error_lower.contains("connection refused") {
+        } else if error_lower.contains("can't connect")
+            || error_lower.contains("connection refused")
+        {
             is_connection_error = true;
             recovery_suggestions.push("Check if MySQL server is running".to_string());
             recovery_suggestions.push("Verify host and port are correct".to_string());
             recovery_suggestions.push("Check firewall settings".to_string());
             "Cannot connect to MySQL server. Please check server status and connection details."
-        } else if error_lower.contains("syntax error") || error_lower.contains("you have an error in your sql syntax") {
+        } else if error_lower.contains("syntax error")
+            || error_lower.contains("you have an error in your sql syntax")
+        {
             is_syntax_error = true;
             error_code = Some("1064".to_string());
             recovery_suggestions.push("Check SQL syntax for typos".to_string());
-            recovery_suggestions.push("Refer to MySQL documentation for correct syntax".to_string());
+            recovery_suggestions
+                .push("Refer to MySQL documentation for correct syntax".to_string());
             "SQL syntax error. Please check your query for syntax mistakes."
         } else if error_lower.contains("table") && error_lower.contains("doesn't exist") {
             recovery_suggestions.push("Check table name spelling".to_string());
@@ -298,26 +312,72 @@ impl Connection for MySqlConnection {
 
     fn get_keywords(&self) -> Vec<String> {
         vec![
-            "SELECT".to_string(), "FROM".to_string(), "WHERE".to_string(), "INSERT".to_string(),
-            "UPDATE".to_string(), "DELETE".to_string(), "CREATE".to_string(), "DROP".to_string(),
-            "ALTER".to_string(), "TABLE".to_string(), "INDEX".to_string(), "VIEW".to_string(),
-            "DATABASE".to_string(), "SCHEMA".to_string(), "PROCEDURE".to_string(), "FUNCTION".to_string(),
-            "TRIGGER".to_string(), "EVENT".to_string(), "PRIMARY".to_string(), "KEY".to_string(),
-            "FOREIGN".to_string(), "REFERENCES".to_string(), "UNIQUE".to_string(), "AUTO_INCREMENT".to_string(),
-            "ENGINE".to_string(), "CHARSET".to_string(), "COLLATE".to_string(), "SHOW".to_string(),
-            "DESCRIBE".to_string(), "EXPLAIN".to_string(), "OPTIMIZE".to_string(), "ANALYZE".to_string(),
+            "SELECT".to_string(),
+            "FROM".to_string(),
+            "WHERE".to_string(),
+            "INSERT".to_string(),
+            "UPDATE".to_string(),
+            "DELETE".to_string(),
+            "CREATE".to_string(),
+            "DROP".to_string(),
+            "ALTER".to_string(),
+            "TABLE".to_string(),
+            "INDEX".to_string(),
+            "VIEW".to_string(),
+            "DATABASE".to_string(),
+            "SCHEMA".to_string(),
+            "PROCEDURE".to_string(),
+            "FUNCTION".to_string(),
+            "TRIGGER".to_string(),
+            "EVENT".to_string(),
+            "PRIMARY".to_string(),
+            "KEY".to_string(),
+            "FOREIGN".to_string(),
+            "REFERENCES".to_string(),
+            "UNIQUE".to_string(),
+            "AUTO_INCREMENT".to_string(),
+            "ENGINE".to_string(),
+            "CHARSET".to_string(),
+            "COLLATE".to_string(),
+            "SHOW".to_string(),
+            "DESCRIBE".to_string(),
+            "EXPLAIN".to_string(),
+            "OPTIMIZE".to_string(),
+            "ANALYZE".to_string(),
         ]
     }
 
     fn get_functions(&self) -> Vec<String> {
         vec![
-            "COUNT".to_string(), "SUM".to_string(), "AVG".to_string(), "MIN".to_string(), "MAX".to_string(),
-            "CONCAT".to_string(), "SUBSTRING".to_string(), "LENGTH".to_string(), "UPPER".to_string(), "LOWER".to_string(),
-            "NOW".to_string(), "CURDATE".to_string(), "CURTIME".to_string(), "DATE_FORMAT".to_string(),
-            "YEAR".to_string(), "MONTH".to_string(), "DAY".to_string(), "HOUR".to_string(),
-            "IFNULL".to_string(), "COALESCE".to_string(), "CASE".to_string(), "IF".to_string(),
-            "JSON_EXTRACT".to_string(), "JSON_OBJECT".to_string(), "JSON_ARRAY".to_string(),
-            "RAND".to_string(), "ROUND".to_string(), "FLOOR".to_string(), "CEIL".to_string(),
+            "COUNT".to_string(),
+            "SUM".to_string(),
+            "AVG".to_string(),
+            "MIN".to_string(),
+            "MAX".to_string(),
+            "CONCAT".to_string(),
+            "SUBSTRING".to_string(),
+            "LENGTH".to_string(),
+            "UPPER".to_string(),
+            "LOWER".to_string(),
+            "NOW".to_string(),
+            "CURDATE".to_string(),
+            "CURTIME".to_string(),
+            "DATE_FORMAT".to_string(),
+            "YEAR".to_string(),
+            "MONTH".to_string(),
+            "DAY".to_string(),
+            "HOUR".to_string(),
+            "IFNULL".to_string(),
+            "COALESCE".to_string(),
+            "CASE".to_string(),
+            "IF".to_string(),
+            "JSON_EXTRACT".to_string(),
+            "JSON_OBJECT".to_string(),
+            "JSON_ARRAY".to_string(),
+            "RAND".to_string(),
+            "ROUND".to_string(),
+            "FLOOR".to_string(),
+            "CEIL".to_string(),
         ]
     }
 }
@@ -620,12 +680,12 @@ impl MySqlConnection {
     /// Get MySQL version
     pub async fn get_mysql_version(&self) -> Result<String> {
         if let Some(pool) = &self.pool {
-            let row = sqlx::query("SELECT VERSION()")
-                .fetch_one(pool)
-                .await?;
+            let row = sqlx::query("SELECT VERSION()").fetch_one(pool).await?;
             Ok(row.get::<String, _>(0))
         } else {
-            Err(LazyTablesError::Connection("No active connection".to_string()))
+            Err(LazyTablesError::Connection(
+                "No active connection".to_string(),
+            ))
         }
     }
 
@@ -637,19 +697,21 @@ impl MySqlConnection {
                 .await?;
             Ok(row.get::<String, _>(0))
         } else {
-            Err(LazyTablesError::Connection("No active connection".to_string()))
+            Err(LazyTablesError::Connection(
+                "No active connection".to_string(),
+            ))
         }
     }
 
     /// Get current timezone
     pub async fn get_timezone(&self) -> Result<String> {
         if let Some(pool) = &self.pool {
-            let row = sqlx::query("SELECT @@time_zone")
-                .fetch_one(pool)
-                .await?;
+            let row = sqlx::query("SELECT @@time_zone").fetch_one(pool).await?;
             Ok(row.get::<String, _>(0))
         } else {
-            Err(LazyTablesError::Connection("No active connection".to_string()))
+            Err(LazyTablesError::Connection(
+                "No active connection".to_string(),
+            ))
         }
     }
 
@@ -662,7 +724,9 @@ impl MySqlConnection {
             let uptime_str: String = row.get("Value");
             Ok(uptime_str.parse().unwrap_or(0))
         } else {
-            Err(LazyTablesError::Connection("No active connection".to_string()))
+            Err(LazyTablesError::Connection(
+                "No active connection".to_string(),
+            ))
         }
     }
 
@@ -684,7 +748,9 @@ impl MySqlConnection {
 
             Ok((active, max_conn))
         } else {
-            Err(LazyTablesError::Connection("No active connection".to_string()))
+            Err(LazyTablesError::Connection(
+                "No active connection".to_string(),
+            ))
         }
     }
 
@@ -922,4 +988,3 @@ fn parse_mysql_type(type_str: &str) -> DataType {
         _ => DataType::Text,
     }
 }
-

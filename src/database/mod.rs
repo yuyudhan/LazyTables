@@ -10,8 +10,8 @@ pub mod query_history;
 pub mod sqlite;
 
 pub use connection::{
-    ConnectionConfig, ConnectionStatus, ConnectionStorage, DatabaseType, SslMode,
-    DatabaseCapabilities, HealthStatus, ServerInfo, PoolStatus, FormattedError,
+    ConnectionConfig, ConnectionStatus, ConnectionStorage, DatabaseCapabilities, DatabaseType,
+    FormattedError, HealthStatus, PoolStatus, ServerInfo, SslMode,
 };
 
 // Re-export the Connection trait from connection module
