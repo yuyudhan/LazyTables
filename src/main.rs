@@ -41,6 +41,9 @@ async fn main() -> color_eyre::Result<()> {
         .await
         .map_err(|e| color_eyre::eyre::eyre!("Application error: {}", e));
 
+    // Log shutdown before restoring terminal
+    lazytables::logging::log_shutdown();
+
     // Restore terminal
     lazytables::terminal::restore()
         .map_err(|e| color_eyre::eyre::eyre!("Failed to restore terminal: {}", e))?;

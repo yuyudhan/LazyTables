@@ -125,7 +125,7 @@ impl DatabaseState {
             .await
             .map_err(|e| format!("Failed to retrieve columns: {e}"))?;
 
-        crate::debug_log!(
+        crate::log_debug!(
             "Retrieved {} columns for table {}",
             columns.len(),
             table_name
@@ -157,7 +157,7 @@ impl DatabaseState {
                 })
                 .collect();
 
-            crate::debug_log!("Assigned {} ColumnInfo structs to tab", tab.columns.len());
+            crate::log_debug!("Assigned {} ColumnInfo structs to tab", tab.columns.len());
 
             // Find primary key columns
             tab.primary_key_columns = columns
