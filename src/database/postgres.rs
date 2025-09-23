@@ -874,7 +874,11 @@ impl PostgresConnection {
                 ("public", table_name)
             };
 
-            crate::debug_log!("Parsed schema: '{}', table: '{}'", schema, actual_table_name);
+            crate::debug_log!(
+                "Parsed schema: '{}', table: '{}'",
+                schema,
+                actual_table_name
+            );
             let query = "SELECT
                 c.column_name,
                 c.data_type,
@@ -900,9 +904,17 @@ impl PostgresConnection {
                 ORDER BY c.ordinal_position";
 
             crate::debug_log!("get_table_columns query: {}", query);
-            crate::debug_log!("get_table_columns schema: '{}', table: '{}'", schema, actual_table_name);
+            crate::debug_log!(
+                "get_table_columns schema: '{}', table: '{}'",
+                schema,
+                actual_table_name
+            );
 
-            let rows = sqlx::query(query).bind(schema).bind(actual_table_name).fetch_all(pool).await?;
+            let rows = sqlx::query(query)
+                .bind(schema)
+                .bind(actual_table_name)
+                .fetch_all(pool)
+                .await?;
 
             crate::debug_log!("get_table_columns returned {} rows", rows.len());
 

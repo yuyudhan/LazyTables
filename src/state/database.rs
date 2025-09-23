@@ -125,7 +125,11 @@ impl DatabaseState {
             .await
             .map_err(|e| format!("Failed to retrieve columns: {e}"))?;
 
-        crate::debug_log!("Retrieved {} columns for table {}", columns.len(), table_name);
+        crate::debug_log!(
+            "Retrieved {} columns for table {}",
+            columns.len(),
+            table_name
+        );
 
         // Get total row count
         let total_rows = pg_connection
