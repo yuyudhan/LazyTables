@@ -490,12 +490,16 @@ impl App {
         }
 
         // Handle connections search input
-        if self.state.ui.connections_search_active && self.state.ui.focused_pane == FocusedPane::Connections {
+        if self.state.ui.connections_search_active
+            && self.state.ui.focused_pane == FocusedPane::Connections
+        {
             match key.code {
                 KeyCode::Backspace => {
                     self.state.ui.backspace_connections_search();
                     // Update filtered connections after character removal
-                    self.state.ui.update_filtered_connections(&self.state.db.connections.connections);
+                    self.state
+                        .ui
+                        .update_filtered_connections(&self.state.db.connections.connections);
                     return Ok(());
                 }
                 KeyCode::Enter => {
@@ -506,17 +510,23 @@ impl App {
                     return Ok(());
                 }
                 KeyCode::Down => {
-                    self.state.ui.connections_selection_down(&self.state.db.connections.connections);
+                    self.state
+                        .ui
+                        .connections_selection_down(&self.state.db.connections.connections);
                     return Ok(());
                 }
                 KeyCode::Up => {
-                    self.state.ui.connections_selection_up(&self.state.db.connections.connections);
+                    self.state
+                        .ui
+                        .connections_selection_up(&self.state.db.connections.connections);
                     return Ok(());
                 }
                 KeyCode::Char(c) => {
                     self.state.ui.add_to_connections_search(c);
                     // Update filtered connections after character addition
-                    self.state.ui.update_filtered_connections(&self.state.db.connections.connections);
+                    self.state
+                        .ui
+                        .update_filtered_connections(&self.state.db.connections.connections);
                     return Ok(());
                 }
                 _ => {}
@@ -705,7 +715,9 @@ impl App {
                         if self.state.ui.focused_pane == FocusedPane::Connections
                             && !self.state.ui.connections_search_active
                         {
-                            self.state.ui.connections_selection_down(&self.state.db.connections.connections);
+                            self.state
+                                .ui
+                                .connections_selection_down(&self.state.db.connections.connections);
                         } else if self.state.ui.focused_pane == FocusedPane::Tables
                             && !self.state.ui.tables_search_active
                         {
@@ -726,7 +738,9 @@ impl App {
                         if self.state.ui.focused_pane == FocusedPane::Connections
                             && !self.state.ui.connections_search_active
                         {
-                            self.state.ui.connections_selection_up(&self.state.db.connections.connections);
+                            self.state
+                                .ui
+                                .connections_selection_up(&self.state.db.connections.connections);
                         } else if self.state.ui.focused_pane == FocusedPane::Tables
                             && !self.state.ui.tables_search_active
                         {
