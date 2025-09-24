@@ -804,12 +804,26 @@ impl ConnectionModalState {
     }
 }
 
+/// Render modal overlay background
+fn render_modal_overlay(frame: &mut Frame, area: Rect) {
+    // Clear the entire screen first
+    frame.render_widget(Clear, area);
+
+    // Create a semi-transparent overlay effect
+    let overlay = Block::default()
+        .style(Style::default().bg(Color::Rgb(0, 0, 0))); // Semi-transparent black overlay
+    frame.render_widget(overlay, area);
+}
+
 /// Render the connection creation modal
 pub fn render_connection_modal(f: &mut Frame, modal_state: &ConnectionModalState, area: Rect) {
+    // First render the overlay background for the entire screen
+    render_modal_overlay(f, area);
+
     // Create centered modal area with better proportions
     let modal_area = centered_rect(55, 75, area);
 
-    // Clear the background
+    // Clear the modal area specifically
     f.render_widget(Clear, modal_area);
 
     // Main modal block with elegant styling

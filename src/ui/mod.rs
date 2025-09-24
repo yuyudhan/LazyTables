@@ -76,25 +76,41 @@ impl UI {
         })
     }
 
+    /// Render modal overlay background
+    fn render_modal_overlay(&self, frame: &mut Frame, area: Rect) {
+        use ratatui::widgets::Clear;
+        // Clear the entire screen first
+        frame.render_widget(Clear, area);
+
+        // Create a semi-transparent overlay effect using the theme color
+        let overlay = Block::default()
+            .style(Style::default().bg(self.theme.get_color("modal_overlay")));
+        frame.render_widget(overlay, area);
+    }
+
     /// Calculate centered modal area
     fn render_confirmation_modal(&self, frame: &mut Frame, modal: &ConfirmationModal, area: Rect) {
         use ratatui::layout::{Direction, Layout, Margin};
         use ratatui::widgets::Clear;
 
+        // Render modal overlay background first
+        self.render_modal_overlay(frame, area);
+
         // Center the modal
         let modal_area = self.center_modal(area, 50, 30);
 
-        // Clear the background
+        // Clear the modal area specifically
         frame.render_widget(Clear, modal_area);
 
-        // Draw modal border
+        // Draw modal border with proper background
         let block = Block::default()
             .borders(Borders::ALL)
-            .border_style(Style::default().fg(Color::Yellow))
+            .border_style(Style::default().fg(self.theme.get_color("modal_border")))
+            .style(Style::default().bg(self.theme.get_color("modal_bg")).fg(Color::White))
             .title(format!(" {} ", modal.title))
             .title_style(
                 Style::default()
-                    .fg(Color::Yellow)
+                    .fg(self.theme.get_color("modal_title"))
                     .add_modifier(Modifier::BOLD),
             );
 
@@ -159,6 +175,12 @@ impl UI {
 
     /// Draw the entire UI
     pub fn draw(&mut self, frame: &mut Frame, state: &mut AppState) {
+        // Clear the frame to prevent artifacts
+        frame.render_widget(
+            ratatui::widgets::Clear,
+            frame.area()
+        );
+
         let areas = self.layout_manager.calculate_layout(frame.area());
 
         // Draw header
