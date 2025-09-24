@@ -236,6 +236,12 @@ impl App {
             return Ok(());
         }
 
+        // Handle Ctrl+D globally for debug view toggle
+        if key.code == KeyCode::Char('d') && key.modifiers == KeyModifiers::CONTROL {
+            self.state.ui.toggle_debug_view();
+            return Ok(());
+        }
+
         // Handle confirmation modal
         if let Some(modal) = &self.state.ui.confirmation_modal {
             match key.code {
@@ -301,6 +307,52 @@ impl App {
                 _ => {}
             }
             return Ok(());
+        }
+
+        // Handle debug view navigation when debug view is open
+        if self.state.ui.show_debug_view {
+            let debug_messages = crate::logging::get_debug_messages();
+            let max_lines = debug_messages.len();
+
+            match key.code {
+                KeyCode::Char('j') | KeyCode::Down => {
+                    self.state.ui.debug_view_scroll_down(max_lines);
+                    return Ok(());
+                }
+                KeyCode::Char('k') | KeyCode::Up => {
+                    self.state.ui.debug_view_scroll_up();
+                    return Ok(());
+                }
+                KeyCode::PageDown => {
+                    self.state.ui.debug_view_page_down(max_lines, 10);
+                    return Ok(());
+                }
+                KeyCode::PageUp => {
+                    self.state.ui.debug_view_page_up(10);
+                    return Ok(());
+                }
+                KeyCode::Char('g') => {
+                    // Handle gg for go to top
+                    if self.state.ui.pending_gg_command {
+                        self.state.ui.debug_view_go_to_top();
+                        self.state.ui.pending_gg_command = false;
+                    } else {
+                        self.state.ui.pending_gg_command = true;
+                    }
+                    return Ok(());
+                }
+                KeyCode::Char('G') => {
+                    self.state.ui.debug_view_go_to_bottom(max_lines);
+                    return Ok(());
+                }
+                KeyCode::Char('c') => {
+                    // Clear debug messages
+                    crate::logging::clear_debug_messages();
+                    self.state.toast_manager.info("Debug messages cleared");
+                    return Ok(());
+                }
+                _ => {}
+            }
         }
 
         // Handle delete confirmation dialog in table viewer
