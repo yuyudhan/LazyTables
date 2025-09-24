@@ -17,6 +17,17 @@ Ensure that the configurations for all the panes specifically the key bindings a
 =======================================
 =======================================
 =======================================
+=======================================
+=======================================
+=======================================
+=======================================
+=======================================
+=======================================
+
+=======================================
+=======================================
+=======================================
+=======================================
 
 =======================================
 =======================================
@@ -24,16 +35,14 @@ Ensure that the configurations for all the panes specifically the key bindings a
 =======================================
 
 =======================================
-=======================================
-=======================================
-=======================================
+DONE:
+In the table data view mechanism in the heading I don't see the number of columns I see the number of rows can you also display the number of columns along with this also another functionality which is missing is the horizontal scrolling so horizontal scrolling should scroll to the right and left if the number of columns don't fit in the width that is present. I think the number of columns to be displayed you have fixed it somewhere can you just verify if this is the case and make it dynamic and horizontally scrollable.
 
 =======================================
+DONE:
 In the table/views listing option, I think when you press J to go down and when you reach the last, it cycles back to the first one after pressing another J. But when you are at the first one, when you press K to go up, it doesn't cycle to the last one. Can you verify if this is the case and fix this bug?
 
 =======================================
-DONE
-When I press Q, it basically closes the application. So if accidentally somebody presses Q, then the application will get closed and their connection will get lost and they have to again open the app. So when Q is pressed, can you ensure to ask a confirmation from the user in the confirmation? When you're asking for the confirmation, you should basically tell the connection will be closed. And do you want to confirm that you want to exit the application? Make a proper message and get that confirmation, please. You can try and identify the right key bindings for the confirmation box. In the confirmation box, you should show a proper message.The buttons that are shown should have a key binding of them their own.
 
 =======================================
 I GUESS THIS IS DONE:
@@ -44,9 +53,6 @@ I want you to implement the search functionality in the connection screen. The s
 
 =======================================
 In the table details pane, when I press j, it does a scrolling. But even after when all the lines have been shown, even then the J keeps on going further down. So it initially as an example shows one out of five, which is table details one slash five. But when I press j 20 times, it will say table details 20 slash five. Why is this happening? Can you resolve this bug? I don't want cycling in this pane.
-
-=======================================
-In the table data view mechanism in the heading I don't see the number of columns I see the number of rows can you also display the number of columns along with this also another functionality which is missing is the horizontal scrolling so horizontal scrolling should scroll to the right and left if the number of columns don't fit in the width that is present. I think the number of columns to be displayed you have fixed it somewhere can you just verify if this is the case and make it dynamic and horizontally scrollable.
 
 =======================================
 =======================================
@@ -62,10 +68,8 @@ There is a table details view pane where we see the tabular data and the schema.
 =======================================
 DONE:
 the table data viewer so basically we are showing 20 rows but one problem I am seeing when all the 20 rows are not coming within the panes allotted size in the screen what is happening is while pressing J it is going down but I don't think the scrolling is happening properly can you please validate and see if this is the problem and if you can resolve it please
+
 =======================================
-=======================================
-=======================================
-=======================================
-=======================================
-=======================================
+DONE
+When I press Q, it basically closes the application. So if accidentally somebody presses Q, then the application will get closed and their connection will get lost and they have to again open the app. So when Q is pressed, can you ensure to ask a confirmation from the user in the confirmation? When you're asking for the confirmation, you should basically tell the connection will be closed. And do you want to confirm that you want to exit the application? Make a proper message and get that confirmation, please. You can try and identify the right key bindings for the confirmation box. In the confirmation box, you should show a proper message.The buttons that are shown should have a key binding of them their own.
 

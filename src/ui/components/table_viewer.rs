@@ -338,7 +338,9 @@ impl TableTab {
                 loop {
                     self.scroll_offset_x = new_offset;
                     let test_visible = self.calculate_visible_columns(available_width);
-                    if !test_visible.is_empty() && self.selected_col < self.scroll_offset_x + test_visible.len() {
+                    if !test_visible.is_empty()
+                        && self.selected_col < self.scroll_offset_x + test_visible.len()
+                    {
                         break;
                     }
                     if new_offset == 0 {
@@ -373,7 +375,10 @@ impl TableTab {
         }
 
         // Ensure at least one column is visible if possible
-        if visible_columns.is_empty() && !self.columns.is_empty() && self.scroll_offset_x < self.columns.len() {
+        if visible_columns.is_empty()
+            && !self.columns.is_empty()
+            && self.scroll_offset_x < self.columns.len()
+        {
             visible_columns.push(self.scroll_offset_x);
         }
 
@@ -1057,10 +1062,12 @@ fn render_data_view(
                     tab.total_rows,
                     tab.columns.len(),
                     if visible_column_indices.len() < tab.columns.len() {
-                        format!("[{}-{}/{}]",
+                        format!(
+                            "[{}-{}/{}]",
                             tab.scroll_offset_x + 1,
                             tab.scroll_offset_x + visible_column_indices.len(),
-                            tab.columns.len())
+                            tab.columns.len()
+                        )
                     } else {
                         String::new()
                     },
