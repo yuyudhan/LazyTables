@@ -318,6 +318,68 @@ impl TableTab {
         self.selected_col = self.columns.len().saturating_sub(1);
     }
 
+    /// Ensure the selected column is visible within the horizontal viewport
+    pub fn ensure_column_visible(&mut self, available_width: usize) {
+        if self.columns.is_empty() {
+            return;
+        }
+
+        // If selected column is before the current scroll offset, scroll left
+        if self.selected_col < self.scroll_offset_x {
+            self.scroll_offset_x = self.selected_col;
+        }
+        // If selected column is beyond visible columns, scroll right
+        else {
+            let visible_columns = self.calculate_visible_columns(available_width);
+            let visible_end = self.scroll_offset_x + visible_columns.len();
+            if !visible_columns.is_empty() && self.selected_col >= visible_end {
+                // Find the rightmost scroll position that includes the selected column
+                let mut new_offset = self.selected_col;
+                loop {
+                    self.scroll_offset_x = new_offset;
+                    let test_visible = self.calculate_visible_columns(available_width);
+                    if !test_visible.is_empty() && self.selected_col < self.scroll_offset_x + test_visible.len() {
+                        break;
+                    }
+                    if new_offset == 0 {
+                        break;
+                    }
+                    new_offset = new_offset.saturating_sub(1);
+                }
+            }
+        }
+    }
+
+    /// Calculate which columns can fit in the available width
+    pub fn calculate_visible_columns(&self, available_width: usize) -> Vec<usize> {
+        let mut visible_columns = Vec::new();
+        let mut used_width = 0usize;
+
+        // Account for column spacing and borders (approximately 3 chars per column)
+        let spacing_per_column = 3;
+        let border_padding = 4; // Account for table borders
+
+        let effective_width = available_width.saturating_sub(border_padding);
+
+        for (idx, col) in self.columns.iter().enumerate().skip(self.scroll_offset_x) {
+            let col_width = col.max_display_width.min(30) + spacing_per_column;
+
+            if used_width + col_width <= effective_width {
+                visible_columns.push(idx);
+                used_width += col_width;
+            } else {
+                break;
+            }
+        }
+
+        // Ensure at least one column is visible if possible
+        if visible_columns.is_empty() && !self.columns.is_empty() && self.scroll_offset_x < self.columns.len() {
+            visible_columns.push(self.scroll_offset_x);
+        }
+
+        visible_columns
+    }
+
     /// Start search mode
     pub fn start_search(&mut self) {
         self.in_search_mode = true;
@@ -854,12 +916,15 @@ fn render_data_view(
     theme: &Theme,
     is_focused: bool,
 ) {
-    // Prepare table headers
-    let headers: Vec<TableCell> = tab
-        .columns
+    // Calculate visible columns based on available width
+    tab.ensure_column_visible(area.width as usize);
+    let visible_column_indices = tab.calculate_visible_columns(area.width as usize);
+
+    // Prepare table headers - only for visible columns
+    let headers: Vec<TableCell> = visible_column_indices
         .iter()
-        .enumerate()
-        .map(|(idx, col)| {
+        .map(|&idx| {
+            let col = &tab.columns[idx];
             let style = if idx == tab.selected_col && !tab.in_edit_mode {
                 Style::default()
                     .fg(theme.get_color("secondary_highlight"))
@@ -904,10 +969,10 @@ fn render_data_view(
     let rows: Vec<Row> = visible_rows
         .iter()
         .map(|(row_idx, row_data)| {
-            let cells: Vec<TableCell> = row_data
+            let cells: Vec<TableCell> = visible_column_indices
                 .iter()
-                .enumerate()
-                .map(|(col_idx, value)| {
+                .map(|&col_idx| {
+                    let value = row_data.get(col_idx).cloned().unwrap_or_default();
                     let is_selected = *row_idx == tab.selected_row && col_idx == tab.selected_col;
                     let is_modified = tab.modified_cells.contains_key(&(*row_idx, col_idx));
                     let is_search_match = tab.search_results.contains(&(*row_idx, col_idx));
@@ -970,11 +1035,13 @@ fn render_data_view(
         })
         .collect();
 
-    // Calculate column widths
-    let widths: Vec<Constraint> = tab
-        .columns
+    // Calculate column widths for visible columns only
+    let widths: Vec<Constraint> = visible_column_indices
         .iter()
-        .map(|col| Constraint::Min(col.max_display_width.min(30) as u16))
+        .map(|&idx| {
+            let col = &tab.columns[idx];
+            Constraint::Min(col.max_display_width.min(30) as u16)
+        })
         .collect();
 
     let table = Table::new(rows, widths)
@@ -983,11 +1050,20 @@ fn render_data_view(
             Block::default()
                 .borders(Borders::ALL)
                 .title(format!(
-                    " {} - Data - Page {}/{} ({} rows) [t] Toggle View{} ",
+                    " {} - Data - Page {}/{} ({} rows, {} cols) {} [t] Toggle View{} ",
                     tab.table_name,
                     tab.current_page + 1,
                     (tab.total_rows.saturating_sub(1)) / tab.rows_per_page + 1,
                     tab.total_rows,
+                    tab.columns.len(),
+                    if visible_column_indices.len() < tab.columns.len() {
+                        format!("[{}-{}/{}]",
+                            tab.scroll_offset_x + 1,
+                            tab.scroll_offset_x + visible_column_indices.len(),
+                            tab.columns.len())
+                    } else {
+                        String::new()
+                    },
                     if tab.in_search_mode {
                         format!(
                             " | Search: '{}' ({}/{})",
