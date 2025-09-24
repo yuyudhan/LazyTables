@@ -1173,8 +1173,7 @@ impl UIState {
 
     /// Page up in debug view
     pub fn debug_view_page_up(&mut self, page_size: usize) {
-        self.debug_view_scroll_offset =
-            self.debug_view_scroll_offset.saturating_sub(page_size);
+        self.debug_view_scroll_offset = self.debug_view_scroll_offset.saturating_sub(page_size);
     }
 
     /// Go to top of debug view

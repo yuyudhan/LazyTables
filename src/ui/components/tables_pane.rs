@@ -161,7 +161,6 @@ fn get_selectable_items_list(
     items
 }
 
-
 /// Get adaptive title based on database objects and connection info
 fn get_adaptive_title(
     db_objects: &Option<DatabaseObjectList>,

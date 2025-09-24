@@ -158,7 +158,6 @@ impl HelpSystem {
         lines
     }
 
-
     /// Helper to add a command line with proper formatting
     fn add_command(lines: &mut Vec<Line<'static>>, key: &str, desc: &str) {
         lines.push(Line::from(vec![
@@ -230,7 +229,9 @@ impl HelpSystem {
         lines.push(Line::from(Span::raw("• Tables with row counts and sizes")));
         lines.push(Line::from(Span::raw("• Views and materialized views")));
         lines.push(Line::from(Span::raw("• Foreign tables (if supported)")));
-        lines.push(Line::from(Span::raw("• Schema information (multi-schema databases)")));
+        lines.push(Line::from(Span::raw(
+            "• Schema information (multi-schema databases)",
+        )));
         lines.push(Line::from(""));
         lines.push(Line::from(Span::styled(
             "Status Messages:",
@@ -238,9 +239,13 @@ impl HelpSystem {
                 .fg(Color::Gray)
                 .add_modifier(Modifier::ITALIC),
         )));
-        lines.push(Line::from(Span::raw("• Choose a connection from Connections pane")));
+        lines.push(Line::from(Span::raw(
+            "• Choose a connection from Connections pane",
+        )));
         lines.push(Line::from(Span::raw("• No tables in database")));
-        lines.push(Line::from(Span::raw("• Connection failed (see status bar)")));
+        lines.push(Line::from(Span::raw(
+            "• Connection failed (see status bar)",
+        )));
         lines.push(Line::from(Span::raw("• Search results with filter count")));
     }
 
@@ -255,9 +260,13 @@ impl HelpSystem {
                 .fg(Color::Gray)
                 .add_modifier(Modifier::ITALIC),
         )));
-        lines.push(Line::from(Span::raw("• Object type (Table/View/Materialized View)")));
+        lines.push(Line::from(Span::raw(
+            "• Object type (Table/View/Materialized View)",
+        )));
         lines.push(Line::from(Span::raw("• Row count and column count")));
-        lines.push(Line::from(Span::raw("• Storage size (total, table, indexes)")));
+        lines.push(Line::from(Span::raw(
+            "• Storage size (total, table, indexes)",
+        )));
         lines.push(Line::from(Span::raw("• Primary keys and foreign keys")));
         lines.push(Line::from(Span::raw("• Index information")));
         lines.push(Line::from(Span::raw("• Table comments and metadata")));
@@ -314,9 +323,15 @@ impl HelpSystem {
                 .fg(Color::Gray)
                 .add_modifier(Modifier::ITALIC),
         )));
-        lines.push(Line::from(Span::raw("• Files stored per connection in ~/.lazytables/")));
-        lines.push(Line::from(Span::raw("• File metadata shown (size, modified time)")));
-        lines.push(Line::from(Span::raw("• Current file indicated with ● symbol")));
+        lines.push(Line::from(Span::raw(
+            "• Files stored per connection in ~/.lazytables/",
+        )));
+        lines.push(Line::from(Span::raw(
+            "• File metadata shown (size, modified time)",
+        )));
+        lines.push(Line::from(Span::raw(
+            "• Current file indicated with ● symbol",
+        )));
         lines.push(Line::from(Span::raw("• Search mode shows current query")));
         lines.push(Line::from(""));
         lines.push(Line::from(Span::styled(
@@ -327,7 +342,9 @@ impl HelpSystem {
         )));
         lines.push(Line::from(Span::raw("• Search: Type to filter files")));
         lines.push(Line::from(Span::raw("• Rename: Enter new filename")));
-        lines.push(Line::from(Span::raw("• Create: Enter filename for new file")));
+        lines.push(Line::from(Span::raw(
+            "• Create: Enter filename for new file",
+        )));
         lines.push(Line::from(""));
         lines.push(Line::from(Span::styled(
             "Status Messages:",
@@ -335,8 +352,12 @@ impl HelpSystem {
                 .fg(Color::Gray)
                 .add_modifier(Modifier::ITALIC),
         )));
-        lines.push(Line::from(Span::raw("• No SQL files found (create with 'n')")));
-        lines.push(Line::from(Span::raw("• [SEARCH], [RENAME], [CREATE] mode indicators")));
+        lines.push(Line::from(Span::raw(
+            "• No SQL files found (create with 'n')",
+        )));
+        lines.push(Line::from(Span::raw(
+            "• [SEARCH], [RENAME], [CREATE] mode indicators",
+        )));
     }
 
     fn add_query_window_commands(lines: &mut Vec<Line<'static>>) {
@@ -434,30 +455,38 @@ impl HelpSystem {
         let left_content = Self::create_left_column(help_mode);
         let left_focused = ui_state.help_pane_focus == crate::state::ui::HelpPaneFocus::Left;
         let left_border_style = if left_focused {
-            Style::default().fg(Color::Rgb(120, 180, 255)).add_modifier(Modifier::BOLD)
+            Style::default()
+                .fg(Color::Rgb(120, 180, 255))
+                .add_modifier(Modifier::BOLD)
         } else {
             Style::default().fg(Color::Rgb(80, 100, 150))
         };
         let left_title = if left_focused {
-            format!(" 🎯 {} Help (focused) ", match help_mode {
-                HelpMode::Connections => "Connections",
-                HelpMode::Tables => "Tables",
-                HelpMode::Details => "Table Details",
-                HelpMode::TabularOutput => "Table Viewer",
-                HelpMode::SqlFiles => "SQL Files",
-                HelpMode::QueryWindow => "Query Editor",
-                HelpMode::None => "LazyTables",
-            })
+            format!(
+                " 🎯 {} Help (focused) ",
+                match help_mode {
+                    HelpMode::Connections => "Connections",
+                    HelpMode::Tables => "Tables",
+                    HelpMode::Details => "Table Details",
+                    HelpMode::TabularOutput => "Table Viewer",
+                    HelpMode::SqlFiles => "SQL Files",
+                    HelpMode::QueryWindow => "Query Editor",
+                    HelpMode::None => "LazyTables",
+                }
+            )
         } else {
-            format!(" {} Help ", match help_mode {
-                HelpMode::Connections => "Connections",
-                HelpMode::Tables => "Tables",
-                HelpMode::Details => "Table Details",
-                HelpMode::TabularOutput => "Table Viewer",
-                HelpMode::SqlFiles => "SQL Files",
-                HelpMode::QueryWindow => "Query Editor",
-                HelpMode::None => "LazyTables",
-            })
+            format!(
+                " {} Help ",
+                match help_mode {
+                    HelpMode::Connections => "Connections",
+                    HelpMode::Tables => "Tables",
+                    HelpMode::Details => "Table Details",
+                    HelpMode::TabularOutput => "Table Viewer",
+                    HelpMode::SqlFiles => "SQL Files",
+                    HelpMode::QueryWindow => "Query Editor",
+                    HelpMode::None => "LazyTables",
+                }
+            )
         };
         let left_widget = Paragraph::new(left_content)
             .style(Style::default().fg(Color::Rgb(240, 245, 250)))
@@ -478,7 +507,9 @@ impl HelpSystem {
         let right_content = Self::create_right_column(help_mode);
         let right_focused = ui_state.help_pane_focus == crate::state::ui::HelpPaneFocus::Right;
         let right_border_style = if right_focused {
-            Style::default().fg(Color::Rgb(120, 180, 255)).add_modifier(Modifier::BOLD)
+            Style::default()
+                .fg(Color::Rgb(120, 180, 255))
+                .add_modifier(Modifier::BOLD)
         } else {
             Style::default().fg(Color::Rgb(80, 100, 150))
         };

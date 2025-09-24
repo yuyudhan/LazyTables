@@ -238,11 +238,13 @@ impl App {
                     return Ok(());
                 }
                 // Page Up/Down for faster scrolling
-                (KeyModifiers::NONE, KeyCode::PageUp) | (KeyModifiers::CONTROL, KeyCode::Char('u')) => {
+                (KeyModifiers::NONE, KeyCode::PageUp)
+                | (KeyModifiers::CONTROL, KeyCode::Char('u')) => {
                     self.state.ui.help_page_up(10);
                     return Ok(());
                 }
-                (KeyModifiers::NONE, KeyCode::PageDown) | (KeyModifiers::CONTROL, KeyCode::Char('d')) => {
+                (KeyModifiers::NONE, KeyCode::PageDown)
+                | (KeyModifiers::CONTROL, KeyCode::Char('d')) => {
                     self.state.ui.help_page_down(100, 10);
                     return Ok(());
                 }

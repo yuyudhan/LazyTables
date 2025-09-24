@@ -110,7 +110,7 @@ impl tracing::field::Visit for LogVisitor {
             self.message = format!("{:?}", value);
             // Remove the quotes from the debug output
             if self.message.starts_with('"') && self.message.ends_with('"') {
-                self.message = self.message[1..self.message.len()-1].to_string();
+                self.message = self.message[1..self.message.len() - 1].to_string();
             }
         }
     }
@@ -181,13 +181,21 @@ mod tests {
         }
 
         let messages = get_debug_messages();
-        assert!(messages.len() <= 1000, "Storage should be limited to 1000 messages, got {}", messages.len());
+        assert!(
+            messages.len() <= 1000,
+            "Storage should be limited to 1000 messages, got {}",
+            messages.len()
+        );
         assert!(messages.len() > 0, "Should have some messages");
 
         // Should have the most recent messages (higher numbers)
         if !messages.is_empty() {
             let last_message = &messages[messages.len() - 1];
-            assert!(last_message.message.contains("1499"), "Should have the last message, got: {}", last_message.message);
+            assert!(
+                last_message.message.contains("1499"),
+                "Should have the last message, got: {}",
+                last_message.message
+            );
         }
 
         println!("SUCCESS: Debug storage limits are working correctly");
@@ -261,10 +269,7 @@ fn init_development_logging(log_dir: &Path, level: LogLevel) -> Result<()> {
                 .with_line_number(true)
                 .with_filter(filter.clone()),
         )
-        .with(
-            MemoryLogLayer
-                .with_filter(filter)
-        )
+        .with(MemoryLogLayer.with_filter(filter))
         .init();
 
     Ok(())

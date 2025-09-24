@@ -5,8 +5,8 @@ use crate::{
     database::{AppStateDb, ConnectionConfig, ConnectionManager, ConnectionStatus, DatabaseType},
     state::{ui::UIState, DatabaseState},
     ui::components::{
-        ConnectionModalState, DebugView, QueryEditor, TableCreatorState, TableEditorState, TableViewerState,
-        ToastManager,
+        ConnectionModalState, DebugView, QueryEditor, TableCreatorState, TableEditorState,
+        TableViewerState, ToastManager,
     },
 };
 
@@ -596,13 +596,21 @@ impl AppState {
     }
 
     /// Get currently selected SQL file name
-    pub fn get_selected_sql_file(&self) -> Option<&String> {
-        self.saved_sql_files.get(self.ui.selected_sql_file)
+    pub fn get_selected_sql_file(&self) -> Option<String> {
+        if self.ui.sql_files_search_active {
+            // When search is active, use filtered list
+            let filtered = self.get_filtered_sql_files();
+            let selected_index = self.get_filtered_sql_file_selection();
+            filtered.get(selected_index).cloned()
+        } else {
+            // Normal mode, use the raw selection
+            self.saved_sql_files.get(self.ui.selected_sql_file).cloned()
+        }
     }
 
     /// Load the currently selected SQL file
     pub fn load_selected_sql_file(&mut self) -> Result<(), Box<dyn std::error::Error>> {
-        if let Some(filename) = self.get_selected_sql_file().cloned() {
+        if let Some(filename) = self.get_selected_sql_file() {
             self.load_query_file(&filename)
         } else {
             Err("No SQL file selected".into())

@@ -390,7 +390,6 @@ impl UI {
             }
         }
 
-
         // Create title with search indicator
         let title = if state.ui.connections_search_active {
             format!(
@@ -773,7 +772,6 @@ impl UI {
                 Style::default().fg(Color::Gray),
             )]));
         }
-
 
         lines
     }

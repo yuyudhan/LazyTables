@@ -3,20 +3,15 @@
 =======================================
 =======================================
 =======================================
-=======================================
-=======================================
-=======================================
-=======================================
-=======================================
-=======================================
-=======================================
-=======================================
-=======================================
 
 =======================================
 THIS WILL REQUIRE DOING AGAIN AND AGAIN:
 DONE:
 Can you check the help modal that opens when pressing question mark? It should align with all the panes, current options that are there. So it should not show anything different from what options are available in each of the panes.
+
+=======================================
+THIS NEEDS TO BE DONE AGAIN AND AGAIN TO ENSURE CONSISTENCY.
+I want you to refer to each and every pane, connections pane, tables pane, table details pane, table data pane, query results pane, SQL query editor pane, SQL files pane. For each of the panes, find out what all keyboard bindings it gives and move those keyboard bindings to the help model, ensure that the help model takes care of all the pane's help bindings as needed.
 
 =======================================
 THIS WILL REQUIRE DOING AGAIN AND AGAIN:
@@ -32,23 +27,22 @@ I want you to complete the edit functionality modal in the connections pane so t
 =======================================
 =======================================
 =======================================
+We have to look at the SQL editor pane. We need to focus on this pane. We have to find out all the issues that are presently present in this pane, how it is structured, what features are missing, what features need to be developed, create a complete plan, thought process and key bindings. It should be properly integrated with the SQL files pane.
 
 =======================================
-THIS NEEDS TO BE DONE AGAIN AND AGAIN TO ENSURE CONSISTENCY.
-I want you to refer to each and every pane, connections pane, tables pane, table details pane, table data pane, query results pane, SQL query editor pane, SQL files pane. For each of the panes, find out what all keyboard bindings it gives and move those keyboard bindings to the help model, ensure that the help model takes care of all the pane's help bindings as needed.
+In the SQL files pane, I think when we do the slash based search, it is searching and showing the matching files only. But when I press on a file which is searched and then I press enter, I don't think it is loading. Can you validate if this issue exists and can you fix it?
 
 =======================================
+DONE:
 I want you to implement the search functionality in the connection screen. The search shall be triggered by pressing the slash command. And after the search is done, I should be able to use the arrow keys to search within the connections. And when I press enter on anything pointed, even after searching, it should open that connection.
 
 =======================================
+DONE:
 In the table details pane, when I press j, it does a scrolling. But even after when all the lines have been shown, even then the J keeps on going further down. So it initially as an example shows one out of five, which is table details one slash five. But when I press j 20 times, it will say table details 20 slash five. Why is this happening? Can you resolve this bug? I don't want cycling in this pane.
 
 =======================================
 DONE:
 Now let us focus on the table data viewer section. So in this, when we are in a particular cell, we should have a keyboard shortcut to edit the contents of that cell. And once we press enter, the value should get updated. This is supposed to act as a edit mechanism for the data in the tables. Focus on the data viewing data table pane table data pane and ensure that this feature is properly implemented. The toast should give the message properly when the data gets updated or if there is any error.
-
-=======================================
-In the SQL files pane, I think when we do the slash based search, it is searching and showing the matching files only. But when I press on a file which is searched and then I press enter, I don't think it is loading. Can you validate if this issue exists and can you fix it?
 
 =======================================
 DONE:

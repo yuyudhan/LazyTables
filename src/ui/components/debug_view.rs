@@ -5,7 +5,10 @@ use ratatui::{
     layout::{Alignment, Constraint, Direction, Layout, Rect},
     style::{Color, Style},
     text::{Line, Span, Text},
-    widgets::{Block, Borders, Clear, List, ListItem, Paragraph, Scrollbar, ScrollbarOrientation, ScrollbarState},
+    widgets::{
+        Block, Borders, Clear, List, ListItem, Paragraph, Scrollbar, ScrollbarOrientation,
+        ScrollbarState,
+    },
     Frame,
 };
 use std::collections::HashMap;
@@ -37,7 +40,14 @@ impl DebugView {
     }
 
     /// Render the debug view as a full-screen overlay
-    pub fn render(&self, frame: &mut Frame, area: Rect, theme: &Theme, debug_messages: &[DebugMessage], scroll_offset: usize) {
+    pub fn render(
+        &self,
+        frame: &mut Frame,
+        area: Rect,
+        theme: &Theme,
+        debug_messages: &[DebugMessage],
+        scroll_offset: usize,
+    ) {
         // Clear the background
         frame.render_widget(Clear, area);
 
@@ -46,7 +56,11 @@ impl DebugView {
             .borders(Borders::ALL)
             .title(" Debug View (Ctrl+B to toggle) ")
             .title_alignment(Alignment::Center)
-            .style(Style::default().bg(theme.get_color("background")).fg(theme.get_color("foreground")));
+            .style(
+                Style::default()
+                    .bg(theme.get_color("background"))
+                    .fg(theme.get_color("foreground")),
+            );
 
         let inner_area = main_block.inner(area);
         frame.render_widget(main_block, area);
@@ -55,10 +69,10 @@ impl DebugView {
         let chunks = Layout::default()
             .direction(Direction::Vertical)
             .constraints([
-                Constraint::Length(8),  // Performance metrics
-                Constraint::Length(3),  // Statistics
-                Constraint::Min(10),    // Log messages
-                Constraint::Length(3),  // Help text
+                Constraint::Length(8), // Performance metrics
+                Constraint::Length(3), // Statistics
+                Constraint::Min(10),   // Log messages
+                Constraint::Length(3), // Help text
             ])
             .split(inner_area);
 
@@ -80,7 +94,11 @@ impl DebugView {
         let metrics_block = Block::default()
             .borders(Borders::ALL)
             .title(" Performance Metrics ")
-            .style(Style::default().bg(theme.get_color("background")).fg(theme.get_color("primary_highlight")));
+            .style(
+                Style::default()
+                    .bg(theme.get_color("background"))
+                    .fg(theme.get_color("primary_highlight")),
+            );
 
         let inner_area = metrics_block.inner(area);
         frame.render_widget(metrics_block, area);
@@ -93,51 +111,82 @@ impl DebugView {
 
         // Left column metrics
         let left_metrics = vec![
-            format!("Memory Usage: {:.1} MB", self.performance_metrics.memory_usage_mb),
-            format!("CPU Usage: {:.1}%", self.performance_metrics.cpu_usage_percent),
+            format!(
+                "Memory Usage: {:.1} MB",
+                self.performance_metrics.memory_usage_mb
+            ),
+            format!(
+                "CPU Usage: {:.1}%",
+                self.performance_metrics.cpu_usage_percent
+            ),
             format!("FPS: {}", self.performance_metrics.fps),
         ];
 
         let left_text = Text::from(
             left_metrics
                 .into_iter()
-                .map(|metric| Line::from(vec![
-                    Span::styled(metric, Style::default().fg(theme.get_color("foreground")))
-                ]))
-                .collect::<Vec<_>>()
+                .map(|metric| {
+                    Line::from(vec![Span::styled(
+                        metric,
+                        Style::default().fg(theme.get_color("foreground")),
+                    )])
+                })
+                .collect::<Vec<_>>(),
         );
 
-        let left_paragraph = Paragraph::new(left_text)
-            .style(Style::default().bg(theme.get_color("background")));
+        let left_paragraph =
+            Paragraph::new(left_text).style(Style::default().bg(theme.get_color("background")));
         frame.render_widget(left_paragraph, columns[0]);
 
         // Right column metrics
         let right_metrics = vec![
-            format!("DB Connections: {}", self.performance_metrics.database_connections),
-            format!("Active Queries: {}", self.performance_metrics.active_queries),
-            format!("Render Time: {:.2}ms", self.performance_metrics.render_time_ms),
+            format!(
+                "DB Connections: {}",
+                self.performance_metrics.database_connections
+            ),
+            format!(
+                "Active Queries: {}",
+                self.performance_metrics.active_queries
+            ),
+            format!(
+                "Render Time: {:.2}ms",
+                self.performance_metrics.render_time_ms
+            ),
         ];
 
         let right_text = Text::from(
             right_metrics
                 .into_iter()
-                .map(|metric| Line::from(vec![
-                    Span::styled(metric, Style::default().fg(theme.get_color("foreground")))
-                ]))
-                .collect::<Vec<_>>()
+                .map(|metric| {
+                    Line::from(vec![Span::styled(
+                        metric,
+                        Style::default().fg(theme.get_color("foreground")),
+                    )])
+                })
+                .collect::<Vec<_>>(),
         );
 
-        let right_paragraph = Paragraph::new(right_text)
-            .style(Style::default().bg(theme.get_color("background")));
+        let right_paragraph =
+            Paragraph::new(right_text).style(Style::default().bg(theme.get_color("background")));
         frame.render_widget(right_paragraph, columns[1]);
     }
 
     /// Render statistics section
-    fn render_statistics(&self, frame: &mut Frame, area: Rect, theme: &Theme, debug_messages: &[DebugMessage]) {
+    fn render_statistics(
+        &self,
+        frame: &mut Frame,
+        area: Rect,
+        theme: &Theme,
+        debug_messages: &[DebugMessage],
+    ) {
         let stats_block = Block::default()
             .borders(Borders::ALL)
             .title(" Log Statistics ")
-            .style(Style::default().bg(theme.get_color("background")).fg(theme.get_color("primary_highlight")));
+            .style(
+                Style::default()
+                    .bg(theme.get_color("background"))
+                    .fg(theme.get_color("primary_highlight")),
+            );
 
         let inner_area = stats_block.inner(area);
         frame.render_widget(stats_block, area);
@@ -159,25 +208,46 @@ impl DebugView {
         };
 
         let paragraph = Paragraph::new(stats_text)
-            .style(Style::default().fg(theme.get_color("foreground")).bg(theme.get_color("background")))
+            .style(
+                Style::default()
+                    .fg(theme.get_color("foreground"))
+                    .bg(theme.get_color("background")),
+            )
             .alignment(Alignment::Center);
         frame.render_widget(paragraph, inner_area);
     }
 
     /// Render log messages section
-    fn render_log_messages(&self, frame: &mut Frame, area: Rect, theme: &Theme, debug_messages: &[DebugMessage], scroll_offset: usize) {
+    fn render_log_messages(
+        &self,
+        frame: &mut Frame,
+        area: Rect,
+        theme: &Theme,
+        debug_messages: &[DebugMessage],
+        scroll_offset: usize,
+    ) {
         let logs_block = Block::default()
             .borders(Borders::ALL)
             .title(" Recent Log Messages ")
-            .style(Style::default().bg(theme.get_color("background")).fg(theme.get_color("primary_highlight")));
+            .style(
+                Style::default()
+                    .bg(theme.get_color("background"))
+                    .fg(theme.get_color("primary_highlight")),
+            );
 
         let inner_area = logs_block.inner(area);
         frame.render_widget(logs_block, area);
 
         if debug_messages.is_empty() {
-            let empty_text = Paragraph::new("No log messages to display.\nTry using the application to generate some logs!")
-                .style(Style::default().fg(theme.get_color("inactive_pane")).bg(theme.get_color("background")))
-                .alignment(Alignment::Center);
+            let empty_text = Paragraph::new(
+                "No log messages to display.\nTry using the application to generate some logs!",
+            )
+            .style(
+                Style::default()
+                    .fg(theme.get_color("inactive_pane"))
+                    .bg(theme.get_color("background")),
+            )
+            .alignment(Alignment::Center);
             frame.render_widget(empty_text, inner_area);
             return;
         }
@@ -194,8 +264,7 @@ impl DebugView {
             .map(|message| self.format_log_message(message, theme))
             .collect();
 
-        let list = List::new(items)
-            .style(Style::default().bg(theme.get_color("background")));
+        let list = List::new(items).style(Style::default().bg(theme.get_color("background")));
 
         frame.render_widget(list, inner_area);
 
@@ -241,14 +310,29 @@ impl DebugView {
         };
 
         let line = Line::from(vec![
-            Span::styled(timestamp, Style::default().fg(theme.get_color("inactive_pane"))),
+            Span::styled(
+                timestamp,
+                Style::default().fg(theme.get_color("inactive_pane")),
+            ),
             Span::raw(" "),
-            Span::styled(format!("{:5}", message.level), Style::default().fg(level_color)),
+            Span::styled(
+                format!("{:5}", message.level),
+                Style::default().fg(level_color),
+            ),
             Span::raw(" "),
-            Span::styled(message.target.clone(), Style::default().fg(theme.get_color("primary_highlight"))),
-            Span::styled(location_info, Style::default().fg(theme.get_color("inactive_pane"))),
+            Span::styled(
+                message.target.clone(),
+                Style::default().fg(theme.get_color("primary_highlight")),
+            ),
+            Span::styled(
+                location_info,
+                Style::default().fg(theme.get_color("inactive_pane")),
+            ),
             Span::raw(": "),
-            Span::styled(message.message.clone(), Style::default().fg(theme.get_color("foreground"))),
+            Span::styled(
+                message.message.clone(),
+                Style::default().fg(theme.get_color("foreground")),
+            ),
         ]);
 
         ListItem::new(line)
@@ -259,7 +343,11 @@ impl DebugView {
         let help_block = Block::default()
             .borders(Borders::ALL)
             .title(" Navigation ")
-            .style(Style::default().bg(theme.get_color("background")).fg(theme.get_color("primary_highlight")));
+            .style(
+                Style::default()
+                    .bg(theme.get_color("background"))
+                    .fg(theme.get_color("primary_highlight")),
+            );
 
         let inner_area = help_block.inner(area);
         frame.render_widget(help_block, area);
@@ -267,7 +355,11 @@ impl DebugView {
         let help_text = "j/k: Scroll • PgUp/PgDn: Page scroll • gg/G: Top/Bottom • c: Clear logs • Ctrl+B: Close debug view";
 
         let paragraph = Paragraph::new(help_text)
-            .style(Style::default().fg(theme.get_color("foreground")).bg(theme.get_color("background")))
+            .style(
+                Style::default()
+                    .fg(theme.get_color("foreground"))
+                    .bg(theme.get_color("background")),
+            )
             .alignment(Alignment::Center);
         frame.render_widget(paragraph, inner_area);
     }
