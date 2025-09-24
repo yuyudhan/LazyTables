@@ -74,8 +74,8 @@ impl HelpSystem {
         lines
     }
 
-    /// Create the right column content (all panes overview)
-    pub fn create_right_column(current_mode: HelpMode) -> Vec<Line<'static>> {
+    /// Create the right column content (global commands)
+    pub fn create_right_column(_current_mode: HelpMode) -> Vec<Line<'static>> {
         let mut lines = vec![];
 
         lines.push(Line::from(vec![Span::styled(
@@ -86,139 +86,78 @@ impl HelpSystem {
         )]));
         lines.push(Line::from(""));
 
-        // Add each pane's key commands
-        Self::add_pane_overview(
-            &mut lines,
-            "Connections",
-            HelpMode::Connections,
-            current_mode,
-        );
-        Self::add_pane_overview(&mut lines, "Tables", HelpMode::Tables, current_mode);
-        Self::add_pane_overview(&mut lines, "Details", HelpMode::Details, current_mode);
-        Self::add_pane_overview(
-            &mut lines,
-            "Table Viewer",
-            HelpMode::TabularOutput,
-            current_mode,
-        );
-        Self::add_pane_overview(&mut lines, "SQL Files", HelpMode::SqlFiles, current_mode);
-        Self::add_pane_overview(
-            &mut lines,
-            "Query Editor",
-            HelpMode::QueryWindow,
-            current_mode,
-        );
+        // Application-level commands
+        lines.push(Line::from(vec![Span::styled(
+            "💾 Application",
+            Style::default()
+                .fg(Color::Rgb(120, 180, 255))
+                .add_modifier(Modifier::BOLD | Modifier::UNDERLINED),
+        )]));
+        lines.push(Line::from(""));
+        Self::add_command(&mut lines, "q", "Quit LazyTables");
+        Self::add_command(&mut lines, "?", "Toggle help guide");
+        Self::add_command(&mut lines, ":", "Enter command mode");
+        Self::add_command(&mut lines, "C-B", "Toggle debug view");
+        lines.push(Line::from(""));
+
+        // Navigation commands
+        lines.push(Line::from(vec![Span::styled(
+            "🧭 Navigation",
+            Style::default()
+                .fg(Color::Rgb(100, 220, 180))
+                .add_modifier(Modifier::BOLD | Modifier::UNDERLINED),
+        )]));
+        lines.push(Line::from(""));
+        Self::add_command(&mut lines, "Tab", "Next pane");
+        Self::add_command(&mut lines, "S-Tab", "Previous pane");
+        Self::add_command(&mut lines, "C-h", "Focus left");
+        Self::add_command(&mut lines, "C-j", "Focus down");
+        Self::add_command(&mut lines, "C-k", "Focus up");
+        Self::add_command(&mut lines, "C-l", "Focus right");
+        lines.push(Line::from(""));
+
+        // Data operations
+        lines.push(Line::from(vec![Span::styled(
+            "📊 Data Operations",
+            Style::default()
+                .fg(Color::Rgb(255, 200, 100))
+                .add_modifier(Modifier::BOLD | Modifier::UNDERLINED),
+        )]));
+        lines.push(Line::from(""));
+        Self::add_command(&mut lines, "C-Enter", "Execute SQL at cursor");
+        Self::add_command(&mut lines, "C-S", "Save current query");
+        Self::add_command(&mut lines, "C-O", "Refresh current view");
+        Self::add_command(&mut lines, "C-N", "New timestamped query");
+        lines.push(Line::from(""));
+
+        // Quick reference
+        lines.push(Line::from(vec![Span::styled(
+            "📖 Quick Reference",
+            Style::default()
+                .fg(Color::Rgb(180, 140, 255))
+                .add_modifier(Modifier::BOLD | Modifier::UNDERLINED),
+        )]));
+        lines.push(Line::from(""));
+        lines.push(Line::from(vec![
+            Span::styled("• ", Style::default().fg(Color::Rgb(100, 220, 180))),
+            Span::raw("Use vim-style navigation (h/j/k/l)"),
+        ]));
+        lines.push(Line::from(vec![
+            Span::styled("• ", Style::default().fg(Color::Rgb(100, 220, 180))),
+            Span::raw("Press 'i' to enter insert mode in forms"),
+        ]));
+        lines.push(Line::from(vec![
+            Span::styled("• ", Style::default().fg(Color::Rgb(100, 220, 180))),
+            Span::raw("ESC exits insert mode and cancels"),
+        ]));
+        lines.push(Line::from(vec![
+            Span::styled("• ", Style::default().fg(Color::Rgb(100, 220, 180))),
+            Span::raw("All changes require connection to database"),
+        ]));
 
         lines
     }
 
-    /// Add a pane overview section with key descriptions
-    fn add_pane_overview(
-        lines: &mut Vec<Line<'static>>,
-        name: &str,
-        mode: HelpMode,
-        current_mode: HelpMode,
-    ) {
-        let is_current = mode == current_mode;
-        let header_style = if is_current {
-            Style::default()
-                .fg(Color::Rgb(255, 220, 100))
-                .add_modifier(Modifier::BOLD)
-        } else {
-            Style::default().fg(Color::Rgb(160, 170, 185))
-        };
-
-        lines.push(Line::from(vec![
-            Span::styled(if is_current { "👉 " } else { "   " }, header_style),
-            Span::styled(
-                name.to_string(),
-                header_style.add_modifier(Modifier::UNDERLINED),
-            ),
-        ]));
-
-        let key_style = if is_current {
-            Style::default().fg(Color::Rgb(150, 200, 255))
-        } else {
-            Style::default().fg(Color::Rgb(130, 140, 160))
-        };
-
-        let desc_style = if is_current {
-            Style::default().fg(Color::Rgb(220, 230, 245))
-        } else {
-            Style::default().fg(Color::Rgb(140, 150, 170))
-        };
-
-        // Add key commands with descriptions for each pane
-        match mode {
-            HelpMode::Connections => {
-                Self::add_overview_command(lines, "Enter", "Connect", key_style, desc_style);
-                Self::add_overview_command(lines, "x", "Disconnect", key_style, desc_style);
-                Self::add_overview_command(
-                    lines,
-                    "a/e/d",
-                    "Add/Edit/Delete",
-                    key_style,
-                    desc_style,
-                );
-            }
-            HelpMode::Tables => {
-                Self::add_overview_command(lines, "Enter", "Open", key_style, desc_style);
-                Self::add_overview_command(lines, "n", "Create", key_style, desc_style);
-                Self::add_overview_command(lines, "e", "Edit", key_style, desc_style);
-                Self::add_overview_command(lines, "/", "Search", key_style, desc_style);
-            }
-            HelpMode::Details => {
-                Self::add_overview_command(lines, "r", "Refresh metadata", key_style, desc_style);
-            }
-            HelpMode::TabularOutput => {
-                Self::add_overview_command(lines, "i", "Edit", key_style, desc_style);
-                Self::add_overview_command(lines, "dd/yy", "Delete/Copy", key_style, desc_style);
-                Self::add_overview_command(lines, "S/D", "Prev/Next tabs", key_style, desc_style);
-                Self::add_overview_command(lines, "/", "Search", key_style, desc_style);
-                Self::add_overview_command(lines, "t", "Toggle view", key_style, desc_style);
-            }
-            HelpMode::SqlFiles => {
-                Self::add_overview_command(lines, "Enter", "Load file", key_style, desc_style);
-                Self::add_overview_command(
-                    lines,
-                    "n/r/d/c",
-                    "New/Rename/Delete/Copy",
-                    key_style,
-                    desc_style,
-                );
-                Self::add_overview_command(lines, "/", "Search files", key_style, desc_style);
-                Self::add_overview_command(lines, "C-n", "New query", key_style, desc_style);
-            }
-            HelpMode::QueryWindow => {
-                Self::add_overview_command(lines, "i", "Edit mode", key_style, desc_style);
-                Self::add_overview_command(
-                    lines,
-                    "C-Enter",
-                    "Execute at cursor",
-                    key_style,
-                    desc_style,
-                );
-                Self::add_overview_command(lines, "C-s", "Save", key_style, desc_style);
-            }
-            _ => {}
-        }
-        lines.push(Line::from(""));
-    }
-
-    /// Helper to add a command line in the overview section
-    fn add_overview_command(
-        lines: &mut Vec<Line<'static>>,
-        key: &str,
-        desc: &str,
-        key_style: Style,
-        desc_style: Style,
-    ) {
-        lines.push(Line::from(vec![
-            Span::raw("    "),
-            Span::styled(format!("{key:8}"), key_style),
-            Span::styled(desc.to_string(), desc_style),
-        ]));
-    }
 
     /// Helper to add a command line with proper formatting
     fn add_command(lines: &mut Vec<Line<'static>>, key: &str, desc: &str) {
@@ -493,29 +432,71 @@ impl HelpSystem {
 
         // Left column - current pane commands + global
         let left_content = Self::create_left_column(help_mode);
+        let left_focused = ui_state.help_pane_focus == crate::state::ui::HelpPaneFocus::Left;
+        let left_border_style = if left_focused {
+            Style::default().fg(Color::Rgb(120, 180, 255)).add_modifier(Modifier::BOLD)
+        } else {
+            Style::default().fg(Color::Rgb(80, 100, 150))
+        };
+        let left_title = if left_focused {
+            format!(" 🎯 {} Help (focused) ", match help_mode {
+                HelpMode::Connections => "Connections",
+                HelpMode::Tables => "Tables",
+                HelpMode::Details => "Table Details",
+                HelpMode::TabularOutput => "Table Viewer",
+                HelpMode::SqlFiles => "SQL Files",
+                HelpMode::QueryWindow => "Query Editor",
+                HelpMode::None => "LazyTables",
+            })
+        } else {
+            format!(" {} Help ", match help_mode {
+                HelpMode::Connections => "Connections",
+                HelpMode::Tables => "Tables",
+                HelpMode::Details => "Table Details",
+                HelpMode::TabularOutput => "Table Viewer",
+                HelpMode::SqlFiles => "SQL Files",
+                HelpMode::QueryWindow => "Query Editor",
+                HelpMode::None => "LazyTables",
+            })
+        };
         let left_widget = Paragraph::new(left_content)
             .style(Style::default().fg(Color::Rgb(240, 245, 250)))
             .wrap(Wrap { trim: true })
+            .scroll((ui_state.help_left_scroll_offset as u16, 0))
             .block(
                 Block::default()
+                    .title(left_title)
                     .borders(Borders::ALL)
                     .border_type(ratatui::widgets::BorderType::Rounded)
-                    .border_style(Style::default().fg(Color::Rgb(80, 100, 150)))
+                    .border_style(left_border_style)
                     .style(Style::default().bg(Color::Rgb(18, 22, 26))),
             );
 
         f.render_widget(left_widget, columns[0]);
 
-        // Right column - all panes overview
+        // Right column - global commands
         let right_content = Self::create_right_column(help_mode);
+        let right_focused = ui_state.help_pane_focus == crate::state::ui::HelpPaneFocus::Right;
+        let right_border_style = if right_focused {
+            Style::default().fg(Color::Rgb(120, 180, 255)).add_modifier(Modifier::BOLD)
+        } else {
+            Style::default().fg(Color::Rgb(80, 100, 150))
+        };
+        let right_title = if right_focused {
+            " 🌐 Global Commands (focused) ".to_string()
+        } else {
+            " 🌐 Global Commands ".to_string()
+        };
         let right_widget = Paragraph::new(right_content)
             .style(Style::default().fg(Color::Rgb(240, 245, 250)))
             .wrap(Wrap { trim: true })
+            .scroll((ui_state.help_right_scroll_offset as u16, 0))
             .block(
                 Block::default()
+                    .title(right_title)
                     .borders(Borders::ALL)
                     .border_type(ratatui::widgets::BorderType::Rounded)
-                    .border_style(Style::default().fg(Color::Rgb(80, 100, 150)))
+                    .border_style(right_border_style)
                     .style(Style::default().bg(Color::Rgb(18, 22, 26))),
             );
 
@@ -529,7 +510,7 @@ impl HelpSystem {
         f.render_widget(separator_paragraph, columns[1]);
 
         // Add elegant footer with instructions
-        let footer_text = "💡 Press ESC or ? to close this help guide";
+        let footer_text = "💡 Press ESC or ? to close • ←/→ or Tab to switch panes • ↑/↓ or j/k to scroll • PgUp/PgDown for faster scrolling";
         let footer = Paragraph::new(footer_text)
             .style(
                 Style::default()

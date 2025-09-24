@@ -207,7 +207,7 @@ impl UI {
 
         // Draw help overlay if active
         use crate::ui::help::HelpSystem;
-        HelpSystem::render_help(frame, state.ui.help_mode);
+        HelpSystem::render_help(frame, &state.ui);
 
         // Cleanup expired toasts
         state.toast_manager.cleanup();
