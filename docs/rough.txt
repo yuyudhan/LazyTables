@@ -1,37 +1,53 @@
-     │ High Priority (Core Functionality)                 │
-     │                                                    │
-     │ 1. Complete Core Implementation: Finish TODO items │
-     │ in connection commands                             │
-     │ 2. Connection Testing: Implement full connection   │
-     │ testing with detailed feedback                     │
-     │ 3. Edit Connection: Complete edit modal            │
-     │ functionality with pre-populated fields            │
-     │ 4. Connection String Validation: Add real-time     │
-     │ validation for connection strings                  │
-     │
+=======================================
+THIS WILL REQUIRE DOING AGAIN AND AGAIN:
+DONE:
+Can you check the help modal that opens when pressing question mark? It should align with all the panes, current options that are there. So it should not show anything different from what options are available in each of the panes.
 
 =======================================
+THIS WILL REQUIRE DOING AGAIN AND AGAIN:
+~/.config/lazytables/conf.yaml
+~/.config/lazytables/conf.yml
+So basically we want to support the configuration of lazy tables using the .config files as given in this directory structure. We should have the com.yml file which should be used in order to allow the users to make the configurations. This should have pane specific configuration. This should have global configurations. And it should be in a proper structure. Configuration capability available for me and also move the configurations of each of the panes like for example connections panes into that config file in the configuration file I also want to allow setting of the key bindings so the user can customize the key bindings however the default which is present right now should be present by default so the user can set the config in the config file for the key bindings and the UI look and feel but if they don't set the sensible default which is present right now gets enabled.
+Ensure that the configurations for all the panes specifically the key bindings are present into the config file.
+
+=======================================
+=======================================
+=======================================
+=======================================
+=======================================
+=======================================
+=======================================
+
+=======================================
+=======================================
+=======================================
+=======================================
+
+=======================================
+=======================================
+=======================================
+=======================================
+
+=======================================
+In the table/views listing option, I think when you press J to go down and when you reach the last, it cycles back to the first one after pressing another J. But when you are at the first one, when you press K to go up, it doesn't cycle to the last one. Can you verify if this is the case and fix this bug?
+
+=======================================
+DONE
+When I press Q, it basically closes the application. So if accidentally somebody presses Q, then the application will get closed and their connection will get lost and they have to again open the app. So when Q is pressed, can you ensure to ask a confirmation from the user in the confirmation? When you're asking for the confirmation, you should basically tell the connection will be closed. And do you want to confirm that you want to exit the application? Make a proper message and get that confirmation, please. You can try and identify the right key bindings for the confirmation box. In the confirmation box, you should show a proper message.The buttons that are shown should have a key binding of them their own.
+
+=======================================
+I GUESS THIS IS DONE:
 I want you to complete the edit functionality modal in the connections pane so that all the connections can be properly edited. Just validate if any other tasks need to be done to make it completed.
 
 =======================================
 I want you to implement the search functionality in the connection screen. The search shall be triggered by pressing the slash command. And after the search is done, I should be able to use the arrow keys to search within the connections. And when I press enter on anything pointed, even after searching, it should open that connection.
-=======================================
-I want you to focus on the SQL files pane so the SQL files pane I press control and it shows a lot of SQL files that were created. We want to allow creating the SQL files that is okay. First of all I want you to validate if the SQL files pane focus only on that does what functionalities does it miss right now that need to be created few that I can think is changing the name of the SQL file another can be renaming of the SQL file.
-=======================================
-Actually I want a change of feature. SPL file should be related to some connections. So only after the connection is stored or sorry I actually when as soon as the connection is connected only then the SPL files corresponding to that connection shall show. I think this will also require the change in the SQLite DB of this application by default like which connection is connected. So can you do all of these changes? This is required in the SQL files pane. Review the code as well as implement myask and implement it properly.
-=======================================
 
-> Actually, still it is not happening. What I want to do
-  is that in the SQL files pane, as soon as the
-  connection is connected, show the SQL files relevant to
-   that connection. And when the connection is
-  disconnected, SQL files pane should reset to the state
-  in which it shows no connection, which is the initial
-  state. Also, every connection should have its SQL files
-   and each SQL file should belong to a particular
-  connection without connection or SQL file. And when the
-   connection is connected, only the SQL files
-  corresponding to that connection should show.
+=======================================
+In the table details pane, when I press j, it does a scrolling. But even after when all the lines have been shown, even then the J keeps on going further down. So it initially as an example shows one out of five, which is table details one slash five. But when I press j 20 times, it will say table details 20 slash five. Why is this happening? Can you resolve this bug? I don't want cycling in this pane.
+
+=======================================
+In the table data view mechanism in the heading I don't see the number of columns I see the number of rows can you also display the number of columns along with this also another functionality which is missing is the horizontal scrolling so horizontal scrolling should scroll to the right and left if the number of columns don't fit in the width that is present. I think the number of columns to be displayed you have fixed it somewhere can you just verify if this is the case and make it dynamic and horizontally scrollable.
+
 =======================================
 =======================================
 =======================================
@@ -41,24 +57,15 @@ THIS WILL NEED TO BE DONE AGAIN AND AGAIN
 Can you check the help modal that opens when pressing question mark? It should align with all the panes, current options that are there. So it should not show anything different from what options are available in each of the panes.
 
 =======================================
-=======================================
-=======================================
-=======================================
-=======================================
-=======================================
 DONE:
 There is a table details view pane where we see the tabular data and the schema. I think there is something wrong with the pane because like for other panes, when we focus on that pane only, then it is shown in blue color in a highlighted manner. But the details of the table, I mean the data of the table and the table schema, the pane this is always showing to be highlighted in blue color. Can you resolve this particular problem?
 =======================================
 DONE:
 the table data viewer so basically we are showing 20 rows but one problem I am seeing when all the 20 rows are not coming within the panes allotted size in the screen what is happening is while pressing J it is going down but I don't think the scrolling is happening properly can you please validate and see if this is the problem and if you can resolve it please
-
 =======================================
-DONE:
-Can you check the help modal that opens when pressing question mark? It should align with all the panes, current options that are there. So it should not show anything different from what options are available in each of the panes.
-
 =======================================
-DONE
-When I press Q, it basically closes the application. So if accidentally somebody presses Q, then the application will get closed and their connection will get lost and they have to again open the app. So when Q is pressed, can you ensure to ask a confirmation from the user in the confirmation? When you're asking for the confirmation, you should basically tell the connection will be closed. And do you want to confirm that you want to exit the application? Make a proper message and get that confirmation, please. You can try and identify the right key bindings for the confirmation box. In the confirmation box, you should show a proper message.The buttons that are shown should have a key binding of them their own.
+=======================================
+=======================================
 =======================================
 =======================================
 
