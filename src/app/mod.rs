@@ -216,9 +216,12 @@ impl App {
             return Ok(());
         }
 
-        // Handle ESC to exit table search mode or cancel pending gg command
+        // Handle ESC to exit search modes or cancel pending gg command
         if key.code == KeyCode::Esc {
-            if self.state.ui.tables_search_active {
+            if self.state.ui.connections_search_active {
+                self.state.ui.exit_connections_search();
+                return Ok(());
+            } else if self.state.ui.tables_search_active {
                 self.state.ui.exit_tables_search();
                 return Ok(());
             } else if self.state.ui.pending_gg_command {
@@ -340,6 +343,7 @@ impl App {
                 && !self.state.ui.show_table_creator
                 && !self.state.ui.show_table_editor
                 && self.state.ui.confirmation_modal.is_none()
+                && !self.state.ui.connections_search_active
                 && !self.state.ui.sql_files_search_active
                 && !self.state.ui.sql_files_rename_mode
                 && !self.state.ui.sql_files_create_mode
@@ -483,6 +487,40 @@ impl App {
         // Handle table editor if active
         if self.state.ui.show_table_editor {
             return self.handle_table_editor_key_event(key).await;
+        }
+
+        // Handle connections search input
+        if self.state.ui.connections_search_active && self.state.ui.focused_pane == FocusedPane::Connections {
+            match key.code {
+                KeyCode::Backspace => {
+                    self.state.ui.backspace_connections_search();
+                    // Update filtered connections after character removal
+                    self.state.ui.update_filtered_connections(&self.state.db.connections.connections);
+                    return Ok(());
+                }
+                KeyCode::Enter => {
+                    // Connect to the highlighted connection
+                    self.state.connect_to_selected_database().await;
+                    // Exit search mode
+                    self.state.ui.exit_connections_search();
+                    return Ok(());
+                }
+                KeyCode::Down => {
+                    self.state.ui.connections_selection_down(&self.state.db.connections.connections);
+                    return Ok(());
+                }
+                KeyCode::Up => {
+                    self.state.ui.connections_selection_up(&self.state.db.connections.connections);
+                    return Ok(());
+                }
+                KeyCode::Char(c) => {
+                    self.state.ui.add_to_connections_search(c);
+                    // Update filtered connections after character addition
+                    self.state.ui.update_filtered_connections(&self.state.db.connections.connections);
+                    return Ok(());
+                }
+                _ => {}
+            }
         }
 
         // Handle tables search input
@@ -664,7 +702,11 @@ impl App {
                     }
                     // Vim-style navigation within panes
                     (KeyModifiers::NONE, KeyCode::Char('j')) => {
-                        if self.state.ui.focused_pane == FocusedPane::Tables
+                        if self.state.ui.focused_pane == FocusedPane::Connections
+                            && !self.state.ui.connections_search_active
+                        {
+                            self.state.ui.connections_selection_down(&self.state.db.connections.connections);
+                        } else if self.state.ui.focused_pane == FocusedPane::Tables
                             && !self.state.ui.tables_search_active
                         {
                             self.state.ui.table_search_selection_down();
@@ -681,7 +723,11 @@ impl App {
                         }
                     }
                     (KeyModifiers::NONE, KeyCode::Char('k')) => {
-                        if self.state.ui.focused_pane == FocusedPane::Tables
+                        if self.state.ui.focused_pane == FocusedPane::Connections
+                            && !self.state.ui.connections_search_active
+                        {
+                            self.state.ui.connections_selection_up(&self.state.db.connections.connections);
+                        } else if self.state.ui.focused_pane == FocusedPane::Tables
                             && !self.state.ui.tables_search_active
                         {
                             self.state.ui.table_search_selection_up();
@@ -923,6 +969,7 @@ impl App {
                         if self.state.ui.focused_pane == crate::app::state::FocusedPane::Connections
                         {
                             // Always connect to selected database (disconnecting others)
+                            // This will work correctly with search mode through get_selected_connection_index
                             self.state.connect_to_selected_database().await;
                         } else if self.state.ui.focused_pane
                             == crate::app::state::FocusedPane::Tables
@@ -1068,7 +1115,10 @@ impl App {
                     }
                     // Search commands
                     (KeyModifiers::NONE, KeyCode::Char('/')) => {
-                        if self.state.ui.focused_pane == FocusedPane::TabularOutput {
+                        if self.state.ui.focused_pane == FocusedPane::Connections {
+                            // Start search mode in connections pane
+                            self.state.ui.enter_connections_search();
+                        } else if self.state.ui.focused_pane == FocusedPane::TabularOutput {
                             // Start search mode in table viewer
                             if let Some(tab) = self.state.table_viewer_state.current_tab_mut() {
                                 if !tab.in_edit_mode {

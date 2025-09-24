@@ -247,6 +247,15 @@ pub struct UIState {
     #[serde(skip)]
     pub pending_gg_command: bool,
 
+    // Connections pane search state
+    /// Whether search mode is active in connections pane
+    pub connections_search_active: bool,
+    /// Current search query for connections
+    pub connections_search_query: String,
+    /// Filtered connections based on search
+    #[serde(skip)]
+    pub filtered_connections: Vec<usize>,
+
     // SQL Files pane state
     /// Whether search mode is active in SQL files pane
     pub sql_files_search_active: bool,
@@ -312,6 +321,9 @@ impl UIState {
             tables_search_query: String::new(),
             filtered_table_items: Vec::new(),
             pending_gg_command: false,
+            connections_search_active: false,
+            connections_search_query: String::new(),
+            filtered_connections: Vec::new(),
             sql_files_search_active: false,
             sql_files_search_query: String::new(),
             sql_files_rename_mode: false,
@@ -1097,6 +1109,138 @@ impl UIState {
         self.exit_sql_files_rename();
         self.exit_sql_files_create();
     }
+
+    // === CONNECTIONS SEARCH FUNCTIONALITY ===
+
+    /// Enter search mode for connections pane
+    pub fn enter_connections_search(&mut self) {
+        self.connections_search_active = true;
+        self.connections_search_query.clear();
+        self.filtered_connections.clear();
+    }
+
+    /// Exit search mode for connections pane
+    pub fn exit_connections_search(&mut self) {
+        self.connections_search_active = false;
+        self.connections_search_query.clear();
+        self.filtered_connections.clear();
+    }
+
+    /// Add character to connections search query
+    pub fn add_to_connections_search(&mut self, ch: char) {
+        if self.connections_search_active {
+            self.connections_search_query.push(ch);
+        }
+    }
+
+    /// Remove character from connections search query
+    pub fn backspace_connections_search(&mut self) {
+        if self.connections_search_active && !self.connections_search_query.is_empty() {
+            self.connections_search_query.pop();
+        }
+    }
+
+    /// Update filtered connections based on search query
+    pub fn update_filtered_connections(&mut self, connections: &[crate::database::ConnectionConfig]) {
+        if !self.connections_search_active || self.connections_search_query.is_empty() {
+            self.filtered_connections.clear();
+            return;
+        }
+
+        let query = self.connections_search_query.to_lowercase();
+        self.filtered_connections.clear();
+
+        for (index, connection) in connections.iter().enumerate() {
+            // Check if the connection name matches the search query using sequence matching
+            let connection_name = connection.name.to_lowercase();
+            if matches_sequence(&connection_name, &query) {
+                self.filtered_connections.push(index);
+            }
+        }
+
+        // Reset selection to first filtered connection if we have results
+        if !self.filtered_connections.is_empty() {
+            self.selected_connection = 0;
+            self.connections_list_state.select(Some(0));
+        } else {
+            // No results, clear selection
+            self.connections_list_state.select(None);
+        }
+    }
+
+    /// Get the display connections list (either filtered or all)
+    pub fn get_display_connections(&self, connections: &[crate::database::ConnectionConfig]) -> Vec<usize> {
+        if self.connections_search_active && !self.filtered_connections.is_empty() {
+            self.filtered_connections.clone()
+        } else if self.connections_search_active {
+            // No search results, show empty list
+            Vec::new()
+        } else {
+            // Normal mode, show all connections by index
+            (0..connections.len()).collect()
+        }
+    }
+
+    /// Navigate down in connections (handles both search and normal mode)
+    pub fn connections_selection_down(&mut self, connections: &[crate::database::ConnectionConfig]) {
+        let display_connections = self.get_display_connections(connections);
+
+        if display_connections.is_empty() {
+            return;
+        }
+
+        if self.connections_search_active && !self.filtered_connections.is_empty() {
+            // Navigate through filtered results
+            self.selected_connection = (self.selected_connection + 1) % display_connections.len();
+        } else if !self.connections_search_active {
+            // Use existing navigation logic for normal mode
+            self.connection_down(connections.len());
+            return;
+        }
+
+        self.connections_list_state.select(Some(self.selected_connection));
+    }
+
+    /// Navigate up in connections (handles both search and normal mode)
+    pub fn connections_selection_up(&mut self, connections: &[crate::database::ConnectionConfig]) {
+        let display_connections = self.get_display_connections(connections);
+
+        if display_connections.is_empty() {
+            return;
+        }
+
+        if self.connections_search_active && !self.filtered_connections.is_empty() {
+            // Navigate through filtered results
+            self.selected_connection = if self.selected_connection > 0 {
+                self.selected_connection - 1
+            } else {
+                display_connections.len() - 1
+            };
+        } else if !self.connections_search_active {
+            // Use existing navigation logic for normal mode
+            self.connection_up(connections.len());
+            return;
+        }
+
+        self.connections_list_state.select(Some(self.selected_connection));
+    }
+
+    /// Get the currently selected connection index (accounting for search filter)
+    pub fn get_selected_connection_index(&self, connections: &[crate::database::ConnectionConfig]) -> Option<usize> {
+        let display_connections = self.get_display_connections(connections);
+
+        if display_connections.is_empty() {
+            return None;
+        }
+
+        if self.connections_search_active && !self.filtered_connections.is_empty() {
+            // Return the actual connection index from filtered results
+            display_connections.get(self.selected_connection).cloned()
+        } else {
+            // Return the selected connection index directly
+            Some(self.selected_connection)
+        }
+    }
 }
 
 impl Default for UIState {
@@ -1239,6 +1383,122 @@ mod tests {
         assert_eq!(ui_state.tables_search_query, "k");
         assert_eq!(ui_state.filtered_table_items.len(), 1); // only "tasks" contains 'k'
         assert_eq!(ui_state.filtered_table_items[0].object_name, "tasks");
+    }
+
+    #[test]
+    fn test_connections_search_functionality() {
+        let mut ui_state = UIState::new();
+
+        // Mock some connections
+        use crate::database::{ConnectionConfig, DatabaseType, ConnectionStatus};
+        let mock_connections = vec![
+            ConnectionConfig {
+                id: "1".to_string(),
+                name: "Production DB".to_string(),
+                database_type: DatabaseType::PostgreSQL,
+                host: "localhost".to_string(),
+                port: 5432,
+                database: Some("prod".to_string()),
+                username: "user".to_string(),
+                password_source: None,
+                password: None,
+                ssl_mode: crate::database::SslMode::Prefer,
+                timeout: None,
+                status: ConnectionStatus::Disconnected,
+            },
+            ConnectionConfig {
+                id: "2".to_string(),
+                name: "Development DB".to_string(),
+                database_type: DatabaseType::MySQL,
+                host: "localhost".to_string(),
+                port: 3306,
+                database: Some("dev".to_string()),
+                username: "user".to_string(),
+                password_source: None,
+                password: None,
+                ssl_mode: crate::database::SslMode::Prefer,
+                timeout: None,
+                status: ConnectionStatus::Disconnected,
+            },
+            ConnectionConfig {
+                id: "3".to_string(),
+                name: "Test Database".to_string(),
+                database_type: DatabaseType::SQLite,
+                host: "test.db".to_string(),
+                port: 0,
+                database: Some("test.db".to_string()),
+                username: "".to_string(),
+                password_source: None,
+                password: None,
+                ssl_mode: crate::database::SslMode::Disable,
+                timeout: None,
+                status: ConnectionStatus::Disconnected,
+            },
+        ];
+
+        // Test entering search mode
+        ui_state.enter_connections_search();
+        assert!(ui_state.connections_search_active);
+        assert!(ui_state.connections_search_query.is_empty());
+
+        // Test adding search query
+        ui_state.add_to_connections_search('p');
+        ui_state.update_filtered_connections(&mock_connections);
+        assert_eq!(ui_state.connections_search_query, "p");
+        // Both "Production DB" and "Development DB" contain 'p'
+        assert_eq!(ui_state.filtered_connections.len(), 2);
+        assert!(ui_state.filtered_connections.contains(&0)); // "Production DB"
+        assert!(ui_state.filtered_connections.contains(&1)); // "Development DB"
+
+        ui_state.add_to_connections_search('r');
+        ui_state.update_filtered_connections(&mock_connections);
+        assert_eq!(ui_state.connections_search_query, "pr");
+        // Only "Production DB" has 'p' followed by 'r' in sequence
+        assert_eq!(ui_state.filtered_connections.len(), 1); // Should only be "Production DB"
+        assert_eq!(ui_state.filtered_connections[0], 0); // First connection
+
+        ui_state.add_to_connections_search('o');
+        ui_state.update_filtered_connections(&mock_connections);
+        assert_eq!(ui_state.connections_search_query, "pro");
+        assert_eq!(ui_state.filtered_connections.len(), 1); // "Production DB" matches "pro"
+
+        // Test that adding 'x' filters out results
+        ui_state.add_to_connections_search('x');
+        ui_state.update_filtered_connections(&mock_connections);
+        assert_eq!(ui_state.connections_search_query, "prox");
+        assert_eq!(ui_state.filtered_connections.len(), 0); // No connections match "prox"
+
+        // Test backspace
+        ui_state.backspace_connections_search();
+        ui_state.update_filtered_connections(&mock_connections);
+        assert_eq!(ui_state.connections_search_query, "pro");
+        assert_eq!(ui_state.filtered_connections.len(), 1); // Back to "Production DB"
+
+        // Test different search query
+        ui_state.connections_search_query.clear();
+        ui_state.add_to_connections_search('d');
+        ui_state.update_filtered_connections(&mock_connections);
+        assert_eq!(ui_state.connections_search_query, "d");
+        assert_eq!(ui_state.filtered_connections.len(), 3); // All connections contain 'd': "Production DB", "Development DB", "Test Database"
+
+        // Test exiting search
+        ui_state.exit_connections_search();
+        assert!(!ui_state.connections_search_active);
+        assert!(ui_state.connections_search_query.is_empty());
+        assert!(ui_state.filtered_connections.is_empty());
+
+        // Test get_selected_connection_index
+        ui_state.selected_connection = 1;
+        assert_eq!(ui_state.get_selected_connection_index(&mock_connections), Some(1));
+
+        // Test with search active - use a query that uniquely identifies one connection
+        ui_state.enter_connections_search();
+        ui_state.add_to_connections_search('e');
+        ui_state.add_to_connections_search('v');
+        ui_state.update_filtered_connections(&mock_connections);
+        // "ev" should match only "Development DB"
+        ui_state.selected_connection = 0; // First (and only) in filtered results
+        assert_eq!(ui_state.get_selected_connection_index(&mock_connections), Some(1)); // Should return actual index of "Development DB"
     }
 
     #[test]
