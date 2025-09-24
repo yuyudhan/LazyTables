@@ -150,9 +150,9 @@ mod tests {
     #[test]
     fn test_export_builtin_themes() {
         let temp_dir = TempDir::new().unwrap();
-        let export_path = temp_dir.path();
+        let export_path = temp_dir.path().to_path_buf();
 
-        ThemeLoader::export_builtin_themes(export_path).unwrap();
+        ThemeLoader::export_builtin_themes(&export_path).unwrap();
 
         assert!(export_path.join("dark.toml").exists());
         assert!(export_path.join("light.toml").exists());
