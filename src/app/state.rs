@@ -204,8 +204,10 @@ impl AppState {
                 }
             }
             FocusedPane::Details => {
-                // Scroll down in details pane - will be bounded by UI logic
-                self.ui.details_viewport_offset += 1;
+                // Scroll down in details pane with proper bounds checking
+                if self.ui.details_viewport_offset < self.ui.details_max_scroll_offset {
+                    self.ui.details_viewport_offset += 1;
+                }
             }
         }
     }
@@ -441,29 +443,21 @@ impl AppState {
     /// Attempt to connect to the selected database
     pub async fn connect_to_selected_database(&mut self) {
         // Get the actual selected connection index (accounting for search)
-        let selected_index = if let Some(index) = self.ui.get_selected_connection_index(&self.db.connections.connections) {
+        let selected_index = if let Some(index) = self
+            .ui
+            .get_selected_connection_index(&self.db.connections.connections)
+        {
             index
         } else {
             return; // No connection selected
         };
 
-        if let Some(connection) = self
-            .db
-            .connections
-            .connections
-            .get(selected_index)
-            .cloned()
-        {
+        if let Some(connection) = self.db.connections.connections.get(selected_index).cloned() {
             // Disconnect all other connections first
             self.disconnect_all_except(selected_index);
 
             // Set connection status to connecting
-            if let Some(conn) = self
-                .db
-                .connections
-                .connections
-                .get_mut(selected_index)
-            {
+            if let Some(conn) = self.db.connections.connections.get_mut(selected_index) {
                 conn.status = ConnectionStatus::Connecting;
             }
 
@@ -484,12 +478,7 @@ impl AppState {
             // Update connection status based on result
             let connection_succeeded = result.is_ok();
 
-            if let Some(conn) = self
-                .db
-                .connections
-                .connections
-                .get_mut(selected_index)
-            {
+            if let Some(conn) = self.db.connections.connections.get_mut(selected_index) {
                 match result {
                     Ok(objects) => {
                         conn.status = ConnectionStatus::Connected;
