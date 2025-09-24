@@ -41,7 +41,12 @@ impl Command for ConnectCommand {
                 let connection_config = connection.clone();
                 let result = tokio::runtime::Handle::current().block_on(async {
                     // First establish the persistent connection
-                    match context.state.connection_manager.connect(&connection_config).await {
+                    match context
+                        .state
+                        .connection_manager
+                        .connect(&connection_config)
+                        .await
+                    {
                         Ok(_) => {
                             // Then load database objects to verify the connection works
                             context
@@ -56,7 +61,9 @@ impl Command for ConnectCommand {
                                         .tables
                                         .iter()
                                         .map(|t| {
-                                            if t.schema.as_deref() == Some("public") || t.schema.is_none() {
+                                            if t.schema.as_deref() == Some("public")
+                                                || t.schema.is_none()
+                                            {
                                                 t.name.clone()
                                             } else {
                                                 t.qualified_name()
@@ -66,7 +73,9 @@ impl Command for ConnectCommand {
                                     objects
                                 })
                         }
-                        Err(e) => Err(crate::core::error::LazyTablesError::Connection(format!("Connection failed: {e}")))
+                        Err(e) => Err(crate::core::error::LazyTablesError::Connection(format!(
+                            "Connection failed: {e}"
+                        ))),
                     }
                 });
 
@@ -92,7 +101,8 @@ impl Command for ConnectCommand {
                         if let Some(conn) =
                             context.state.db.connections.connections.get_mut(selected)
                         {
-                            conn.status = crate::database::ConnectionStatus::Failed(error.to_string());
+                            conn.status =
+                                crate::database::ConnectionStatus::Failed(error.to_string());
                         }
                         context
                             .state
@@ -498,4 +508,3 @@ impl Command for TestConnectionCommand {
             && !context.state.db.connections.connections.is_empty()
     }
 }
-

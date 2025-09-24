@@ -61,4 +61,3 @@ impl Command for ExitInsertModeCommand {
         CommandCategory::Editing
     }
 }
-
