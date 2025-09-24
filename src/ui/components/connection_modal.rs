@@ -1,6 +1,7 @@
 // FilePath: src/ui/components/connection_modal.rs
 
 use crate::database::connection::{ConnectionConfig, DatabaseType, SslMode};
+use crate::security::PasswordSource;
 use ratatui::{
     layout::{Alignment, Constraint, Direction, Layout, Margin, Rect},
     style::{Color, Modifier, Style},
@@ -768,15 +769,61 @@ impl ConnectionModalState {
         self.port_input = connection.port.to_string();
         self.database = connection.database.as_deref().unwrap_or("").to_string();
         self.username = connection.username.clone();
-        self.password = connection.password.as_deref().unwrap_or("").to_string();
         self.ssl_mode = connection.ssl_mode.clone();
 
-        // Set up list state for database type
-        let db_types = get_database_types();
-        if let Some(index) = db_types
-            .iter()
-            .position(|db| db.to_lowercase() == connection.database_type.display_name())
-        {
+        // Handle password sources - populate based on the connection's password source
+        if let Some(ref password_source) = connection.password_source {
+            match password_source {
+                PasswordSource::PlainText(password) => {
+                    self.password_storage_type = PasswordStorageType::PlainText;
+                    self.password = password.clone();
+                    self.password_env_var.clear();
+                    self.encryption_key.clear();
+                    self.encryption_hint.clear();
+                }
+                PasswordSource::Environment { var_name } => {
+                    self.password_storage_type = PasswordStorageType::Environment;
+                    self.password_env_var = var_name.clone();
+                    self.password.clear();
+                    self.encryption_key.clear();
+                    self.encryption_hint.clear();
+                }
+                PasswordSource::Encrypted(encrypted_pwd) => {
+                    self.password_storage_type = PasswordStorageType::Encrypted;
+                    // Don't populate the password field for security (user will need to re-enter)
+                    self.password.clear();
+                    self.password_env_var.clear();
+                    self.encryption_key.clear();
+                    // Show the hint to help user remember their encryption key
+                    self.encryption_hint = encrypted_pwd.hint.clone().unwrap_or_default();
+                }
+            }
+        } else if let Some(ref legacy_password) = connection.password {
+            // Handle legacy plain text password
+            self.password_storage_type = PasswordStorageType::PlainText;
+            self.password = legacy_password.clone();
+            self.password_env_var.clear();
+            self.encryption_key.clear();
+            self.encryption_hint.clear();
+        } else {
+            // No password configured
+            self.password_storage_type = PasswordStorageType::PlainText;
+            self.password.clear();
+            self.password_env_var.clear();
+            self.encryption_key.clear();
+            self.encryption_hint.clear();
+        }
+
+        // Set up list state for database type - use direct enum matching
+        let db_types = [
+            DatabaseType::PostgreSQL,
+            DatabaseType::MySQL,
+            DatabaseType::MariaDB,
+            DatabaseType::SQLite,
+        ];
+        if let Some(index) = db_types.iter().position(|db_type| {
+            std::mem::discriminant(db_type) == std::mem::discriminant(&connection.database_type)
+        }) {
             self.db_type_list_state.select(Some(index));
         }
 
@@ -815,7 +862,7 @@ fn render_modal_overlay(frame: &mut Frame, area: Rect) {
 }
 
 /// Render the connection creation modal
-pub fn render_connection_modal(f: &mut Frame, modal_state: &ConnectionModalState, area: Rect) {
+pub fn render_connection_modal(f: &mut Frame, modal_state: &ConnectionModalState, area: Rect, is_edit_mode: bool) {
     // First render the overlay background for the entire screen
     render_modal_overlay(f, area);
 
@@ -825,9 +872,15 @@ pub fn render_connection_modal(f: &mut Frame, modal_state: &ConnectionModalState
     // Clear the modal area specifically
     f.render_widget(Clear, modal_area);
 
-    // Main modal block with elegant styling
+    // Main modal block with elegant styling and dynamic title
+    let title = if is_edit_mode {
+        " ✏️  Edit Database Connection "
+    } else {
+        " 🗄️  New Database Connection "
+    };
+
     let modal_block = Block::default()
-        .title(" 🗄️  New Database Connection ")
+        .title(title)
         .title_style(
             Style::default()
                 .fg(Color::Rgb(116, 199, 236)) // LazyTables brand color
@@ -1928,5 +1981,159 @@ mod tests {
         assert!(modes.contains(&"Prefer".to_string()));
         assert!(modes.contains(&"Require".to_string()));
         assert!(modes.contains(&"Verify Full".to_string()));
+    }
+
+    #[test]
+    fn test_populate_from_connection_with_password_sources() {
+        let mut modal_state = ConnectionModalState::new();
+
+        // Test with plain text password source
+        let connection_with_plain_text = ConnectionConfig {
+            id: "test1".to_string(),
+            name: "Test Connection".to_string(),
+            database_type: DatabaseType::PostgreSQL,
+            host: "localhost".to_string(),
+            port: 5432,
+            database: Some("testdb".to_string()),
+            username: "testuser".to_string(),
+            password_source: Some(PasswordSource::PlainText("secret123".to_string())),
+            password: None,
+            ssl_mode: SslMode::Prefer,
+            timeout: None,
+            status: crate::database::ConnectionStatus::Disconnected,
+        };
+
+        modal_state.populate_from_connection(&connection_with_plain_text);
+        assert_eq!(modal_state.password_storage_type, PasswordStorageType::PlainText);
+        assert_eq!(modal_state.password, "secret123");
+        assert_eq!(modal_state.password_env_var, "");
+        assert_eq!(modal_state.encryption_key, "");
+
+        // Test with environment variable password source
+        let connection_with_env_var = ConnectionConfig {
+            id: "test2".to_string(),
+            name: "Test Connection 2".to_string(),
+            database_type: DatabaseType::MySQL,
+            host: "192.168.1.100".to_string(),
+            port: 3306,
+            database: Some("mydb".to_string()),
+            username: "myuser".to_string(),
+            password_source: Some(PasswordSource::Environment {
+                var_name: "DB_PASSWORD".to_string(),
+            }),
+            password: None,
+            ssl_mode: SslMode::Require,
+            timeout: None,
+            status: crate::database::ConnectionStatus::Disconnected,
+        };
+
+        modal_state.populate_from_connection(&connection_with_env_var);
+        assert_eq!(modal_state.password_storage_type, PasswordStorageType::Environment);
+        assert_eq!(modal_state.password_env_var, "DB_PASSWORD");
+        assert_eq!(modal_state.password, "");
+        assert_eq!(modal_state.encryption_key, "");
+
+        // Test with encrypted password source
+        use crate::security::EncryptedPassword;
+        let encrypted_password = EncryptedPassword {
+            ciphertext: "encrypted_data".to_string(),
+            nonce: "nonce_data".to_string(),
+            salt: "salt_data".to_string(),
+            hint: Some("Remember your master password".to_string()),
+        };
+
+        let connection_with_encrypted = ConnectionConfig {
+            id: "test3".to_string(),
+            name: "Test Connection 3".to_string(),
+            database_type: DatabaseType::SQLite,
+            host: "".to_string(),
+            port: 0,
+            database: Some("/path/to/db.sqlite".to_string()),
+            username: "".to_string(),
+            password_source: Some(PasswordSource::Encrypted(encrypted_password)),
+            password: None,
+            ssl_mode: SslMode::Disable,
+            timeout: None,
+            status: crate::database::ConnectionStatus::Disconnected,
+        };
+
+        modal_state.populate_from_connection(&connection_with_encrypted);
+        assert_eq!(modal_state.password_storage_type, PasswordStorageType::Encrypted);
+        assert_eq!(modal_state.password, ""); // Should be empty for security
+        assert_eq!(modal_state.password_env_var, "");
+        assert_eq!(modal_state.encryption_key, ""); // Should be empty for security
+        assert_eq!(modal_state.encryption_hint, "Remember your master password");
+
+        // Test with legacy password field
+        let connection_with_legacy = ConnectionConfig {
+            id: "test4".to_string(),
+            name: "Legacy Connection".to_string(),
+            database_type: DatabaseType::MariaDB,
+            host: "legacy.host.com".to_string(),
+            port: 3306,
+            database: Some("legacydb".to_string()),
+            username: "legacy_user".to_string(),
+            password_source: None,
+            password: Some("legacy_pass".to_string()),
+            ssl_mode: SslMode::Allow,
+            timeout: None,
+            status: crate::database::ConnectionStatus::Disconnected,
+        };
+
+        modal_state.populate_from_connection(&connection_with_legacy);
+        assert_eq!(modal_state.password_storage_type, PasswordStorageType::PlainText);
+        assert_eq!(modal_state.password, "legacy_pass");
+        assert_eq!(modal_state.password_env_var, "");
+        assert_eq!(modal_state.encryption_key, "");
+        assert_eq!(modal_state.encryption_hint, "");
+    }
+
+    #[test]
+    fn test_populate_from_connection_database_type_selection() {
+        let mut modal_state = ConnectionModalState::new();
+
+        // Test PostgreSQL selection
+        let pg_connection = ConnectionConfig {
+            id: "pg_test".to_string(),
+            name: "PostgreSQL Test".to_string(),
+            database_type: DatabaseType::PostgreSQL,
+            host: "localhost".to_string(),
+            port: 5432,
+            database: Some("testdb".to_string()),
+            username: "postgres".to_string(),
+            password_source: None,
+            password: None,
+            ssl_mode: SslMode::Prefer,
+            timeout: None,
+            status: crate::database::ConnectionStatus::Disconnected,
+        };
+
+        modal_state.populate_from_connection(&pg_connection);
+
+        // Check that the database type list state is properly set
+        assert!(modal_state.db_type_list_state.selected().is_some());
+        // PostgreSQL should be the first item (index 0) in the supported database types
+        assert_eq!(modal_state.db_type_list_state.selected(), Some(0));
+
+        // Test MySQL selection
+        let mysql_connection = ConnectionConfig {
+            id: "mysql_test".to_string(),
+            name: "MySQL Test".to_string(),
+            database_type: DatabaseType::MySQL,
+            host: "localhost".to_string(),
+            port: 3306,
+            database: Some("testdb".to_string()),
+            username: "root".to_string(),
+            password_source: None,
+            password: None,
+            ssl_mode: SslMode::Require,
+            timeout: None,
+            status: crate::database::ConnectionStatus::Disconnected,
+        };
+
+        modal_state.populate_from_connection(&mysql_connection);
+
+        // MySQL should be the second item (index 1) in the supported database types
+        assert_eq!(modal_state.db_type_list_state.selected(), Some(1));
     }
 }

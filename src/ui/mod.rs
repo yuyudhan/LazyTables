@@ -228,6 +228,7 @@ impl UI {
                 frame,
                 &state.connection_modal_state,
                 frame.area(),
+                state.ui.show_edit_connection_modal, // Pass edit mode flag
             );
         }
 
