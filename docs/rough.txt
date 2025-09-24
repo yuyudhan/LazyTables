@@ -54,12 +54,15 @@ the connections pane, connection search functionality which is triggered by pres
 =======================================
 In the SQL files pane, we have the suggestions, enter to load and for new are, rename the delete C copy slash search. We want to remove these help items from the pane. Instead, it should come after the key question mark has been pressed while the SQL files pane is focused. From the SQL files, remove the help assistance, just put the assistance in the help model which is triggered by pressing question mark.
 =======================================
+DONE:
 From the table details pane, remove the help and actions and assistance related things. They should be shown while the question mark is put. I mean question mark is pressed while the table details pane is focused. We want the help to be in the help model only as a standard across the application. So, do it for the table details pane. Once the question mark is pressed, then in the help model, the details related to table details are put, but not within the table details pane. We don't want to show any help and actions.
 =======================================
 DONE:
 In the connections pane, we have a lot of help assistance details provided within the pane. We don't want it to be there. We want it to be in the help modal. Help modal is triggered while we press question mark. So when we are focused on the connections pane and then press question mark, then the help modal should open with the details of the connections pane. In the pane specific, section of the help modal.
 =======================================
+In the table slash views, I want you to remove all the help items from this pane. The pane items, sorry, the help item should only be available from the pressing of question mark and opening of help model. Help model is the standard mechanism of providing all the help. So remove everything from table slash views and move it to the help model. Also, I see press Ctrl + H to go to connections. This is wrong. You can just remove it from the table slash views pane.
 =======================================
+In the SQL files pane, I think when we do the slash based search, it is searching and showing the matching files only. But when I press on a file which is searched and then I press enter, I don't think it is loading. Can you validate if this issue exists and can you fix it?
 =======================================
 =======================================
 =======================================
