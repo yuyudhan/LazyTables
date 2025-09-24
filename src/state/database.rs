@@ -52,6 +52,7 @@ impl DatabaseState {
         table_viewer_state: &mut TableViewerState,
         selected_connection: usize,
         tab_idx: usize,
+        connection_manager: &crate::database::ConnectionManager,
     ) -> Result<(), String> {
         if let Some(tab) = table_viewer_state.tabs.get_mut(tab_idx) {
             let table_name = tab.table_name.clone();
@@ -78,6 +79,7 @@ impl DatabaseState {
                                     offset,
                                     table_viewer_state,
                                     tab_idx,
+                                    connection_manager,
                                 )
                                 .await
                             }
@@ -101,7 +103,7 @@ impl DatabaseState {
         }
     }
 
-    /// Load PostgreSQL table data
+    /// Load PostgreSQL table data using individual connection (reverting to working approach)
     async fn load_postgres_table_data(
         &mut self,
         connection: &ConnectionConfig,
@@ -110,14 +112,17 @@ impl DatabaseState {
         offset: usize,
         table_viewer_state: &mut TableViewerState,
         tab_idx: usize,
+        _connection_manager: &crate::database::ConnectionManager,
     ) -> Result<(), String> {
         use crate::database::postgres::PostgresConnection;
         use crate::database::Connection;
 
+        // Create individual connection (reverting to working approach)
         let mut pg_connection = PostgresConnection::new(connection.clone());
-        pg_connection.connect().await.map_err(|e| {
-            format!("Failed to establish database connection for table loading: {e}")
-        })?;
+        pg_connection
+            .connect()
+            .await
+            .map_err(|e| format!("Connection failed: {e}"))?;
 
         // Get table columns
         let columns = pg_connection
@@ -131,11 +136,17 @@ impl DatabaseState {
             table_name
         );
 
-        // Get total row count
-        let total_rows = pg_connection
-            .get_table_row_count(table_name)
+        // Get total row count using raw query
+        let count_query = format!("SELECT COUNT(*) FROM {table_name}");
+        let (_, count_rows) = pg_connection
+            .execute_raw_query(&count_query)
             .await
             .map_err(|e| format!("Failed to get row count: {e}"))?;
+
+        let total_rows = count_rows.get(0)
+            .and_then(|row| row.get(0))
+            .and_then(|count_str| count_str.parse::<usize>().ok())
+            .unwrap_or(0);
 
         // Get table data
         let rows = pg_connection
@@ -173,8 +184,8 @@ impl DatabaseState {
             tab.error = None;
         }
 
+        // Clean up individual connection
         let _ = pg_connection.disconnect().await;
-
         Ok(())
     }
 
