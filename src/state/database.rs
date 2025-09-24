@@ -287,18 +287,23 @@ impl DatabaseState {
             return Err("Cannot update row without primary key".to_string());
         }
 
-        let _sql = format!(
+        let sql = format!(
             "UPDATE {} SET {} = '{}' WHERE {}",
             update.table_name,
             update.column_name,
-            update.new_value,
+            update.new_value.replace("'", "''"), // Escape single quotes
             where_clauses.join(" AND ")
         );
-        //
-        //         pg_connection
-        //             .execute_sql(&sql)
-        //             .await
-        //             .map_err(|e| format!("Failed to update cell: {e}"))?;
+
+        // Execute the SQL update
+        if let Some(pool) = &pg_connection.pool {
+            sqlx::query(&sql)
+                .execute(pool)
+                .await
+                .map_err(|e| format!("Failed to update cell: {e}"))?;
+        } else {
+            return Err("Database connection not established".to_string());
+        }
 
         let _ = pg_connection.disconnect().await;
 
