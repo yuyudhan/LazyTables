@@ -41,9 +41,11 @@ I want you to implement the search functionality in the connection screen. The s
 In the table details pane, when I press j, it does a scrolling. But even after when all the lines have been shown, even then the J keeps on going further down. So it initially as an example shows one out of five, which is table details one slash five. But when I press j 20 times, it will say table details 20 slash five. Why is this happening? Can you resolve this bug? I don't want cycling in this pane.
 
 =======================================
+DONE:
 Now let us focus on the table data viewer section. So in this, when we are in a particular cell, we should have a keyboard shortcut to edit the contents of that cell. And once we press enter, the value should get updated. This is supposed to act as a edit mechanism for the data in the tables. Focus on the data viewing data table pane table data pane and ensure that this feature is properly implemented. The toast should give the message properly when the data gets updated or if there is any error.
 
 =======================================
+DONE:
 I think for the debug mode full screen pane mode switch, we created the shortcut called control D but control D and control U were the shortcuts for the table data viewing pane for going to the next page and going to the previous page I think they are conflicting so can you update the shortcut for going into the control B which is currently set for going into the debug pane to get the debug logs.
 
 =======================================
