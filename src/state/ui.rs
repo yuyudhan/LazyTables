@@ -199,6 +199,10 @@ pub struct UIState {
     pub details_viewport_offset: usize,
     /// Height of the details pane viewport
     pub details_viewport_height: usize,
+    /// Content height of details pane (updated during rendering)
+    pub details_content_height: usize,
+    /// Maximum scroll offset for details pane (updated during rendering)
+    pub details_max_scroll_offset: usize,
 
     // Vim command state
     /// Vim command buffer for :w, :q, etc
@@ -301,6 +305,8 @@ impl UIState {
             query_viewport_height: 0,
             details_viewport_offset: 0,
             details_viewport_height: 0,
+            details_content_height: 0,
+            details_max_scroll_offset: 0,
             vim_command_buffer: String::new(),
             in_vim_command: false,
             show_add_connection_modal: false,
@@ -790,17 +796,9 @@ impl UIState {
             return;
         }
 
-        if self.selected_table_item_index == 0 {
-            // Wrap to last selectable item
-            for i in (0..self.selectable_table_items.len()).rev() {
-                if self.selectable_table_items[i].is_selectable {
-                    self.selected_table_item_index = i;
-                    self.update_tables_list_state_selection();
-                    return;
-                }
-            }
-        } else {
-            // Find previous selectable item
+        // Find previous selectable item, wrapping around if needed
+        if self.selected_table_item_index > 0 {
+            // Look backwards from current position
             let mut prev_index = self.selected_table_item_index - 1;
             loop {
                 if self.selectable_table_items[prev_index].is_selectable {
@@ -812,6 +810,15 @@ impl UIState {
                     break;
                 }
                 prev_index -= 1;
+            }
+        }
+
+        // If we didn't find anything above, or we're at index 0, wrap to last selectable item
+        for i in (0..self.selectable_table_items.len()).rev() {
+            if self.selectable_table_items[i].is_selectable {
+                self.selected_table_item_index = i;
+                self.update_tables_list_state_selection();
+                return;
             }
         }
     }
@@ -1141,7 +1148,10 @@ impl UIState {
     }
 
     /// Update filtered connections based on search query
-    pub fn update_filtered_connections(&mut self, connections: &[crate::database::ConnectionConfig]) {
+    pub fn update_filtered_connections(
+        &mut self,
+        connections: &[crate::database::ConnectionConfig],
+    ) {
         if !self.connections_search_active || self.connections_search_query.is_empty() {
             self.filtered_connections.clear();
             return;
@@ -1169,7 +1179,10 @@ impl UIState {
     }
 
     /// Get the display connections list (either filtered or all)
-    pub fn get_display_connections(&self, connections: &[crate::database::ConnectionConfig]) -> Vec<usize> {
+    pub fn get_display_connections(
+        &self,
+        connections: &[crate::database::ConnectionConfig],
+    ) -> Vec<usize> {
         if self.connections_search_active && !self.filtered_connections.is_empty() {
             self.filtered_connections.clone()
         } else if self.connections_search_active {
@@ -1182,7 +1195,10 @@ impl UIState {
     }
 
     /// Navigate down in connections (handles both search and normal mode)
-    pub fn connections_selection_down(&mut self, connections: &[crate::database::ConnectionConfig]) {
+    pub fn connections_selection_down(
+        &mut self,
+        connections: &[crate::database::ConnectionConfig],
+    ) {
         let display_connections = self.get_display_connections(connections);
 
         if display_connections.is_empty() {
@@ -1198,7 +1214,8 @@ impl UIState {
             return;
         }
 
-        self.connections_list_state.select(Some(self.selected_connection));
+        self.connections_list_state
+            .select(Some(self.selected_connection));
     }
 
     /// Navigate up in connections (handles both search and normal mode)
@@ -1222,11 +1239,15 @@ impl UIState {
             return;
         }
 
-        self.connections_list_state.select(Some(self.selected_connection));
+        self.connections_list_state
+            .select(Some(self.selected_connection));
     }
 
     /// Get the currently selected connection index (accounting for search filter)
-    pub fn get_selected_connection_index(&self, connections: &[crate::database::ConnectionConfig]) -> Option<usize> {
+    pub fn get_selected_connection_index(
+        &self,
+        connections: &[crate::database::ConnectionConfig],
+    ) -> Option<usize> {
         let display_connections = self.get_display_connections(connections);
 
         if display_connections.is_empty() {
@@ -1390,7 +1411,7 @@ mod tests {
         let mut ui_state = UIState::new();
 
         // Mock some connections
-        use crate::database::{ConnectionConfig, DatabaseType, ConnectionStatus};
+        use crate::database::{ConnectionConfig, ConnectionStatus, DatabaseType};
         let mock_connections = vec![
             ConnectionConfig {
                 id: "1".to_string(),
@@ -1489,7 +1510,10 @@ mod tests {
 
         // Test get_selected_connection_index
         ui_state.selected_connection = 1;
-        assert_eq!(ui_state.get_selected_connection_index(&mock_connections), Some(1));
+        assert_eq!(
+            ui_state.get_selected_connection_index(&mock_connections),
+            Some(1)
+        );
 
         // Test with search active - use a query that uniquely identifies one connection
         ui_state.enter_connections_search();
@@ -1498,7 +1522,10 @@ mod tests {
         ui_state.update_filtered_connections(&mock_connections);
         // "ev" should match only "Development DB"
         ui_state.selected_connection = 0; // First (and only) in filtered results
-        assert_eq!(ui_state.get_selected_connection_index(&mock_connections), Some(1)); // Should return actual index of "Development DB"
+        assert_eq!(
+            ui_state.get_selected_connection_index(&mock_connections),
+            Some(1)
+        ); // Should return actual index of "Development DB"
     }
 
     #[test]

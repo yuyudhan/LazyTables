@@ -254,7 +254,9 @@ impl UI {
         };
 
         // Get display connections (filtered or all)
-        let display_indices = state.ui.get_display_connections(&state.db.connections.connections);
+        let display_indices = state
+            .ui
+            .get_display_connections(&state.db.connections.connections);
 
         // Create list items from connections to display
         let mut items: Vec<ListItem> = display_indices
@@ -451,7 +453,10 @@ impl UI {
 
         // Create title with search indicator
         let title = if state.ui.connections_search_active {
-            format!(" Connections [SEARCH: {}] ", state.ui.connections_search_query)
+            format!(
+                " Connections [SEARCH: {}] ",
+                state.ui.connections_search_query
+            )
         } else {
             " Connections ".to_string()
         };
@@ -484,7 +489,7 @@ impl UI {
     }
 
     /// Draw the enhanced table details pane with comprehensive metadata
-    fn draw_details_pane(&self, frame: &mut Frame, area: Rect, state: &AppState) {
+    fn draw_details_pane(&self, frame: &mut Frame, area: Rect, state: &mut AppState) {
         let is_focused = state.ui.focused_pane == FocusedPane::Details;
         let border_style = if is_focused {
             Style::default().fg(self.theme.get_color("active_border"))
@@ -541,6 +546,11 @@ impl UI {
         // Apply scrolling if content is too long
         let content_height = details_text.len();
         let available_height = area.height.saturating_sub(2) as usize; // Account for borders
+
+        // Store content dimensions for scroll bounds checking
+        state.ui.details_content_height = content_height;
+        state.ui.details_viewport_height = available_height;
+        state.ui.details_max_scroll_offset = content_height.saturating_sub(available_height);
 
         let visible_lines = if content_height > available_height {
             let start = state
