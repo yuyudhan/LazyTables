@@ -43,7 +43,7 @@ DONE:
 In the table/views listing option, I think when you press J to go down and when you reach the last, it cycles back to the first one after pressing another J. But when you are at the first one, when you press K to go up, it doesn't cycle to the last one. Can you verify if this is the case and fix this bug?
 
 =======================================
-
+from the help menu that comes after pressing question mark in the lazy tables application the parent modal only should be black background there should be no transparency actually I am seeing that the text from the behind and some residual characters are still showing so we don't need to clear the entire screen maybe but the modal only can have a black background so that the background text does not show.
 =======================================
 I GUESS THIS IS DONE:
 I want you to complete the edit functionality modal in the connections pane so that all the connections can be properly edited. Just validate if any other tasks need to be done to make it completed.
@@ -54,6 +54,16 @@ I want you to implement the search functionality in the connection screen. The s
 =======================================
 In the table details pane, when I press j, it does a scrolling. But even after when all the lines have been shown, even then the J keeps on going further down. So it initially as an example shows one out of five, which is table details one slash five. But when I press j 20 times, it will say table details 20 slash five. Why is this happening? Can you resolve this bug? I don't want cycling in this pane.
 
+=======================================
+Now let us focus on the table data viewer section. So in this, when we are in a particular cell, we should have a keyboard shortcut to edit the contents of that cell. And once we press enter, the value should get updated. This is supposed to act as a edit mechanism for the data in the tables. Focus on the data viewing data table pane table data pane and ensure that this feature is properly implemented. The toast should give the message properly when the data gets updated or if there is any error.
+=======================================
+=======================================
+=======================================
+=======================================
+=======================================
+=======================================
+=======================================
+=======================================
 =======================================
 =======================================
 =======================================
