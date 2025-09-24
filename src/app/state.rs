@@ -440,22 +440,29 @@ impl AppState {
 
     /// Attempt to connect to the selected database
     pub async fn connect_to_selected_database(&mut self) {
+        // Get the actual selected connection index (accounting for search)
+        let selected_index = if let Some(index) = self.ui.get_selected_connection_index(&self.db.connections.connections) {
+            index
+        } else {
+            return; // No connection selected
+        };
+
         if let Some(connection) = self
             .db
             .connections
             .connections
-            .get(self.ui.selected_connection)
+            .get(selected_index)
             .cloned()
         {
             // Disconnect all other connections first
-            self.disconnect_all_except(self.ui.selected_connection);
+            self.disconnect_all_except(selected_index);
 
             // Set connection status to connecting
             if let Some(conn) = self
                 .db
                 .connections
                 .connections
-                .get_mut(self.ui.selected_connection)
+                .get_mut(selected_index)
             {
                 conn.status = ConnectionStatus::Connecting;
             }
@@ -481,7 +488,7 @@ impl AppState {
                 .db
                 .connections
                 .connections
-                .get_mut(self.ui.selected_connection)
+                .get_mut(selected_index)
             {
                 match result {
                     Ok(objects) => {
