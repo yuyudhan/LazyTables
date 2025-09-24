@@ -9,6 +9,7 @@ use sqlx::postgres::{PgPool, PgPoolOptions};
 use sqlx::{Column, Row};
 
 /// PostgreSQL database connection implementation
+#[derive(Debug)]
 pub struct PostgresConnection {
     config: ConnectionConfig,
     pub pool: Option<PgPool>,
@@ -1078,6 +1079,57 @@ impl PostgresConnection {
             Err(LazyTablesError::Connection(
                 "Not connected to database".to_string(),
             ))
+        }
+    }
+}
+
+/// Implement ManagedConnection trait for PostgresConnection to work with ConnectionManager
+#[async_trait]
+impl crate::database::connection_manager::ManagedConnection for PostgresConnection {
+    async fn execute_raw_query(&self, query: &str) -> Result<(Vec<String>, Vec<Vec<String>>)> {
+        PostgresConnection::execute_raw_query(self, query).await
+    }
+
+    async fn get_table_data(
+        &self,
+        table_name: &str,
+        limit: usize,
+        offset: usize,
+    ) -> Result<Vec<Vec<String>>> {
+        PostgresConnection::get_table_data(self, table_name, limit, offset).await
+    }
+
+    async fn get_table_columns(
+        &self,
+        table_name: &str,
+    ) -> Result<Vec<crate::database::TableColumn>> {
+        PostgresConnection::get_table_columns(self, table_name).await
+    }
+
+    async fn get_table_metadata(&self, table_name: &str) -> Result<crate::database::TableMetadata> {
+        PostgresConnection::get_table_metadata(self, table_name).await
+    }
+
+    async fn list_database_objects(&self) -> Result<crate::database::DatabaseObjectList> {
+        PostgresConnection::list_database_objects(self).await
+    }
+
+    // Note: ManagedConnection trait doesn't have disconnect method anymore
+    // Connections are cleaned up automatically when dropped from the connection manager
+
+    fn is_connected(&self) -> bool {
+        Connection::is_connected(self)
+    }
+}
+
+/// Implement Drop trait to ensure clean connection cleanup
+impl Drop for PostgresConnection {
+    fn drop(&mut self) {
+        if let Some(pool) = self.pool.take() {
+            // Close the pool asynchronously when the connection is dropped
+            tokio::spawn(async move {
+                pool.close().await;
+            });
         }
     }
 }
