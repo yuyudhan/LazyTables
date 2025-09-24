@@ -61,9 +61,11 @@ impl HelpSystem {
         // Global commands
         Self::add_command(&mut lines, "q", "Quit LazyTables");
         Self::add_command(&mut lines, "?", "Toggle help");
+        Self::add_command(&mut lines, ":", "Enter command mode");
+        Self::add_command(&mut lines, "C-B", "Toggle debug view");
+        lines.push(Line::from(""));
         Self::add_command(&mut lines, "Tab", "Next pane");
         Self::add_command(&mut lines, "S-Tab", "Previous pane");
-        lines.push(Line::from(""));
         Self::add_command(&mut lines, "C-h", "Focus left");
         Self::add_command(&mut lines, "C-j", "Focus down");
         Self::add_command(&mut lines, "C-k", "Focus up");
@@ -77,7 +79,7 @@ impl HelpSystem {
         let mut lines = vec![];
 
         lines.push(Line::from(vec![Span::styled(
-            "📋 All Panes Overview",
+            "🌐 Global Commands",
             Style::default()
                 .fg(Color::Rgb(255, 150, 200))
                 .add_modifier(Modifier::BOLD | Modifier::UNDERLINED),
@@ -243,6 +245,8 @@ impl HelpSystem {
         Self::add_command(lines, "e", "Edit connection");
         Self::add_command(lines, "d", "Delete connection");
         Self::add_command(lines, "/", "Search connections");
+        Self::add_command(lines, "ESC", "Exit search mode");
+        Self::add_command(lines, "↑/↓", "Navigate search results");
         lines.push(Line::from(""));
         lines.push(Line::from(Span::styled(
             "Connection Status:",
@@ -271,12 +275,12 @@ impl HelpSystem {
     fn add_tables_commands(lines: &mut Vec<Line<'static>>) {
         Self::add_command(lines, "j/k", "Navigate up/down");
         Self::add_command(lines, "gg/G", "First/last table");
-        Self::add_command(lines, "Enter", "Open table");
+        Self::add_command(lines, "Enter/Space", "Open table");
         Self::add_command(lines, "n", "Create table");
         Self::add_command(lines, "e", "Edit structure");
         Self::add_command(lines, "/", "Search tables");
+        Self::add_command(lines, "ESC", "Exit search mode");
         Self::add_command(lines, "↑/↓", "Navigate search results");
-        Self::add_command(lines, "Enter/Esc", "Exit search mode");
         lines.push(Line::from(""));
         lines.push(Line::from(Span::styled(
             "Objects Displayed:",
@@ -303,7 +307,7 @@ impl HelpSystem {
 
     fn add_details_commands(lines: &mut Vec<Line<'static>>) {
         Self::add_command(lines, "j/k", "Scroll up/down");
-        Self::add_command(lines, "Enter", "Load detailed metadata");
+        Self::add_command(lines, "Enter/Space", "Load detailed metadata");
         Self::add_command(lines, "r", "Refresh metadata");
         lines.push(Line::from(""));
         lines.push(Line::from(Span::styled(
@@ -332,30 +336,36 @@ impl HelpSystem {
 
     fn add_tabular_commands(lines: &mut Vec<Line<'static>>) {
         Self::add_command(lines, "h/j/k/l", "Navigate cells");
-        Self::add_command(lines, "i", "Edit cell");
-        Self::add_command(lines, "ESC", "Save changes");
-        Self::add_command(lines, "dd", "Delete row");
-        Self::add_command(lines, "yy", "Copy row (CSV)");
-        Self::add_command(lines, "/", "Search");
-        Self::add_command(lines, "n/N", "Next/prev match");
-        Self::add_command(lines, "S/D", "Prev/next tab");
-        Self::add_command(lines, "x", "Close tab");
-        Self::add_command(lines, "r", "Refresh data");
-        Self::add_command(lines, "t", "Toggle Data/Schema view");
-        Self::add_command(lines, "C-d/u", "Page down/up");
         Self::add_command(lines, "gg/G", "First/last row");
         Self::add_command(lines, "0/$", "First/last col");
+        Self::add_command(lines, "i", "Edit cell (insert mode)");
+        Self::add_command(lines, "ESC/Enter", "Save cell changes");
+        Self::add_command(lines, "C-c", "Cancel cell edit");
+        lines.push(Line::from(""));
+        Self::add_command(lines, "dd", "Delete row (with confirm)");
+        Self::add_command(lines, "yy", "Copy row (CSV)");
+        Self::add_command(lines, "/", "Search in table");
+        Self::add_command(lines, "n/N", "Next/prev match");
+        Self::add_command(lines, "r", "Refresh table data");
+        Self::add_command(lines, "t", "Toggle Data/Schema view");
+        lines.push(Line::from(""));
+        Self::add_command(lines, "S/D", "Prev/next tab");
+        Self::add_command(lines, "x", "Close current tab");
+        Self::add_command(lines, "C-d/u", "Page down/up");
     }
 
     fn add_sql_files_commands(lines: &mut Vec<Line<'static>>) {
         Self::add_command(lines, "j/k", "Navigate files");
-        Self::add_command(lines, "Enter", "Load file");
+        Self::add_command(lines, "Enter/Space", "Load file");
         Self::add_command(lines, "n", "Create new file");
         Self::add_command(lines, "r", "Rename file");
         Self::add_command(lines, "d", "Delete file (with confirmation)");
         Self::add_command(lines, "c", "Copy/duplicate file");
         Self::add_command(lines, "/", "Search files");
         Self::add_command(lines, "ESC", "Exit input modes");
+        Self::add_command(lines, "i", "Enter Query mode");
+        lines.push(Line::from(""));
+        Self::add_command(lines, "C-s", "Save current query");
         Self::add_command(lines, "C-o", "Refresh file list");
         Self::add_command(lines, "C-n", "New timestamped query");
         lines.push(Line::from(""));
@@ -391,16 +401,32 @@ impl HelpSystem {
     }
 
     fn add_query_window_commands(lines: &mut Vec<Line<'static>>) {
-        Self::add_command(lines, "i", "Insert mode");
-        Self::add_command(lines, "ESC", "Exit insert");
+        Self::add_command(lines, "i", "Enter Query mode (full editor)");
+        Self::add_command(lines, "h/j/k/l", "Navigate cursor");
         Self::add_command(lines, "C-Enter", "Execute query at cursor");
+        lines.push(Line::from(""));
+        lines.push(Line::from(Span::styled(
+            "Query Mode (Vim-style):",
+            Style::default()
+                .fg(Color::Gray)
+                .add_modifier(Modifier::ITALIC),
+        )));
+        Self::add_command(lines, "ESC", "Exit Query mode");
+        Self::add_command(lines, "i", "Insert mode (within Query)");
+        Self::add_command(lines, ":", "Vim command mode (:w, :q)");
+        Self::add_command(lines, "w/e", "Word navigation");
+        Self::add_command(lines, "0/$", "Line start/end");
+        Self::add_command(lines, "gg/G", "File start/end");
+        Self::add_command(lines, "C-d/u", "Half page scroll");
+        lines.push(Line::from(""));
         Self::add_command(lines, "C-s", "Save query");
         Self::add_command(lines, "C-o", "Refresh file list");
         Self::add_command(lines, "C-n", "New timestamped query");
     }
 
     /// Render the help overlay
-    pub fn render_help(f: &mut Frame, help_mode: HelpMode) {
+    pub fn render_help(f: &mut Frame, ui_state: &crate::state::ui::UIState) {
+        let help_mode = ui_state.help_mode;
         if help_mode == HelpMode::None {
             return;
         }

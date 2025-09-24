@@ -148,6 +148,15 @@ pub enum HelpMode {
     QueryWindow,
 }
 
+/// Which pane is focused in the help modal
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+pub enum HelpPaneFocus {
+    /// Left pane (pane-specific help)
+    Left,
+    /// Right pane (global commands)
+    Right,
+}
+
 /// Internal editing state for query window
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub enum QueryEditMode {
@@ -166,6 +175,12 @@ pub struct UIState {
     pub last_left_pane: FocusedPane,
     /// Current help display mode
     pub help_mode: HelpMode,
+    /// Which pane is focused in the help modal (left or right)
+    pub help_pane_focus: HelpPaneFocus,
+    /// Vertical scroll offset for left help pane
+    pub help_left_scroll_offset: usize,
+    /// Vertical scroll offset for right help pane
+    pub help_right_scroll_offset: usize,
 
     // Selection indices
     /// Selected connection index
@@ -296,6 +311,9 @@ impl UIState {
             focused_pane: FocusedPane::Connections,
             last_left_pane: FocusedPane::Connections,
             help_mode: HelpMode::None,
+            help_pane_focus: HelpPaneFocus::Left,
+            help_left_scroll_offset: 0,
+            help_right_scroll_offset: 0,
             selected_connection: 0,
             selected_table: 0,
             selected_sql_file: 0,
@@ -1312,6 +1330,83 @@ impl UIState {
         } else {
             // Return the selected connection index directly
             Some(self.selected_connection)
+        }
+    }
+
+    // === HELP MODAL NAVIGATION FUNCTIONALITY ===
+
+    /// Switch focus between left and right help panes
+    pub fn toggle_help_pane_focus(&mut self) {
+        self.help_pane_focus = match self.help_pane_focus {
+            HelpPaneFocus::Left => HelpPaneFocus::Right,
+            HelpPaneFocus::Right => HelpPaneFocus::Left,
+        };
+    }
+
+    /// Reset help modal state when help is opened
+    pub fn reset_help_modal_state(&mut self) {
+        self.help_pane_focus = HelpPaneFocus::Left;
+        self.help_left_scroll_offset = 0;
+        self.help_right_scroll_offset = 0;
+    }
+
+    /// Scroll the currently focused help pane down
+    pub fn help_scroll_down(&mut self, max_lines: usize) {
+        match self.help_pane_focus {
+            HelpPaneFocus::Left => {
+                if max_lines > 0 && self.help_left_scroll_offset < max_lines.saturating_sub(1) {
+                    self.help_left_scroll_offset += 1;
+                }
+            }
+            HelpPaneFocus::Right => {
+                if max_lines > 0 && self.help_right_scroll_offset < max_lines.saturating_sub(1) {
+                    self.help_right_scroll_offset += 1;
+                }
+            }
+        }
+    }
+
+    /// Scroll the currently focused help pane up
+    pub fn help_scroll_up(&mut self) {
+        match self.help_pane_focus {
+            HelpPaneFocus::Left => {
+                if self.help_left_scroll_offset > 0 {
+                    self.help_left_scroll_offset -= 1;
+                }
+            }
+            HelpPaneFocus::Right => {
+                if self.help_right_scroll_offset > 0 {
+                    self.help_right_scroll_offset -= 1;
+                }
+            }
+        }
+    }
+
+    /// Page down in the currently focused help pane
+    pub fn help_page_down(&mut self, max_lines: usize, page_size: usize) {
+        match self.help_pane_focus {
+            HelpPaneFocus::Left => {
+                self.help_left_scroll_offset =
+                    (self.help_left_scroll_offset + page_size).min(max_lines.saturating_sub(1));
+            }
+            HelpPaneFocus::Right => {
+                self.help_right_scroll_offset =
+                    (self.help_right_scroll_offset + page_size).min(max_lines.saturating_sub(1));
+            }
+        }
+    }
+
+    /// Page up in the currently focused help pane
+    pub fn help_page_up(&mut self, page_size: usize) {
+        match self.help_pane_focus {
+            HelpPaneFocus::Left => {
+                self.help_left_scroll_offset =
+                    self.help_left_scroll_offset.saturating_sub(page_size);
+            }
+            HelpPaneFocus::Right => {
+                self.help_right_scroll_offset =
+                    self.help_right_scroll_offset.saturating_sub(page_size);
+            }
         }
     }
 }

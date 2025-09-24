@@ -70,6 +70,9 @@ impl Command for HelpCommand {
             crate::app::FocusedPane::SqlFiles => HelpMode::SqlFiles,
         };
 
+        // Reset help modal navigation state
+        context.state.ui.reset_help_modal_state();
+
         Ok(CommandResult::SuccessWithMessage(
             "Help overlay opened".to_string(),
         ))

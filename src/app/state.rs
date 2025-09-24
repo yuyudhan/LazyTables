@@ -11,7 +11,7 @@ use crate::{
 };
 
 // Re-export for backward compatibility
-pub use crate::state::ui::{FocusedPane, HelpMode, QueryEditMode};
+pub use crate::state::ui::{FocusedPane, HelpMode, HelpPaneFocus, QueryEditMode};
 
 /// Query editor movement directions
 #[derive(Debug, Clone, Copy)]
