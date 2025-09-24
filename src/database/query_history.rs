@@ -5,6 +5,7 @@ use crate::database::DatabaseType;
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use sqlx::{Row, SqlitePool};
+use sqlx::sqlite::SqliteConnectOptions;
 use std::path::PathBuf;
 
 /// Query history entry
@@ -47,9 +48,17 @@ impl QueryHistoryManager {
 
     /// Initialize the database connection and create tables
     pub async fn initialize(&mut self) -> Result<()> {
-        let database_url = format!("sqlite:{}", self.db_path.display());
+        // Ensure parent directory exists
+        if let Some(parent) = self.db_path.parent() {
+            std::fs::create_dir_all(parent)?;
+        }
 
-        let pool = SqlitePool::connect(&database_url).await.map_err(|e| {
+        // Use SqliteConnectOptions for better control
+        let options = SqliteConnectOptions::new()
+            .filename(&self.db_path)
+            .create_if_missing(true);
+
+        let pool = SqlitePool::connect_with(options).await.map_err(|e| {
             LazyTablesError::Config(format!(
                 "Failed to connect to query history database: {}",
                 e
@@ -106,7 +115,7 @@ impl QueryHistoryManager {
             LazyTablesError::Config("Query history database not initialized".to_string())
         })?;
 
-        let row = sqlx::query(
+        let result = sqlx::query(
             r#"
             INSERT INTO query_history
             (query_text, database_type, database_name, execution_time_ms, success, error_message)
@@ -119,11 +128,11 @@ impl QueryHistoryManager {
         .bind(execution_time_ms)
         .bind(success)
         .bind(error_message)
-        .fetch_one(pool)
+        .execute(pool)
         .await
         .map_err(|e| LazyTablesError::Config(format!("Failed to add query to history: {}", e)))?;
 
-        Ok(row.get(0))
+        Ok(result.last_insert_rowid())
     }
 
     /// Get query history with optional database type filter
@@ -341,13 +350,12 @@ mod tests {
 
     #[tokio::test]
     async fn test_query_history_creation() -> Result<()> {
-        let dir = tempdir().unwrap();
-        std::env::set_var("TMPDIR", dir.path());
-        let db_path = dir.path().join("test_history.db");
+        let temp_dir = tempdir().unwrap();
+        let db_path = temp_dir.path().join("test_history.db");
 
         let mut manager = QueryHistoryManager {
             pool: None,
-            db_path,
+            db_path: db_path.clone(),
         };
 
         manager.initialize().await?;
@@ -375,13 +383,12 @@ mod tests {
 
     #[tokio::test]
     async fn test_database_type_filtering() -> Result<()> {
-        let dir = tempdir().unwrap();
-        std::env::set_var("TMPDIR", dir.path());
-        let db_path = dir.path().join("test_filter.db");
+        let temp_dir = tempdir().unwrap();
+        let db_path = temp_dir.path().join("test_filter.db");
 
         let mut manager = QueryHistoryManager {
             pool: None,
-            db_path,
+            db_path: db_path.clone(),
         };
 
         manager.initialize().await?;
