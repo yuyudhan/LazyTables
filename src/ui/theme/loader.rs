@@ -174,3 +174,4 @@ mod tests {
         assert_eq!(loaded_theme.name, test_theme.name);
     }
 }
+

@@ -424,3 +424,4 @@ impl Default for CommandRegistry {
         Self::new()
     }
 }
+
