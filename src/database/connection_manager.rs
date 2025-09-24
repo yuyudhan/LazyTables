@@ -6,6 +6,9 @@ use std::collections::HashMap;
 use std::sync::Arc;
 use tokio::sync::Mutex;
 
+/// Type alias for the complex connection storage type
+type ConnectionStorage = Arc<Mutex<HashMap<String, Arc<Mutex<Box<dyn ManagedConnection>>>>>>;
+
 /// Connection manager that maintains persistent database connections
 /// to prevent the connection churning issue where connections are
 /// constantly created and destroyed for each operation
@@ -32,7 +35,7 @@ pub trait ManagedConnection: Send + Sync + std::fmt::Debug {
 #[derive(Debug, Clone)]
 pub struct ConnectionManager {
     /// Active connections keyed by connection ID
-    connections: Arc<Mutex<HashMap<String, Arc<Mutex<Box<dyn ManagedConnection>>>>>>,
+    connections: ConnectionStorage,
 }
 
 impl ConnectionManager {

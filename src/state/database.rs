@@ -104,6 +104,7 @@ impl DatabaseState {
     }
 
     /// Load PostgreSQL table data using individual connection (reverting to working approach)
+    #[allow(clippy::too_many_arguments)]
     async fn load_postgres_table_data(
         &mut self,
         connection: &ConnectionConfig,
@@ -144,8 +145,8 @@ impl DatabaseState {
             .map_err(|e| format!("Failed to get row count: {e}"))?;
 
         let total_rows = count_rows
-            .get(0)
-            .and_then(|row| row.get(0))
+            .first()
+            .and_then(|row| row.first())
             .and_then(|count_str| count_str.parse::<usize>().ok())
             .unwrap_or(0);
 

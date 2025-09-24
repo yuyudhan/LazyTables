@@ -76,15 +76,15 @@ impl HelpSystem {
 
     /// Create the right column content (global commands)
     pub fn create_right_column(_current_mode: HelpMode) -> Vec<Line<'static>> {
-        let mut lines = vec![];
-
-        lines.push(Line::from(vec![Span::styled(
-            "🌐 Global Commands",
-            Style::default()
-                .fg(Color::Rgb(255, 150, 200))
-                .add_modifier(Modifier::BOLD | Modifier::UNDERLINED),
-        )]));
-        lines.push(Line::from(""));
+        let mut lines = vec![
+            Line::from(vec![Span::styled(
+                "🌐 Global Commands",
+                Style::default()
+                    .fg(Color::Rgb(255, 150, 200))
+                    .add_modifier(Modifier::BOLD | Modifier::UNDERLINED),
+            )]),
+            Line::from(""),
+        ];
 
         // Application-level commands
         lines.push(Line::from(vec![Span::styled(

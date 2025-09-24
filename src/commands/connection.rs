@@ -54,7 +54,7 @@ impl Command for ConnectCommand {
                                 .connection_manager
                                 .list_database_objects(&connection_config.id)
                                 .await
-                                .map(|objects| {
+                                .inspect(|objects| {
                                     // Update database state with loaded objects
                                     context.state.db.database_objects = Some(objects.clone());
                                     context.state.db.tables = objects
@@ -70,7 +70,6 @@ impl Command for ConnectCommand {
                                             }
                                         })
                                         .collect();
-                                    objects
                                 })
                         }
                         Err(e) => Err(crate::core::error::LazyTablesError::Connection(format!(
