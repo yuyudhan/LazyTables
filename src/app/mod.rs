@@ -216,6 +216,46 @@ impl App {
             return Ok(());
         }
 
+        // Handle help modal navigation keys when help is active
+        if self.state.ui.help_mode != crate::app::state::HelpMode::None {
+            match (key.modifiers, key.code) {
+                // Left/Right arrow keys or h/l to switch between help panes
+                (KeyModifiers::NONE, KeyCode::Left)
+                | (KeyModifiers::NONE, KeyCode::Right)
+                | (KeyModifiers::NONE, KeyCode::Char('h'))
+                | (KeyModifiers::NONE, KeyCode::Char('l')) => {
+                    self.state.ui.toggle_help_pane_focus();
+                    return Ok(());
+                }
+                // Up/Down arrow keys or j/k for scrolling
+                (KeyModifiers::NONE, KeyCode::Up) | (KeyModifiers::NONE, KeyCode::Char('k')) => {
+                    self.state.ui.help_scroll_up();
+                    return Ok(());
+                }
+                (KeyModifiers::NONE, KeyCode::Down) | (KeyModifiers::NONE, KeyCode::Char('j')) => {
+                    // We need to pass the max_lines, but for now we'll use a reasonable default
+                    self.state.ui.help_scroll_down(100);
+                    return Ok(());
+                }
+                // Page Up/Down for faster scrolling
+                (KeyModifiers::NONE, KeyCode::PageUp) | (KeyModifiers::CONTROL, KeyCode::Char('u')) => {
+                    self.state.ui.help_page_up(10);
+                    return Ok(());
+                }
+                (KeyModifiers::NONE, KeyCode::PageDown) | (KeyModifiers::CONTROL, KeyCode::Char('d')) => {
+                    self.state.ui.help_page_down(100, 10);
+                    return Ok(());
+                }
+                // Tab to switch between panes
+                (KeyModifiers::NONE, KeyCode::Tab) => {
+                    self.state.ui.toggle_help_pane_focus();
+                    return Ok(());
+                }
+                // Other keys fall through to be handled normally (like '?' for closing)
+                _ => {}
+            }
+        }
+
         // Handle ESC to exit search modes or cancel pending gg command
         if key.code == KeyCode::Esc {
             if self.state.ui.connections_search_active {
@@ -236,8 +276,8 @@ impl App {
             return Ok(());
         }
 
-        // Handle Ctrl+D globally for debug view toggle
-        if key.code == KeyCode::Char('d') && key.modifiers == KeyModifiers::CONTROL {
+        // Handle Ctrl+B globally for debug view toggle
+        if key.code == KeyCode::Char('b') && key.modifiers == KeyModifiers::CONTROL {
             self.state.ui.toggle_debug_view();
             return Ok(());
         }
@@ -1597,9 +1637,7 @@ impl App {
                         KeyCode::Char('w') => {
                             self.state.move_to_next_word();
                         }
-                        KeyCode::Char('b') => {
-                            self.state.move_to_prev_word();
-                        }
+                        // Note: 'b' key navigation removed to avoid confusion with Ctrl+B debug toggle
                         KeyCode::Char('e') => {
                             self.state.move_to_end_of_word();
                         }

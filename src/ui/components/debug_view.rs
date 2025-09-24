@@ -44,7 +44,7 @@ impl DebugView {
         // Main block with borders
         let main_block = Block::default()
             .borders(Borders::ALL)
-            .title(" Debug View (Ctrl+D to toggle) ")
+            .title(" Debug View (Ctrl+B to toggle) ")
             .title_alignment(Alignment::Center)
             .style(Style::default().bg(theme.get_color("background")).fg(theme.get_color("foreground")));
 
@@ -264,7 +264,7 @@ impl DebugView {
         let inner_area = help_block.inner(area);
         frame.render_widget(help_block, area);
 
-        let help_text = "j/k: Scroll • PgUp/PgDn: Page scroll • gg/G: Top/Bottom • c: Clear logs • Ctrl+D: Close debug view";
+        let help_text = "j/k: Scroll • PgUp/PgDn: Page scroll • gg/G: Top/Bottom • c: Clear logs • Ctrl+B: Close debug view";
 
         let paragraph = Paragraph::new(help_text)
             .style(Style::default().fg(theme.get_color("foreground")).bg(theme.get_color("background")))
