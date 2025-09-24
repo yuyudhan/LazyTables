@@ -769,56 +769,11 @@ impl UI {
         } else {
             // No metadata loaded yet
             lines.push(Line::from(vec![Span::styled(
-                "Press Enter to load detailed metadata".to_string(),
-                Style::default().fg(if is_focused {
-                    Color::Yellow
-                } else {
-                    Color::DarkGray
-                }),
+                "No metadata loaded yet".to_string(),
+                Style::default().fg(Color::Gray),
             )]));
         }
 
-        // === ACTIONS SECTION ===
-        lines.push(Line::from("".to_string()));
-        lines.push(Line::from("".to_string()));
-        lines.push(Line::from(vec![Span::styled(
-            "⌨️  Actions".to_string(),
-            Style::default()
-                .fg(if is_focused {
-                    Color::DarkGray
-                } else {
-                    Color::Black
-                })
-                .add_modifier(if is_focused {
-                    Modifier::BOLD
-                } else {
-                    Modifier::empty()
-                }),
-        )]));
-
-        let actions = vec![("r", "Refresh metadata")];
-
-        for (key, desc) in actions {
-            lines.push(Line::from(vec![
-                Span::styled("  ".to_string(), Style::default()),
-                Span::styled(
-                    format!("{}: ", key),
-                    Style::default().fg(if is_focused {
-                        Color::Yellow
-                    } else {
-                        Color::DarkGray
-                    }),
-                ),
-                Span::styled(
-                    desc.to_string(),
-                    Style::default().fg(if is_focused {
-                        Color::Gray
-                    } else {
-                        Color::DarkGray
-                    }),
-                ),
-            ]));
-        }
 
         lines
     }
@@ -1085,69 +1040,12 @@ impl UI {
             items.insert(1, ListItem::new(""));
         }
 
-        // Add instruction text if no files exist
+        // Add message if no files exist
         if display_files.is_empty() && !state.ui.sql_files_create_mode {
             items.push(ListItem::new(Line::from(vec![Span::styled(
                 "No SQL files found",
                 Style::default().fg(Color::Gray),
             )])));
-            items.push(ListItem::new(Line::from(vec![Span::styled(
-                "Press 'n' to create files",
-                Style::default().fg(Color::Gray),
-            )])));
-        } else if is_focused
-            && !state.ui.sql_files_search_active
-            && !state.ui.sql_files_rename_mode
-            && !state.ui.sql_files_create_mode
-        {
-            // Add keybinding help when focused
-            items.push(ListItem::new(""));
-            items.push(ListItem::new(Line::from(vec![
-                Span::styled(
-                    "Enter",
-                    Style::default()
-                        .fg(Color::Yellow)
-                        .add_modifier(Modifier::BOLD),
-                ),
-                Span::styled(" load | ", Style::default().fg(Color::Gray)),
-                Span::styled(
-                    "n",
-                    Style::default()
-                        .fg(Color::Yellow)
-                        .add_modifier(Modifier::BOLD),
-                ),
-                Span::styled(" new | ", Style::default().fg(Color::Gray)),
-                Span::styled(
-                    "r",
-                    Style::default()
-                        .fg(Color::Yellow)
-                        .add_modifier(Modifier::BOLD),
-                ),
-                Span::styled(" rename", Style::default().fg(Color::Gray)),
-            ])));
-            items.push(ListItem::new(Line::from(vec![
-                Span::styled(
-                    "d",
-                    Style::default()
-                        .fg(Color::Yellow)
-                        .add_modifier(Modifier::BOLD),
-                ),
-                Span::styled(" delete | ", Style::default().fg(Color::Gray)),
-                Span::styled(
-                    "c",
-                    Style::default()
-                        .fg(Color::Yellow)
-                        .add_modifier(Modifier::BOLD),
-                ),
-                Span::styled(" copy | ", Style::default().fg(Color::Gray)),
-                Span::styled(
-                    "/",
-                    Style::default()
-                        .fg(Color::Yellow)
-                        .add_modifier(Modifier::BOLD),
-                ),
-                Span::styled(" search", Style::default().fg(Color::Gray)),
-            ])));
         }
 
         // Create title with search/mode indicator
