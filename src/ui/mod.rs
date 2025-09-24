@@ -369,119 +369,27 @@ impl UI {
             items.push(ListItem::new(""));
         }
 
-        // Add keybinding help
+        // Show error message if the selected connection has failed and we're focused
         if is_focused {
-            items.push(ListItem::new(""));
-            items.push(ListItem::new(Line::from(vec![
-                Span::styled("Press ", Style::default().fg(Color::Gray)),
-                Span::styled(
-                    "Enter/Space",
-                    Style::default()
-                        .fg(Color::Yellow)
-                        .add_modifier(Modifier::BOLD),
-                ),
-                Span::styled(" to connect", Style::default().fg(Color::Gray)),
-            ])));
-            items.push(ListItem::new(Line::from(vec![
-                Span::styled("Press ", Style::default().fg(Color::Gray)),
-                Span::styled(
-                    "x",
-                    Style::default()
-                        .fg(Color::Yellow)
-                        .add_modifier(Modifier::BOLD),
-                ),
-                Span::styled(" to disconnect", Style::default().fg(Color::Gray)),
-            ])));
-            items.push(ListItem::new(Line::from(vec![
-                Span::styled("Press ", Style::default().fg(Color::Gray)),
-                Span::styled(
-                    "a",
-                    Style::default()
-                        .fg(Color::Yellow)
-                        .add_modifier(Modifier::BOLD),
-                ),
-                Span::styled(" to add connection", Style::default().fg(Color::Gray)),
-            ])));
-            if !state.db.connections.connections.is_empty() {
-                items.push(ListItem::new(Line::from(vec![
-                    Span::styled("Press ", Style::default().fg(Color::Gray)),
-                    Span::styled(
-                        "e",
-                        Style::default()
-                            .fg(Color::Yellow)
-                            .add_modifier(Modifier::BOLD),
-                    ),
-                    Span::styled(" to edit connection", Style::default().fg(Color::Gray)),
-                ])));
-                items.push(ListItem::new(Line::from(vec![
-                    Span::styled("Press ", Style::default().fg(Color::Gray)),
-                    Span::styled(
-                        "d",
-                        Style::default()
-                            .fg(Color::Yellow)
-                            .add_modifier(Modifier::BOLD),
-                    ),
-                    Span::styled(" to delete connection", Style::default().fg(Color::Gray)),
-                ])));
-                items.push(ListItem::new(Line::from(vec![
-                    Span::styled("Press ", Style::default().fg(Color::Gray)),
-                    Span::styled(
-                        "/",
-                        Style::default()
-                            .fg(Color::Yellow)
-                            .add_modifier(Modifier::BOLD),
-                    ),
-                    Span::styled(" to search connections", Style::default().fg(Color::Gray)),
-                ])));
-
-                // Show error message if the selected connection has failed
-                if let Some(connection) = state
-                    .db
-                    .connections
-                    .connections
-                    .get(state.ui.selected_connection)
-                {
-                    if let Some(error) = connection.get_error() {
-                        items.push(ListItem::new(""));
-                        items.push(ListItem::new(Line::from(vec![
-                            Span::styled(
-                                "Error: ",
-                                Style::default().fg(Color::Red).add_modifier(Modifier::BOLD),
-                            ),
-                            Span::styled(error, Style::default().fg(Color::Red)),
-                        ])));
-                    }
+            if let Some(connection) = state
+                .db
+                .connections
+                .connections
+                .get(state.ui.selected_connection)
+            {
+                if let Some(error) = connection.get_error() {
+                    items.push(ListItem::new(""));
+                    items.push(ListItem::new(Line::from(vec![
+                        Span::styled(
+                            "Error: ",
+                            Style::default().fg(Color::Red).add_modifier(Modifier::BOLD),
+                        ),
+                        Span::styled(error, Style::default().fg(Color::Red)),
+                    ])));
                 }
             }
         }
 
-        // Add legend for status symbols at the bottom if there are connections
-        if !state.db.connections.connections.is_empty() && !is_focused {
-            items.push(ListItem::new(""));
-            items.push(ListItem::new(Line::from(vec![
-                Span::styled("✓ ", Style::default().fg(Color::Green)),
-                Span::styled(
-                    "Connected  ",
-                    Style::default()
-                        .fg(Color::DarkGray)
-                        .add_modifier(Modifier::DIM),
-                ),
-                Span::styled("— ", Style::default().fg(Color::DarkGray)),
-                Span::styled(
-                    "Not connected  ",
-                    Style::default()
-                        .fg(Color::DarkGray)
-                        .add_modifier(Modifier::DIM),
-                ),
-                Span::styled("✗ ", Style::default().fg(Color::Red)),
-                Span::styled(
-                    "Failed",
-                    Style::default()
-                        .fg(Color::DarkGray)
-                        .add_modifier(Modifier::DIM),
-                ),
-            ])));
-        }
 
         // Create title with search indicator
         let title = if state.ui.connections_search_active {

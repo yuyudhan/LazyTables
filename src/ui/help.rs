@@ -242,6 +242,30 @@ impl HelpSystem {
         Self::add_command(lines, "a", "Add connection");
         Self::add_command(lines, "e", "Edit connection");
         Self::add_command(lines, "d", "Delete connection");
+        Self::add_command(lines, "/", "Search connections");
+        lines.push(Line::from(""));
+        lines.push(Line::from(Span::styled(
+            "Connection Status:",
+            Style::default()
+                .fg(Color::Gray)
+                .add_modifier(Modifier::ITALIC),
+        )));
+        lines.push(Line::from(vec![
+            Span::styled("✓ ", Style::default().fg(Color::Green)),
+            Span::raw("Connected"),
+        ]));
+        lines.push(Line::from(vec![
+            Span::styled("— ", Style::default().fg(Color::DarkGray)),
+            Span::raw("Not connected"),
+        ]));
+        lines.push(Line::from(vec![
+            Span::styled("✗ ", Style::default().fg(Color::Red)),
+            Span::raw("Failed"),
+        ]));
+        lines.push(Line::from(vec![
+            Span::styled("⟳ ", Style::default().fg(Color::Yellow)),
+            Span::raw("Connecting"),
+        ]));
     }
 
     fn add_tables_commands(lines: &mut Vec<Line<'static>>) {
