@@ -2,7 +2,7 @@
 
 use crate::{
     config::Config,
-    database::{AppStateDb, ConnectionConfig, ConnectionStatus, DatabaseType},
+    database::{AppStateDb, ConnectionConfig, ConnectionManager, ConnectionStatus, DatabaseType},
     state::{ui::UIState, DatabaseState},
     ui::components::{
         ConnectionModalState, QueryEditor, TableCreatorState, TableEditorState, TableViewerState,
@@ -47,6 +47,8 @@ pub struct AppState {
     pub query_editor: QueryEditor,
     /// Application state database
     pub app_state_db: AppStateDb,
+    /// Persistent connection manager
+    pub connection_manager: ConnectionManager,
 }
 
 impl AppState {
@@ -76,6 +78,7 @@ impl AppState {
             toast_manager: ToastManager::new(),
             query_editor: QueryEditor::new(),
             app_state_db: AppStateDb::new(),
+            connection_manager: ConnectionManager::new(),
         };
 
         // Load SQL files during initialization
@@ -1619,6 +1622,7 @@ impl AppState {
                 &mut self.table_viewer_state,
                 self.ui.selected_connection,
                 tab_idx,
+                &self.connection_manager,
             )
             .await
     }

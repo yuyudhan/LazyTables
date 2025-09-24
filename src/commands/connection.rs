@@ -37,14 +37,37 @@ impl Command for ConnectCommand {
                     .toast_manager
                     .info(format!("Connecting to {}...", connection.name));
 
-                // Spawn async connection task
+                // Spawn async connection task using the connection manager
                 let connection_config = connection.clone();
                 let result = tokio::runtime::Handle::current().block_on(async {
-                    context
-                        .state
-                        .db
-                        .try_connect_to_database(&connection_config)
-                        .await
+                    // First establish the persistent connection
+                    match context.state.connection_manager.connect(&connection_config).await {
+                        Ok(_) => {
+                            // Then load database objects to verify the connection works
+                            context
+                                .state
+                                .connection_manager
+                                .list_database_objects(&connection_config.id)
+                                .await
+                                .map(|objects| {
+                                    // Update database state with loaded objects
+                                    context.state.db.database_objects = Some(objects.clone());
+                                    context.state.db.tables = objects
+                                        .tables
+                                        .iter()
+                                        .map(|t| {
+                                            if t.schema.as_deref() == Some("public") || t.schema.is_none() {
+                                                t.name.clone()
+                                            } else {
+                                                t.qualified_name()
+                                            }
+                                        })
+                                        .collect();
+                                    objects
+                                })
+                        }
+                        Err(e) => Err(crate::core::error::LazyTablesError::Connection(format!("Connection failed: {e}")))
+                    }
                 });
 
                 match result {
@@ -69,7 +92,7 @@ impl Command for ConnectCommand {
                         if let Some(conn) =
                             context.state.db.connections.connections.get_mut(selected)
                         {
-                            conn.status = crate::database::ConnectionStatus::Failed(error.clone());
+                            conn.status = crate::database::ConnectionStatus::Failed(error.to_string());
                         }
                         context
                             .state
@@ -262,15 +285,47 @@ pub struct DisconnectCommand;
 
 impl Command for DisconnectCommand {
     fn execute(&self, context: &mut CommandContext) -> Result<CommandResult> {
-        // Perform actual disconnection (sync version only - async cleanup handled elsewhere)
-        context.state.disconnect_from_database_sync();
-
-        context
+        // Get the currently selected connection
+        let selected = context.state.ui.selected_connection;
+        if let Some(connection) = context
             .state
-            .toast_manager
-            .info("Disconnected from database");
+            .db
+            .connections
+            .connections
+            .get(selected)
+            .cloned()
+        {
+            // Perform actual disconnection using the connection manager
+            let connection_id = connection.id.clone();
+            let connection_name = connection.name.clone();
 
-        Ok(CommandResult::Success)
+            tokio::runtime::Handle::current().block_on(async {
+                let _ = context
+                    .state
+                    .connection_manager
+                    .disconnect(&connection_id)
+                    .await;
+            });
+
+            // Update UI state synchronously
+            context.state.disconnect_from_database_sync();
+
+            context
+                .state
+                .toast_manager
+                .info(format!("Disconnected from {}", connection_name));
+
+            Ok(CommandResult::SuccessWithMessage(format!(
+                "Disconnected from {}",
+                connection_name
+            )))
+        } else {
+            context
+                .state
+                .toast_manager
+                .info("Disconnected from database");
+            Ok(CommandResult::Success)
+        }
     }
 
     fn description(&self) -> &str {

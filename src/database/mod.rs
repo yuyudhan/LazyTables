@@ -3,6 +3,7 @@
 // Database adapter modules
 pub mod app_state;
 pub mod connection;
+pub mod connection_manager;
 pub mod factory;
 pub mod mysql;
 pub mod objects;
@@ -20,6 +21,9 @@ pub use connection::Connection;
 
 // Re-export adapter factory for AC3 compliance
 pub use factory::AdapterFactory;
+
+// Re-export connection manager
+pub use connection_manager::ConnectionManager;
 
 // Re-export database object types
 pub use objects::{DatabaseObject, DatabaseObjectList, DatabaseObjectType};
