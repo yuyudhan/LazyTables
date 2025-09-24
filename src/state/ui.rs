@@ -626,7 +626,7 @@ impl UIState {
                 let is_expanded = self.is_object_group_expanded("Tables");
                 self.selectable_table_items
                     .push(SelectableTableItem::new_header(
-                        format!("▼ Tables ({})", objects.tables.len()),
+                        "▼ Tables".to_string(),
                         display_index,
                     ));
                 display_index += 1;
@@ -660,7 +660,7 @@ impl UIState {
                 let is_expanded = self.is_object_group_expanded("Views");
                 self.selectable_table_items
                     .push(SelectableTableItem::new_header(
-                        format!("▼ Views ({})", objects.views.len()),
+                        "▼ Views".to_string(),
                         display_index,
                     ));
                 display_index += 1;
@@ -694,10 +694,7 @@ impl UIState {
                 let is_expanded = self.is_object_group_expanded("Materialized Views");
                 self.selectable_table_items
                     .push(SelectableTableItem::new_header(
-                        format!(
-                            "▼ Materialized Views ({})",
-                            objects.materialized_views.len()
-                        ),
+                        "▼ Materialized Views".to_string(),
                         display_index,
                     ));
                 display_index += 1;
@@ -731,7 +728,7 @@ impl UIState {
                 let is_expanded = self.is_object_group_expanded("Foreign Tables");
                 self.selectable_table_items
                     .push(SelectableTableItem::new_header(
-                        format!("▼ Foreign Tables ({})", objects.foreign_tables.len()),
+                        "▼ Foreign Tables".to_string(),
                         display_index,
                     ));
                 display_index += 1;
@@ -1534,7 +1531,7 @@ mod tests {
 
         // Add mock table items
         ui_state.selectable_table_items = vec![
-            SelectableTableItem::new_header("▼ Tables (3)".to_string(), 0),
+            SelectableTableItem::new_header("▼ Tables".to_string(), 0),
             SelectableTableItem::new_selectable(
                 "first_table".to_string(),
                 "first_table".to_string(),
