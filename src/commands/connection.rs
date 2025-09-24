@@ -443,3 +443,4 @@ impl Command for TestConnectionCommand {
             && !context.state.db.connections.connections.is_empty()
     }
 }
+
