@@ -32,8 +32,11 @@ I want you to complete the edit functionality modal in the connections pane so t
 =======================================
 =======================================
 =======================================
+
 =======================================
+THIS NEEDS TO BE DONE AGAIN AND AGAIN TO ENSURE CONSISTENCY.
 I want you to refer to each and every pane, connections pane, tables pane, table details pane, table data pane, query results pane, SQL query editor pane, SQL files pane. For each of the panes, find out what all keyboard bindings it gives and move those keyboard bindings to the help model, ensure that the help model takes care of all the pane's help bindings as needed.
+
 =======================================
 I want you to implement the search functionality in the connection screen. The search shall be triggered by pressing the slash command. And after the search is done, I should be able to use the arrow keys to search within the connections. And when I press enter on anything pointed, even after searching, it should open that connection.
 
@@ -45,14 +48,15 @@ DONE:
 Now let us focus on the table data viewer section. So in this, when we are in a particular cell, we should have a keyboard shortcut to edit the contents of that cell. And once we press enter, the value should get updated. This is supposed to act as a edit mechanism for the data in the tables. Focus on the data viewing data table pane table data pane and ensure that this feature is properly implemented. The toast should give the message properly when the data gets updated or if there is any error.
 
 =======================================
+In the SQL files pane, I think when we do the slash based search, it is searching and showing the matching files only. But when I press on a file which is searched and then I press enter, I don't think it is loading. Can you validate if this issue exists and can you fix it?
+
+=======================================
 DONE:
 I think for the debug mode full screen pane mode switch, we created the shortcut called control D but control D and control U were the shortcuts for the table data viewing pane for going to the next page and going to the previous page I think they are conflicting so can you update the shortcut for going into the control B which is currently set for going into the debug pane to get the debug logs.
 
 =======================================
+DONE:
 the connections pane, connection search functionality which is triggered by pressing the forward slash is not working correctly as soon as I press forward slash I don't see any connections it says no connections are configured however when we are not in the search mode the connections that are configured are listed down properly please correct this work and make the search functionality work correctly.
-
-=======================================
-In the SQL files pane, I think when we do the slash based search, it is searching and showing the matching files only. But when I press on a file which is searched and then I press enter, I don't think it is loading. Can you validate if this issue exists and can you fix it?
 
 =======================================
 DONE:
