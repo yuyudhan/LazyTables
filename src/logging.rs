@@ -129,7 +129,6 @@ pub fn clear_debug_messages() {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::cli::LogLevel;
 
     #[test]
     fn test_debug_storage_basic() {
