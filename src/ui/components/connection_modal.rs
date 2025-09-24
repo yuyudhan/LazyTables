@@ -810,8 +810,7 @@ fn render_modal_overlay(frame: &mut Frame, area: Rect) {
     frame.render_widget(Clear, area);
 
     // Create a semi-transparent overlay effect
-    let overlay = Block::default()
-        .style(Style::default().bg(Color::Rgb(0, 0, 0))); // Semi-transparent black overlay
+    let overlay = Block::default().style(Style::default().bg(Color::Rgb(0, 0, 0))); // Semi-transparent black overlay
     frame.render_widget(overlay, area);
 }
 

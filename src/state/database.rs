@@ -143,7 +143,8 @@ impl DatabaseState {
             .await
             .map_err(|e| format!("Failed to get row count: {e}"))?;
 
-        let total_rows = count_rows.get(0)
+        let total_rows = count_rows
+            .get(0)
             .and_then(|row| row.get(0))
             .and_then(|count_str| count_str.parse::<usize>().ok())
             .unwrap_or(0);

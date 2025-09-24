@@ -62,7 +62,8 @@ impl ConnectionManager {
         // Create new connection based on database type
         let connection: Box<dyn ManagedConnection> = match config.database_type {
             crate::database::DatabaseType::PostgreSQL => {
-                let mut pg_conn = crate::database::postgres::PostgresConnection::new(config.clone());
+                let mut pg_conn =
+                    crate::database::postgres::PostgresConnection::new(config.clone());
                 // Establish the connection
                 Connection::connect(&mut pg_conn).await?;
                 Box::new(pg_conn)
@@ -78,7 +79,10 @@ impl ConnectionManager {
         // Store the connected instance
         tracing::error!("Storing connection with ID: '{}'", config.id);
         connections.insert(config.id.clone(), Arc::new(Mutex::new(connection)));
-        tracing::error!("Connection manager now has {} connections", connections.len());
+        tracing::error!(
+            "Connection manager now has {} connections",
+            connections.len()
+        );
 
         Ok(())
     }
@@ -92,14 +96,18 @@ impl ConnectionManager {
 
         // Error-level logging to help diagnose connection issues (visible in production)
         tracing::error!("Looking for connection ID: '{}'", connection_id);
-        tracing::error!("Available connections: {:?}", connections.keys().collect::<Vec<_>>());
+        tracing::error!(
+            "Available connections: {:?}",
+            connections.keys().collect::<Vec<_>>()
+        );
 
-        connections
-            .get(connection_id)
-            .cloned()
-            .ok_or_else(|| {
-                LazyTablesError::Connection(format!("Connection not found or not active. Requested: '{}', Available: {:?}", connection_id, connections.keys().collect::<Vec<_>>()))
-            })
+        connections.get(connection_id).cloned().ok_or_else(|| {
+            LazyTablesError::Connection(format!(
+                "Connection not found or not active. Requested: '{}', Available: {:?}",
+                connection_id,
+                connections.keys().collect::<Vec<_>>()
+            ))
+        })
     }
 
     /// Disconnect from a specific database

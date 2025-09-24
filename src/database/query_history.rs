@@ -4,8 +4,8 @@ use crate::core::error::{LazyTablesError, Result};
 use crate::database::DatabaseType;
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
-use sqlx::{Row, SqlitePool};
 use sqlx::sqlite::SqliteConnectOptions;
+use sqlx::{Row, SqlitePool};
 use std::path::PathBuf;
 
 /// Query history entry
