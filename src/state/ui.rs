@@ -1194,6 +1194,9 @@ impl UIState {
         self.connections_search_active = true;
         self.connections_search_query.clear();
         self.filtered_connections.clear();
+        // Reset selection to first connection when entering search
+        self.selected_connection = 0;
+        self.connections_list_state.select(Some(0));
     }
 
     /// Exit search mode for connections pane
@@ -1253,11 +1256,12 @@ impl UIState {
         &self,
         connections: &[crate::database::ConnectionConfig],
     ) -> Vec<usize> {
-        if self.connections_search_active && !self.filtered_connections.is_empty() {
+        if self.connections_search_active && !self.connections_search_query.is_empty() {
+            // Search is active with a query - return filtered results
             self.filtered_connections.clone()
         } else if self.connections_search_active {
-            // No search results, show empty list
-            Vec::new()
+            // Search is active but no query yet - show all connections
+            (0..connections.len()).collect()
         } else {
             // Normal mode, show all connections by index
             (0..connections.len()).collect()
