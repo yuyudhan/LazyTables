@@ -4,7 +4,7 @@ use ratatui::{
     layout::{Alignment, Constraint, Direction, Layout, Margin, Rect},
     style::{Color, Modifier, Style},
     text::{Line, Span},
-    widgets::{Block, Borders, ListState, Paragraph, Row, Table},
+    widgets::{Block, Borders, Clear, ListState, Paragraph, Row, Table},
     Frame,
 };
 
@@ -409,12 +409,30 @@ impl Default for TableEditorState {
 }
 
 /// Render the table editor view
+/// Render modal overlay background
+fn render_modal_overlay(frame: &mut Frame, area: Rect) {
+    // Clear the entire screen first
+    frame.render_widget(Clear, area);
+
+    // Create a semi-transparent overlay effect
+    let overlay = Block::default()
+        .style(Style::default().bg(Color::Rgb(0, 0, 0))); // Semi-transparent black overlay
+    frame.render_widget(overlay, area);
+}
+
 pub fn render_table_editor(f: &mut Frame, state: &mut TableEditorState, area: Rect) {
-    // Main block
+    // Render overlay background first
+    render_modal_overlay(f, f.area());
+
+    // Clear the modal area specifically
+    f.render_widget(Clear, area);
+
+    // Main block with proper background
     let block = Block::default()
         .title(" ✏️  Edit Table ")
         .borders(Borders::ALL)
-        .border_style(Style::default().fg(Color::Yellow));
+        .border_style(Style::default().fg(Color::Yellow))
+        .style(Style::default().bg(Color::Rgb(13, 13, 13)).fg(Color::White));
 
     f.render_widget(block, area);
 
