@@ -1,0 +1,2 @@
+Configuration for theming should also be in the ~/.config/lazytables directory.
+
