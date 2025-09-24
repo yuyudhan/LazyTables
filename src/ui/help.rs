@@ -270,25 +270,64 @@ impl HelpSystem {
 
     fn add_tables_commands(lines: &mut Vec<Line<'static>>) {
         Self::add_command(lines, "j/k", "Navigate up/down");
+        Self::add_command(lines, "gg/G", "First/last table");
         Self::add_command(lines, "Enter", "Open table");
         Self::add_command(lines, "n", "Create table");
         Self::add_command(lines, "e", "Edit structure");
         Self::add_command(lines, "/", "Search tables");
-        Self::add_command(lines, "gg/G", "First/last table");
-    }
-
-    fn add_details_commands(lines: &mut Vec<Line<'static>>) {
-        Self::add_command(lines, "r", "Refresh metadata");
+        Self::add_command(lines, "↑/↓", "Navigate search results");
+        Self::add_command(lines, "Enter/Esc", "Exit search mode");
         lines.push(Line::from(""));
         lines.push(Line::from(Span::styled(
-            "Displays:",
+            "Objects Displayed:",
             Style::default()
                 .fg(Color::Gray)
                 .add_modifier(Modifier::ITALIC),
         )));
-        lines.push(Line::from(Span::raw("• Size & row count")));
-        lines.push(Line::from(Span::raw("• Keys & indexes")));
-        lines.push(Line::from(Span::raw("• Comments")));
+        lines.push(Line::from(Span::raw("• Tables with row counts and sizes")));
+        lines.push(Line::from(Span::raw("• Views and materialized views")));
+        lines.push(Line::from(Span::raw("• Foreign tables (if supported)")));
+        lines.push(Line::from(Span::raw("• Schema information (multi-schema databases)")));
+        lines.push(Line::from(""));
+        lines.push(Line::from(Span::styled(
+            "Status Messages:",
+            Style::default()
+                .fg(Color::Gray)
+                .add_modifier(Modifier::ITALIC),
+        )));
+        lines.push(Line::from(Span::raw("• Choose a connection from Connections pane")));
+        lines.push(Line::from(Span::raw("• No tables in database")));
+        lines.push(Line::from(Span::raw("• Connection failed (see status bar)")));
+        lines.push(Line::from(Span::raw("• Search results with filter count")));
+    }
+
+    fn add_details_commands(lines: &mut Vec<Line<'static>>) {
+        Self::add_command(lines, "j/k", "Scroll up/down");
+        Self::add_command(lines, "Enter", "Load detailed metadata");
+        Self::add_command(lines, "r", "Refresh metadata");
+        lines.push(Line::from(""));
+        lines.push(Line::from(Span::styled(
+            "Information Displayed:",
+            Style::default()
+                .fg(Color::Gray)
+                .add_modifier(Modifier::ITALIC),
+        )));
+        lines.push(Line::from(Span::raw("• Object type (Table/View/Materialized View)")));
+        lines.push(Line::from(Span::raw("• Row count and column count")));
+        lines.push(Line::from(Span::raw("• Storage size (total, table, indexes)")));
+        lines.push(Line::from(Span::raw("• Primary keys and foreign keys")));
+        lines.push(Line::from(Span::raw("• Index information")));
+        lines.push(Line::from(Span::raw("• Table comments and metadata")));
+        lines.push(Line::from(""));
+        lines.push(Line::from(Span::styled(
+            "Status Messages:",
+            Style::default()
+                .fg(Color::Gray)
+                .add_modifier(Modifier::ITALIC),
+        )));
+        lines.push(Line::from(Span::raw("• No database connected")));
+        lines.push(Line::from(Span::raw("• No tables in database")));
+        lines.push(Line::from(Span::raw("• No table selected")));
     }
 
     fn add_tabular_commands(lines: &mut Vec<Line<'static>>) {
@@ -319,6 +358,36 @@ impl HelpSystem {
         Self::add_command(lines, "ESC", "Exit input modes");
         Self::add_command(lines, "C-o", "Refresh file list");
         Self::add_command(lines, "C-n", "New timestamped query");
+        lines.push(Line::from(""));
+        lines.push(Line::from(Span::styled(
+            "File Operations:",
+            Style::default()
+                .fg(Color::Gray)
+                .add_modifier(Modifier::ITALIC),
+        )));
+        lines.push(Line::from(Span::raw("• Files stored per connection in ~/.lazytables/")));
+        lines.push(Line::from(Span::raw("• File metadata shown (size, modified time)")));
+        lines.push(Line::from(Span::raw("• Current file indicated with ● symbol")));
+        lines.push(Line::from(Span::raw("• Search mode shows current query")));
+        lines.push(Line::from(""));
+        lines.push(Line::from(Span::styled(
+            "Input Modes:",
+            Style::default()
+                .fg(Color::Gray)
+                .add_modifier(Modifier::ITALIC),
+        )));
+        lines.push(Line::from(Span::raw("• Search: Type to filter files")));
+        lines.push(Line::from(Span::raw("• Rename: Enter new filename")));
+        lines.push(Line::from(Span::raw("• Create: Enter filename for new file")));
+        lines.push(Line::from(""));
+        lines.push(Line::from(Span::styled(
+            "Status Messages:",
+            Style::default()
+                .fg(Color::Gray)
+                .add_modifier(Modifier::ITALIC),
+        )));
+        lines.push(Line::from(Span::raw("• No SQL files found (create with 'n')")));
+        lines.push(Line::from(Span::raw("• [SEARCH], [RENAME], [CREATE] mode indicators")));
     }
 
     fn add_query_window_commands(lines: &mut Vec<Line<'static>>) {
