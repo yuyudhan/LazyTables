@@ -248,6 +248,18 @@ impl UI {
                 self.center_modal(frame.area(), 90, 80),
             );
         }
+
+        // Draw debug view if active (full-screen overlay)
+        if state.ui.show_debug_view {
+            let debug_messages = crate::logging::get_debug_messages();
+            state.debug_view.render(
+                frame,
+                frame.area(),
+                &self.theme,
+                &debug_messages,
+                state.ui.debug_view_scroll_offset,
+            );
+        }
     }
 
     /// Draw the header bar
