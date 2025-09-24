@@ -1,4 +1,19 @@
 =======================================
+=======================================
+=======================================
+=======================================
+=======================================
+=======================================
+=======================================
+=======================================
+=======================================
+=======================================
+=======================================
+=======================================
+=======================================
+=======================================
+
+=======================================
 THIS WILL REQUIRE DOING AGAIN AND AGAIN:
 DONE:
 Can you check the help modal that opens when pressing question mark? It should align with all the panes, current options that are there. So it should not show anything different from what options are available in each of the panes.
@@ -11,33 +26,14 @@ So basically we want to support the configuration of lazy tables using the .conf
 Ensure that the configurations for all the panes specifically the key bindings are present into the config file.
 
 =======================================
-=======================================
-=======================================
-=======================================
-=======================================
-=======================================
-=======================================
-=======================================
-=======================================
-=======================================
-=======================================
-=======================================
-=======================================
-
-=======================================
-=======================================
-=======================================
-=======================================
-
-=======================================
-=======================================
-=======================================
-=======================================
-
-=======================================
 I GUESS THIS IS DONE:
 I want you to complete the edit functionality modal in the connections pane so that all the connections can be properly edited. Just validate if any other tasks need to be done to make it completed.
 
+=======================================
+=======================================
+=======================================
+=======================================
+I want you to refer to each and every pane, connections pane, tables pane, table details pane, table data pane, query results pane, SQL query editor pane, SQL files pane. For each of the panes, find out what all keyboard bindings it gives and move those keyboard bindings to the help model, ensure that the help model takes care of all the pane's help bindings as needed.
 =======================================
 I want you to implement the search functionality in the connection screen. The search shall be triggered by pressing the slash command. And after the search is done, I should be able to use the arrow keys to search within the connections. And when I press enter on anything pointed, even after searching, it should open that connection.
 
@@ -46,26 +42,16 @@ In the table details pane, when I press j, it does a scrolling. But even after w
 
 =======================================
 Now let us focus on the table data viewer section. So in this, when we are in a particular cell, we should have a keyboard shortcut to edit the contents of that cell. And once we press enter, the value should get updated. This is supposed to act as a edit mechanism for the data in the tables. Focus on the data viewing data table pane table data pane and ensure that this feature is properly implemented. The toast should give the message properly when the data gets updated or if there is any error.
+
 =======================================
-=======================================
-I think for the debug mode we created the shortcut called control D but control D and control U were the shortcuts for the table data viewing pane for going to the next page and going to the previous page I think they are conflicting so can you update the shortcut for going into the control B which is currently set for going into the debug pane to get the debug logs.
+I think for the debug mode full screen pane mode switch, we created the shortcut called control D but control D and control U were the shortcuts for the table data viewing pane for going to the next page and going to the previous page I think they are conflicting so can you update the shortcut for going into the control B which is currently set for going into the debug pane to get the debug logs.
+
 =======================================
 the connections pane, connection search functionality which is triggered by pressing the forward slash is not working correctly as soon as I press forward slash I don't see any connections it says no connections are configured however when we are not in the search mode the connections that are configured are listed down properly please correct this work and make the search functionality work correctly.
-=======================================
-In the SQL files pane, we have the suggestions, enter to load and for new are, rename the delete C copy slash search. We want to remove these help items from the pane. Instead, it should come after the key question mark has been pressed while the SQL files pane is focused. From the SQL files, remove the help assistance, just put the assistance in the help model which is triggered by pressing question mark.
-=======================================
-DONE:
-From the table details pane, remove the help and actions and assistance related things. They should be shown while the question mark is put. I mean question mark is pressed while the table details pane is focused. We want the help to be in the help model only as a standard across the application. So, do it for the table details pane. Once the question mark is pressed, then in the help model, the details related to table details are put, but not within the table details pane. We don't want to show any help and actions.
-=======================================
-DONE:
-In the connections pane, we have a lot of help assistance details provided within the pane. We don't want it to be there. We want it to be in the help modal. Help modal is triggered while we press question mark. So when we are focused on the connections pane and then press question mark, then the help modal should open with the details of the connections pane. In the pane specific, section of the help modal.
-=======================================
-In the table slash views, I want you to remove all the help items from this pane. The pane items, sorry, the help item should only be available from the pressing of question mark and opening of help model. Help model is the standard mechanism of providing all the help. So remove everything from table slash views and move it to the help model. Also, I see press Ctrl + H to go to connections. This is wrong. You can just remove it from the table slash views pane.
+
 =======================================
 In the SQL files pane, I think when we do the slash based search, it is searching and showing the matching files only. But when I press on a file which is searched and then I press enter, I don't think it is loading. Can you validate if this issue exists and can you fix it?
-=======================================
-=======================================
-=======================================
+
 =======================================
 DONE:
 THIS WILL NEED TO BE DONE AGAIN AND AGAIN
@@ -74,6 +60,7 @@ Can you check the help modal that opens when pressing question mark? It should a
 =======================================
 DONE:
 There is a table details view pane where we see the tabular data and the schema. I think there is something wrong with the pane because like for other panes, when we focus on that pane only, then it is shown in blue color in a highlighted manner. But the details of the table, I mean the data of the table and the table schema, the pane this is always showing to be highlighted in blue color. Can you resolve this particular problem?
+
 =======================================
 DONE:
 the table data viewer so basically we are showing 20 rows but one problem I am seeing when all the 20 rows are not coming within the panes allotted size in the screen what is happening is while pressing J it is going down but I don't think the scrolling is happening properly can you please validate and see if this is the problem and if you can resolve it please
@@ -93,4 +80,20 @@ In the table/views listing option, I think when you press J to go down and when 
 =======================================
 DONE:
 from the help menu that comes after pressing question mark in the lazy tables application the parent modal only should be black background there should be no transparency actually I am seeing that the text from the behind and some residual characters are still showing so we don't need to clear the entire screen maybe but the modal only can have a black background so that the background text does not show.
+
+=======================================
+DONE:
+In the SQL files pane, we have the suggestions, enter to load and for new are, rename the delete C copy slash search. We want to remove these help items from the pane. Instead, it should come after the key question mark has been pressed while the SQL files pane is focused. From the SQL files, remove the help assistance, just put the assistance in the help model which is triggered by pressing question mark.
+
+=======================================
+DONE:
+From the table details pane, remove the help and actions and assistance related things. They should be shown while the question mark is put. I mean question mark is pressed while the table details pane is focused. We want the help to be in the help model only as a standard across the application. So, do it for the table details pane. Once the question mark is pressed, then in the help model, the details related to table details are put, but not within the table details pane. We don't want to show any help and actions.
+
+=======================================
+DONE:
+In the connections pane, we have a lot of help assistance details provided within the pane. We don't want it to be there. We want it to be in the help modal. Help modal is triggered while we press question mark. So when we are focused on the connections pane and then press question mark, then the help modal should open with the details of the connections pane. In the pane specific, section of the help modal.
+=======================================
+
+DONE:
+In the table slash views, I want you to remove all the help items from this pane. The pane items, sorry, the help item should only be available from the pressing of question mark and opening of help model. Help model is the standard mechanism of providing all the help. So remove everything from table slash views and move it to the help model. Also, I see press Ctrl + H to go to connections. This is wrong. You can just remove it from the table slash views pane.
 
