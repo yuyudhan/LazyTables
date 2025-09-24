@@ -253,12 +253,13 @@ impl UI {
             Style::default().fg(self.theme.get_color("border"))
         };
 
-        // Create list items from stored connections
-        let mut items: Vec<ListItem> = state
-            .db
-            .connections
-            .connections
+        // Get display connections (filtered or all)
+        let display_indices = state.ui.get_display_connections(&state.db.connections.connections);
+
+        // Create list items from connections to display
+        let mut items: Vec<ListItem> = display_indices
             .iter()
+            .filter_map(|&index| state.db.connections.connections.get(index))
             .map(|connection| {
                 // Get status symbol and color based on connection status
                 let (symbol_style, text_style) = match &connection.status {
@@ -388,6 +389,16 @@ impl UI {
                     ),
                     Span::styled(" to delete connection", Style::default().fg(Color::Gray)),
                 ])));
+                items.push(ListItem::new(Line::from(vec![
+                    Span::styled("Press ", Style::default().fg(Color::Gray)),
+                    Span::styled(
+                        "/",
+                        Style::default()
+                            .fg(Color::Yellow)
+                            .add_modifier(Modifier::BOLD),
+                    ),
+                    Span::styled(" to search connections", Style::default().fg(Color::Gray)),
+                ])));
 
                 // Show error message if the selected connection has failed
                 if let Some(connection) = state
@@ -438,10 +449,17 @@ impl UI {
             ])));
         }
 
+        // Create title with search indicator
+        let title = if state.ui.connections_search_active {
+            format!(" Connections [SEARCH: {}] ", state.ui.connections_search_query)
+        } else {
+            " Connections ".to_string()
+        };
+
         let connections = List::new(items)
             .block(
                 Block::default()
-                    .title(" Connections ")
+                    .title(title)
                     .borders(Borders::ALL)
                     .border_style(border_style),
             )
