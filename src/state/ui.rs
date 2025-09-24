@@ -220,6 +220,11 @@ pub struct UIState {
     /// Show table editor view
     pub show_table_editor: bool,
 
+    /// Show debug view (full screen debug logs and diagnostics)
+    pub show_debug_view: bool,
+    /// Debug view scroll offset
+    pub debug_view_scroll_offset: usize,
+
     /// Confirmation modal state
     #[serde(skip)]
     pub confirmation_modal: Option<crate::ui::ConfirmationModal>,
@@ -313,6 +318,8 @@ impl UIState {
             show_edit_connection_modal: false,
             show_table_creator: false,
             show_table_editor: false,
+            show_debug_view: false,
+            debug_view_scroll_offset: 0,
             confirmation_modal: None,
             expanded_schemas: std::collections::HashSet::new(),
             expanded_object_groups: {
@@ -569,6 +576,7 @@ impl UIState {
         self.show_edit_connection_modal = false;
         self.show_table_creator = false;
         self.show_table_editor = false;
+        self.show_debug_view = false;
     }
 
     /// Enter vim command mode
@@ -1112,6 +1120,53 @@ impl UIState {
         self.exit_sql_files_search();
         self.exit_sql_files_rename();
         self.exit_sql_files_create();
+    }
+
+    // === DEBUG VIEW FUNCTIONALITY ===
+
+    /// Toggle debug view visibility
+    pub fn toggle_debug_view(&mut self) {
+        self.show_debug_view = !self.show_debug_view;
+        if self.show_debug_view {
+            // Reset scroll when opening
+            self.debug_view_scroll_offset = 0;
+        }
+    }
+
+    /// Scroll debug view down
+    pub fn debug_view_scroll_down(&mut self, max_lines: usize) {
+        if max_lines > 0 && self.debug_view_scroll_offset < max_lines.saturating_sub(1) {
+            self.debug_view_scroll_offset += 1;
+        }
+    }
+
+    /// Scroll debug view up
+    pub fn debug_view_scroll_up(&mut self) {
+        if self.debug_view_scroll_offset > 0 {
+            self.debug_view_scroll_offset -= 1;
+        }
+    }
+
+    /// Page down in debug view
+    pub fn debug_view_page_down(&mut self, max_lines: usize, page_size: usize) {
+        self.debug_view_scroll_offset =
+            (self.debug_view_scroll_offset + page_size).min(max_lines.saturating_sub(1));
+    }
+
+    /// Page up in debug view
+    pub fn debug_view_page_up(&mut self, page_size: usize) {
+        self.debug_view_scroll_offset =
+            self.debug_view_scroll_offset.saturating_sub(page_size);
+    }
+
+    /// Go to top of debug view
+    pub fn debug_view_go_to_top(&mut self) {
+        self.debug_view_scroll_offset = 0;
+    }
+
+    /// Go to bottom of debug view
+    pub fn debug_view_go_to_bottom(&mut self, max_lines: usize) {
+        self.debug_view_scroll_offset = max_lines.saturating_sub(1);
     }
 
     // === CONNECTIONS SEARCH FUNCTIONALITY ===
