@@ -78,13 +78,10 @@ impl UI {
 
     /// Render modal overlay background
     fn render_modal_overlay(&self, frame: &mut Frame, area: Rect) {
-        use ratatui::widgets::Clear;
-        // Clear the entire screen first
-        frame.render_widget(Clear, area);
-
-        // Create a semi-transparent overlay effect using the theme color
-        let overlay = Block::default()
-            .style(Style::default().bg(self.theme.get_color("modal_overlay")));
+        // Create a dimmed overlay effect using the theme's background color
+        // This maintains the dark theme elegance without the whitish artifact
+        let overlay =
+            Block::default().style(Style::default().bg(self.theme.get_color("background")));
         frame.render_widget(overlay, area);
     }
 
@@ -106,7 +103,11 @@ impl UI {
         let block = Block::default()
             .borders(Borders::ALL)
             .border_style(Style::default().fg(self.theme.get_color("modal_border")))
-            .style(Style::default().bg(self.theme.get_color("modal_bg")).fg(Color::White))
+            .style(
+                Style::default()
+                    .bg(self.theme.get_color("modal_bg"))
+                    .fg(Color::White),
+            )
             .title(format!(" {} ", modal.title))
             .title_style(
                 Style::default()
@@ -176,10 +177,7 @@ impl UI {
     /// Draw the entire UI
     pub fn draw(&mut self, frame: &mut Frame, state: &mut AppState) {
         // Clear the frame to prevent artifacts
-        frame.render_widget(
-            ratatui::widgets::Clear,
-            frame.area()
-        );
+        frame.render_widget(ratatui::widgets::Clear, frame.area());
 
         let areas = self.layout_manager.calculate_layout(frame.area());
 
