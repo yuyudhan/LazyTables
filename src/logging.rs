@@ -2,10 +2,198 @@
 
 use crate::{cli::LogLevel, config::Config, core::error::Result};
 use std::{
+    collections::VecDeque,
     fs,
     path::{Path, PathBuf},
+    sync::{Arc, Mutex},
 };
 use tracing_subscriber::{prelude::*, EnvFilter, Layer};
+
+/// Debug message entry for the debug view
+#[derive(Debug, Clone)]
+pub struct DebugMessage {
+    pub timestamp: chrono::DateTime<chrono::Utc>,
+    pub level: String,
+    pub target: String,
+    pub message: String,
+    pub location: Option<String>,
+}
+
+/// In-memory log storage for debug view
+#[derive(Debug)]
+pub struct DebugLogStorage {
+    messages: Arc<Mutex<VecDeque<DebugMessage>>>,
+    max_messages: usize,
+}
+
+impl DebugLogStorage {
+    pub fn new(max_messages: usize) -> Self {
+        Self {
+            messages: Arc::new(Mutex::new(VecDeque::new())),
+            max_messages,
+        }
+    }
+
+    pub fn add_message(&self, message: DebugMessage) {
+        if let Ok(mut messages) = self.messages.lock() {
+            messages.push_back(message);
+            // Keep only the last max_messages
+            while messages.len() > self.max_messages {
+                messages.pop_front();
+            }
+        }
+    }
+
+    pub fn get_messages(&self) -> Vec<DebugMessage> {
+        if let Ok(messages) = self.messages.lock() {
+            messages.iter().cloned().collect()
+        } else {
+            Vec::new()
+        }
+    }
+
+    pub fn clear(&self) {
+        if let Ok(mut messages) = self.messages.lock() {
+            messages.clear();
+        }
+    }
+}
+
+lazy_static::lazy_static! {
+    static ref DEBUG_LOG_STORAGE: DebugLogStorage = DebugLogStorage::new(1000);
+}
+
+/// Custom tracing layer to capture logs in memory
+#[derive(Debug)]
+struct MemoryLogLayer;
+
+impl<S> Layer<S> for MemoryLogLayer
+where
+    S: tracing::Subscriber,
+{
+    fn on_event(
+        &self,
+        event: &tracing::Event<'_>,
+        _ctx: tracing_subscriber::layer::Context<'_, S>,
+    ) {
+        let metadata = event.metadata();
+        let mut visitor = LogVisitor::default();
+        event.record(&mut visitor);
+
+        let message = DebugMessage {
+            timestamp: chrono::Utc::now(),
+            level: metadata.level().to_string(),
+            target: metadata.target().to_string(),
+            message: visitor.message,
+            location: metadata.file().map(|file| {
+                if let Some(line) = metadata.line() {
+                    format!("{}:{}", file, line)
+                } else {
+                    file.to_string()
+                }
+            }),
+        };
+
+        DEBUG_LOG_STORAGE.add_message(message);
+    }
+}
+
+/// Visitor to extract the log message from the event
+#[derive(Default)]
+struct LogVisitor {
+    message: String,
+}
+
+impl tracing::field::Visit for LogVisitor {
+    fn record_debug(&mut self, field: &tracing::field::Field, value: &dyn std::fmt::Debug) {
+        if field.name() == "message" {
+            self.message = format!("{:?}", value);
+            // Remove the quotes from the debug output
+            if self.message.starts_with('"') && self.message.ends_with('"') {
+                self.message = self.message[1..self.message.len()-1].to_string();
+            }
+        }
+    }
+}
+
+/// Get debug messages for the debug view
+pub fn get_debug_messages() -> Vec<DebugMessage> {
+    DEBUG_LOG_STORAGE.get_messages()
+}
+
+/// Clear debug messages
+pub fn clear_debug_messages() {
+    DEBUG_LOG_STORAGE.clear();
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::cli::LogLevel;
+
+    #[test]
+    fn test_debug_storage_basic() {
+        // Test that we can create and clear the storage
+        clear_debug_messages();
+        let messages = get_debug_messages();
+        println!("After clear: {} messages", messages.len());
+
+        // Add a test message directly
+        let test_message = DebugMessage {
+            timestamp: chrono::Utc::now(),
+            level: "TEST".to_string(),
+            target: "test_target".to_string(),
+            message: "Test message".to_string(),
+            location: Some("test.rs:123".to_string()),
+        };
+
+        DEBUG_LOG_STORAGE.add_message(test_message);
+        let messages = get_debug_messages();
+        assert!(messages.len() > 0, "Should have at least one message");
+
+        // Find our test message
+        let test_message = messages.iter().find(|m| m.target == "test_target");
+        assert!(test_message.is_some(), "Should find our test message");
+
+        let test_message = test_message.unwrap();
+        assert_eq!(test_message.level, "TEST");
+        assert_eq!(test_message.target, "test_target");
+        assert_eq!(test_message.message, "Test message");
+        assert_eq!(test_message.location, Some("test.rs:123".to_string()));
+
+        println!("SUCCESS: Debug storage is working correctly");
+    }
+
+    #[test]
+    fn test_debug_storage_limits() {
+        // Clear messages
+        clear_debug_messages();
+
+        // Add more than the limit (1000)
+        for i in 0..1500 {
+            let message = DebugMessage {
+                timestamp: chrono::Utc::now(),
+                level: "INFO".to_string(),
+                target: "test".to_string(),
+                message: format!("Test message {}", i),
+                location: None,
+            };
+            DEBUG_LOG_STORAGE.add_message(message);
+        }
+
+        let messages = get_debug_messages();
+        assert!(messages.len() <= 1000, "Storage should be limited to 1000 messages, got {}", messages.len());
+        assert!(messages.len() > 0, "Should have some messages");
+
+        // Should have the most recent messages (higher numbers)
+        if !messages.is_empty() {
+            let last_message = &messages[messages.len() - 1];
+            assert!(last_message.message.contains("1499"), "Should have the last message, got: {}", last_message.message);
+        }
+
+        println!("SUCCESS: Debug storage limits are working correctly");
+    }
+}
 
 /// Initialize the logging system based on mode and level
 pub fn init(level: LogLevel) -> Result<()> {
@@ -72,7 +260,11 @@ fn init_development_logging(log_dir: &Path, level: LogLevel) -> Result<()> {
                 .with_level(true)
                 .with_file(true)
                 .with_line_number(true)
-                .with_filter(filter),
+                .with_filter(filter.clone()),
+        )
+        .with(
+            MemoryLogLayer
+                .with_filter(filter)
         )
         .init();
 
