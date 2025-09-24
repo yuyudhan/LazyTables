@@ -62,8 +62,8 @@ pub fn render_tables_pane(
 }
 
 /// Get message when no database is connected
-fn get_no_connection_message(is_focused: bool) -> Vec<ListItem<'static>> {
-    let mut items = vec![
+fn get_no_connection_message(_is_focused: bool) -> Vec<ListItem<'static>> {
+    vec![
         ListItem::new(Line::from(vec![Span::styled(
             "Choose a connection",
             Style::default().fg(Color::Gray),
@@ -77,25 +77,7 @@ fn get_no_connection_message(is_focused: bool) -> Vec<ListItem<'static>> {
             "to view tables and views",
             Style::default().fg(Color::Gray),
         )])),
-        ListItem::new(""),
-    ];
-
-    if is_focused {
-        items.push(ListItem::new(Line::from(vec![
-            Span::styled("Press ", Style::default().fg(Color::Gray)),
-            Span::styled(
-                "Ctrl+h",
-                Style::default()
-                    .fg(Color::Yellow)
-                    .add_modifier(Modifier::BOLD),
-            ),
-            Span::styled(" to go to connections", Style::default().fg(Color::Gray)),
-        ])));
-    } else {
-        items.push(ListItem::new(""));
-    }
-
-    items
+    ]
 }
 
 /// Get message when database is connected but no tables exist
@@ -131,7 +113,7 @@ fn get_no_tables_message(state: &AppState) -> Vec<ListItem<'static>> {
 /// Get list items from selectable table items
 fn get_selectable_items_list(
     selectable_items: &[crate::state::ui::SelectableTableItem],
-    is_focused: bool,
+    _is_focused: bool,
     ui_state: &crate::state::ui::UIState,
 ) -> Vec<ListItem<'static>> {
     let mut items = Vec::new();
@@ -157,109 +139,28 @@ fn get_selectable_items_list(
         }
     }
 
-    // Add search info or navigation help if focused and we have selectable items
-    if is_focused {
-        if ui_state.tables_search_active {
-            add_search_help(&mut items, &ui_state.tables_search_query);
-        } else if selectable_items.iter().any(|item| item.is_selectable) {
-            add_navigation_help(&mut items);
-        }
+    // Show active search query if in search mode
+    if ui_state.tables_search_active {
+        items.push(ListItem::new(""));
+        items.push(ListItem::new(Line::from(vec![
+            Span::styled(
+                "Search: ",
+                Style::default()
+                    .fg(Color::Cyan)
+                    .add_modifier(Modifier::BOLD),
+            ),
+            Span::styled(
+                format!("{}_", ui_state.tables_search_query),
+                Style::default()
+                    .fg(Color::White)
+                    .add_modifier(Modifier::UNDERLINED),
+            ),
+        ])));
     }
 
     items
 }
 
-/// Add navigation help for focused pane
-fn add_navigation_help(items: &mut Vec<ListItem<'static>>) {
-    items.push(ListItem::new(""));
-    items.push(ListItem::new(Line::from(vec![
-        Span::styled("Press ", Style::default().fg(Color::Gray)),
-        Span::styled(
-            "j/k",
-            Style::default()
-                .fg(Color::Yellow)
-                .add_modifier(Modifier::BOLD),
-        ),
-        Span::styled(" to navigate, ", Style::default().fg(Color::Gray)),
-        Span::styled(
-            "gg/G",
-            Style::default()
-                .fg(Color::Yellow)
-                .add_modifier(Modifier::BOLD),
-        ),
-        Span::styled(" for top/bottom", Style::default().fg(Color::Gray)),
-    ])));
-    items.push(ListItem::new(Line::from(vec![
-        Span::styled("Press ", Style::default().fg(Color::Gray)),
-        Span::styled(
-            "/",
-            Style::default()
-                .fg(Color::Yellow)
-                .add_modifier(Modifier::BOLD),
-        ),
-        Span::styled(" to search tables", Style::default().fg(Color::Gray)),
-    ])));
-    items.push(ListItem::new(Line::from(vec![
-        Span::styled("Press ", Style::default().fg(Color::Gray)),
-        Span::styled(
-            "Enter",
-            Style::default()
-                .fg(Color::Yellow)
-                .add_modifier(Modifier::BOLD),
-        ),
-        Span::styled(" to view table data", Style::default().fg(Color::Gray)),
-    ])));
-    items.push(ListItem::new(Line::from(vec![
-        Span::styled("Press ", Style::default().fg(Color::Gray)),
-        Span::styled(
-            "n",
-            Style::default()
-                .fg(Color::Yellow)
-                .add_modifier(Modifier::BOLD),
-        ),
-        Span::styled(" to create new table", Style::default().fg(Color::Gray)),
-    ])));
-}
-
-/// Add search help and display current search query
-fn add_search_help(items: &mut Vec<ListItem<'static>>, search_query: &str) {
-    items.push(ListItem::new(""));
-    items.push(ListItem::new(Line::from(vec![
-        Span::styled(
-            "Search: ",
-            Style::default()
-                .fg(Color::Cyan)
-                .add_modifier(Modifier::BOLD),
-        ),
-        Span::styled(
-            format!("{}_", search_query),
-            Style::default()
-                .fg(Color::White)
-                .add_modifier(Modifier::UNDERLINED),
-        ),
-    ])));
-    items.push(ListItem::new(""));
-    items.push(ListItem::new(Line::from(vec![
-        Span::styled("Press ", Style::default().fg(Color::Gray)),
-        Span::styled(
-            "↑/↓",
-            Style::default()
-                .fg(Color::Yellow)
-                .add_modifier(Modifier::BOLD),
-        ),
-        Span::styled(" to navigate results", Style::default().fg(Color::Gray)),
-    ])));
-    items.push(ListItem::new(Line::from(vec![
-        Span::styled("Press ", Style::default().fg(Color::Gray)),
-        Span::styled(
-            "Enter/Esc",
-            Style::default()
-                .fg(Color::Yellow)
-                .add_modifier(Modifier::BOLD),
-        ),
-        Span::styled(" to exit search", Style::default().fg(Color::Gray)),
-    ])));
-}
 
 /// Get adaptive title based on database objects and connection info
 fn get_adaptive_title(
@@ -398,8 +299,8 @@ mod tests {
         let ui_state = crate::state::ui::UIState::new();
         let items = get_selectable_items_list(&selectable_items, true, &ui_state);
 
-        // Should have table + navigation help (5 additional items including search help)
-        assert!(items.len() > 1);
+        // Should have just the table item (no help text is shown in pane anymore)
+        assert_eq!(items.len(), 1);
     }
 
     #[test]
