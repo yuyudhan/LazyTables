@@ -345,9 +345,9 @@ mod tests {
 
     #[test]
     fn test_selectable_table_item_header() {
-        let item = SelectableTableItem::new_header("▼ Tables (5)".to_string(), 0);
+        let item = SelectableTableItem::new_header("▼ Tables".to_string(), 0);
 
-        assert_eq!(item.display_name, "▼ Tables (5)");
+        assert_eq!(item.display_name, "▼ Tables");
         assert!(!item.is_selectable);
     }
 
@@ -361,7 +361,7 @@ mod tests {
     #[test]
     fn test_get_selectable_items_list_with_items() {
         let selectable_items = vec![
-            SelectableTableItem::new_header("▼ Tables (2)".to_string(), 0),
+            SelectableTableItem::new_header("▼ Tables".to_string(), 0),
             SelectableTableItem::new_selectable(
                 "  📋 users".to_string(),
                 "users".to_string(),
