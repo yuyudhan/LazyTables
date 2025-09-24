@@ -668,6 +668,14 @@ impl App {
                         return Ok(());
                     }
                     KeyCode::Enter => {
+                        // Load the selected SQL file before exiting search mode
+                        if let Err(e) = self.state.load_selected_sql_file() {
+                            self.state
+                                .toast_manager
+                                .error(format!("Failed to load SQL file: {e}"));
+                        } else {
+                            self.state.toast_manager.success("SQL file loaded");
+                        }
                         self.state.ui.exit_sql_files_search();
                         return Ok(());
                     }
