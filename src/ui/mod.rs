@@ -250,6 +250,19 @@ impl UI {
             );
         }
 
+        // Draw connection mode if active (full-screen overlay)
+        if state.ui.show_connection_mode {
+            if let Some(connection_mode) = &state.connection_mode {
+                connection_mode.render(
+                    frame,
+                    frame.area(),
+                    &self.theme,
+                    state.ui.connection_mode_type,
+                    state.ui.connection_mode_scroll_offset,
+                );
+            }
+        }
+
         // Draw debug view if active (full-screen overlay)
         if state.ui.show_debug_view {
             let debug_messages = crate::logging::get_debug_messages();
