@@ -501,6 +501,35 @@ impl QueryEditor {
         self.content = new_lines.join("\n");
     }
 
+    /// Delete character under cursor (X key)
+    pub fn delete_char_under_cursor(&mut self) {
+        if self.is_insert_mode {
+            return;
+        }
+
+        let lines: Vec<String> = self.content.lines().map(|s| s.to_string()).collect();
+        let mut new_lines = lines;
+
+        if self.cursor_line < new_lines.len() {
+            let line = &mut new_lines[self.cursor_line];
+            let mut chars: Vec<char> = line.chars().collect();
+
+            // Delete character at cursor position
+            if self.cursor_col < chars.len() {
+                chars.remove(self.cursor_col);
+                *line = chars.into_iter().collect();
+                self.is_modified = true;
+
+                // Adjust cursor if it's now at the end of line
+                if self.cursor_col > line.len() {
+                    self.cursor_col = line.len();
+                }
+            }
+        }
+
+        self.content = new_lines.join("\n");
+    }
+
     /// Helper method to skip whitespace forward
     fn skip_whitespace_forward(&mut self) {
         let lines = self.content.lines().collect::<Vec<_>>();
@@ -899,6 +928,11 @@ impl QueryEditor {
                 self.pending_command = Some("d".to_string());
                 true
             }
+            'X' => {
+                // Delete character under cursor
+                self.delete_char_under_cursor();
+                true
+            }
             _ => false,
         }
     }
@@ -1267,5 +1301,55 @@ mod tests {
 
         assert!(editor.is_insert_mode());
         assert_eq!(editor.cursor_col, 0);
+    }
+
+    #[test]
+    fn test_delete_char_under_cursor() {
+        let mut editor = QueryEditor::new();
+        editor.set_content("hello world".to_string());
+
+        // Position cursor at 'e' (position 1)
+        editor.cursor_line = 0;
+        editor.cursor_col = 1;
+
+        // Test X command (delete character under cursor)
+        editor.delete_char_under_cursor();
+
+        assert_eq!(editor.get_content(), "hllo world");
+        assert_eq!(editor.cursor_col, 1); // Cursor should stay at same position
+        assert!(editor.is_modified());
+    }
+
+    #[test]
+    fn test_delete_char_under_cursor_at_end_of_line() {
+        let mut editor = QueryEditor::new();
+        editor.set_content("hello".to_string());
+
+        // Position cursor at end of line (position 5, beyond last char)
+        editor.cursor_line = 0;
+        editor.cursor_col = 5;
+
+        // Test X command at end of line (should do nothing)
+        editor.delete_char_under_cursor();
+
+        assert_eq!(editor.get_content(), "hello"); // No change
+        assert_eq!(editor.cursor_col, 5);
+    }
+
+    #[test]
+    fn test_delete_char_under_cursor_last_char() {
+        let mut editor = QueryEditor::new();
+        editor.set_content("hello".to_string());
+
+        // Position cursor at last character 'o' (position 4)
+        editor.cursor_line = 0;
+        editor.cursor_col = 4;
+
+        // Test X command on last character
+        editor.delete_char_under_cursor();
+
+        assert_eq!(editor.get_content(), "hell");
+        assert_eq!(editor.cursor_col, 4); // Cursor should be adjusted to end of line
+        assert!(editor.is_modified());
     }
 }
