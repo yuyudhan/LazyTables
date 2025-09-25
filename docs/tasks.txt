@@ -2,13 +2,25 @@ MAJOR features pending.
 Table structure editing.
 sql pane features to be done properly.
 Help modal can be moved into a mode similar to debug mode and connection mode? Think on it first.
-
+=======================================
+=======================================
+In the SQL query editor, once I have edited the file and I am in the normal mode, pressing E or CTRL+ENTER should execute the query, show a toast message as well as it should print in the debug mode toggle, the debug view that we have created, add more info, log, debug error messages as needed.
+=======================================
+In the SQL editor, I think my save functionality is all screwed up. Can you see how the files are being managed? Where the files are getting saved? So we have the SQL files pane which saves the files. SQL editor pane is where I will go and press colon W like whim to save the file in normal mode. But whenever I save, it is not saving. I have when I change. something go outside and come back. It is like before the changes that I made are not reflected. There is some bug. Can you find it out properly?
+=======================================
+DONE:
+In the debug mode window, there is a log statistics that is mentioned. Actually it is flickering a lot. It is sometimes showing info error. It is switching at a very high frequency, like per second, two, three times. Is there some issue with that?
+=======================================
+In the SQL query editor, I think there is something wrong. When I press colon W, it should save the file. I don't know if it is saving. Can you verify if it is saving correctly and make it work?
 =======================================
 DONE:
 In the SQL query editor, I don't think I'm able to go to lines above and lines below by using the J and K keys in the normal mode. Why do you think this is happening? Can you make it happen? Even the arrow keys are not helping me go up and down. I am able to use the arrow keys to go up and down in the insert mode but in the normal mode it is not working. Can you check and resolve this behaviour please?
 
 =======================================
+
 When the connection is switched or connection is disconnected, the SQL query editor should get reset. If I changed connection to some other connection, then also SQL query editor should get reset.
+=======================================
+In the SQL Editor we have VIM modes active. In that VIM mode I want you to implement pressing X in normal mode to delete the character under cursor.
 =======================================
 
 I want you to implement the query execution feature properly. The errors of the query should show in the toast if there are any errors. I should be able to press Ctrl+Enter to execute the query which is in focus of my cursor and the result should show in the data pane.
