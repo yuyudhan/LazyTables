@@ -302,13 +302,11 @@ impl SqlSuggestionEngine {
             && !recent_tokens
                 .iter()
                 .any(|&t| matches!(t, "WHERE" | "GROUP" | "ORDER" | "HAVING"))
-        {
-            if recent_tokens
+            && recent_tokens
                 .iter()
                 .any(|&t| matches!(t, "JOIN" | "INNER" | "LEFT" | "RIGHT" | "FULL" | "CROSS"))
-            {
-                return SqlContext::JoinClause;
-            }
+        {
+            return SqlContext::JoinClause;
         }
 
         SqlContext::General

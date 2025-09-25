@@ -194,7 +194,7 @@ impl ConnectionMode {
         frame.render_widget(db_type_block, area);
 
         // Database type options
-        let db_types = vec![
+        let db_types = [
             ("PostgreSQL", DatabaseType::PostgreSQL),
             ("MySQL", DatabaseType::MySQL),
             ("SQLite", DatabaseType::SQLite),
@@ -202,8 +202,7 @@ impl ConnectionMode {
 
         let items: Vec<ListItem> = db_types
             .iter()
-            .enumerate()
-            .map(|(_i, (name, db_type))| {
+            .map(|(name, db_type)| {
                 let is_selected = *db_type == self.form_state.database_type;
                 let symbol = if is_selected { "● " } else { "○ " };
 
