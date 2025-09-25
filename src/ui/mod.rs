@@ -937,78 +937,91 @@ impl UI {
     /// Draw the SQL files browser pane
     fn draw_sql_files_pane(&self, frame: &mut Frame, area: Rect, state: &AppState) {
         let is_focused = state.ui.focused_pane == FocusedPane::SqlFiles;
-        let border_style = if is_focused {
+        let sql_panes_enabled = state.are_sql_panes_enabled();
+
+        let border_style = if !sql_panes_enabled {
+            // Show disabled state with gray border
+            Style::default().fg(Color::DarkGray)
+        } else if is_focused {
             Style::default().fg(self.theme.get_color("active_border"))
         } else {
             Style::default().fg(self.theme.get_color("border"))
         };
 
-        // Get filtered files list for display
-        let display_files = state.get_filtered_sql_files();
+        // Get filtered files list for display (empty if disabled)
+        let display_files = if sql_panes_enabled {
+            state.get_filtered_sql_files()
+        } else {
+            Vec::new()
+        };
         let selected_index = state.get_filtered_sql_file_selection();
 
         // Create list items from SQL files
-        let mut items: Vec<ListItem> = display_files
-            .iter()
-            .enumerate()
-            .map(|(i, filename)| {
-                let prefix = if Some(filename) == state.ui.current_sql_file.as_ref() {
-                    "● " // Indicate currently loaded file
-                } else {
-                    "  "
-                };
+        let mut items: Vec<ListItem> = if sql_panes_enabled {
+            display_files
+                .iter()
+                .enumerate()
+                .map(|(i, filename)| {
+                    let prefix = if Some(filename) == state.ui.current_sql_file.as_ref() {
+                        "● " // Indicate currently loaded file
+                    } else {
+                        "  "
+                    };
 
-                let style = if Some(filename) == state.ui.current_sql_file.as_ref() {
-                    Style::default()
-                        .fg(Color::Green)
-                        .add_modifier(Modifier::BOLD)
-                } else if i == selected_index && is_focused {
-                    Style::default().fg(self.theme.get_color("primary_highlight"))
-                } else {
-                    Style::default().fg(self.theme.get_color("text"))
-                };
+                    let style = if Some(filename) == state.ui.current_sql_file.as_ref() {
+                        Style::default()
+                            .fg(Color::Green)
+                            .add_modifier(Modifier::BOLD)
+                    } else if i == selected_index && is_focused {
+                        Style::default().fg(self.theme.get_color("primary_highlight"))
+                    } else {
+                        Style::default().fg(self.theme.get_color("text"))
+                    };
 
-                // Add file metadata if focused and not in input mode
-                let file_display = if is_focused
-                    && !state.ui.sql_files_search_active
-                    && !state.ui.sql_files_rename_mode
-                    && !state.ui.sql_files_create_mode
-                {
-                    // Get file size and modification time
-                    let connection_name = if let Some(connection) = state
-                        .db
-                        .connections
-                        .connections
-                        .get(state.ui.selected_connection)
+                    // Add file metadata if focused and not in input mode
+                    let file_display = if is_focused
+                        && !state.ui.sql_files_search_active
+                        && !state.ui.sql_files_rename_mode
+                        && !state.ui.sql_files_create_mode
                     {
-                        connection.name.clone()
+                        // Get file size and modification time
+                        let connection_name = if let Some(connection) = state
+                            .db
+                            .connections
+                            .connections
+                            .get(state.ui.selected_connection)
+                        {
+                            connection.name.clone()
+                        } else {
+                            "default".to_string()
+                        };
+
+                        let connection_dir =
+                            crate::config::Config::sql_files_dir().join(&connection_name);
+                        let root_dir = crate::config::Config::sql_files_dir();
+
+                        let connection_path = connection_dir.join(format!("{filename}.sql"));
+                        let root_path = root_dir.join(format!("{filename}.sql"));
+
+                        let (size_str, modified_str) = if connection_path.exists() {
+                            self.get_file_metadata(&connection_path)
+                        } else if root_path.exists() {
+                            self.get_file_metadata(&root_path)
+                        } else {
+                            ("?".to_string(), "?".to_string())
+                        };
+
+                        format!("{prefix}{filename}.sql  [{size_str}] {modified_str}")
                     } else {
-                        "default".to_string()
+                        format!("{prefix}{filename}.sql")
                     };
 
-                    let connection_dir =
-                        crate::config::Config::sql_files_dir().join(&connection_name);
-                    let root_dir = crate::config::Config::sql_files_dir();
-
-                    let connection_path = connection_dir.join(format!("{filename}.sql"));
-                    let root_path = root_dir.join(format!("{filename}.sql"));
-
-                    let (size_str, modified_str) = if connection_path.exists() {
-                        self.get_file_metadata(&connection_path)
-                    } else if root_path.exists() {
-                        self.get_file_metadata(&root_path)
-                    } else {
-                        ("?".to_string(), "?".to_string())
-                    };
-
-                    format!("{prefix}{filename}.sql  [{size_str}] {modified_str}")
-                } else {
-                    format!("{prefix}{filename}.sql")
-                };
-
-                ListItem::new(Line::from(vec![Span::styled(file_display, style)]))
-            })
-            .collect();
+                    ListItem::new(Line::from(vec![Span::styled(file_display, style)]))
+                })
+                .collect()
+        } else {
+            Vec::new()
+        };
 
         // Handle input modes
         if state.ui.sql_files_search_active && is_focused {
@@ -1052,16 +1065,27 @@ impl UI {
             items.insert(1, ListItem::new(""));
         }
 
-        // Add message if no files exist
-        if display_files.is_empty() && !state.ui.sql_files_create_mode {
+        // Add message if no files exist or SQL panes are disabled
+        if !sql_panes_enabled {
+            items.push(ListItem::new(Line::from(vec![Span::styled(
+                "🔒 Connect to database",
+                Style::default().fg(Color::DarkGray),
+            )])));
+            items.push(ListItem::new(Line::from(vec![Span::styled(
+                "   to access SQL files",
+                Style::default().fg(Color::DarkGray),
+            )])));
+        } else if display_files.is_empty() && !state.ui.sql_files_create_mode {
             items.push(ListItem::new(Line::from(vec![Span::styled(
                 "No SQL files found",
                 Style::default().fg(Color::Gray),
             )])));
         }
 
-        // Create title with search/mode indicator
-        let title = if state.ui.sql_files_search_active {
+        // Create title with search/mode/disabled indicator
+        let title = if !sql_panes_enabled {
+            " SQL Files [DISABLED] ".to_string()
+        } else if state.ui.sql_files_search_active {
             format!(" SQL Files [SEARCH: {}] ", state.ui.sql_files_search_query)
         } else if state.ui.sql_files_rename_mode {
             " SQL Files [RENAME] ".to_string()
@@ -1131,6 +1155,35 @@ impl UI {
     /// Draw the query window area using the QueryEditor component
     fn draw_query_window(&self, frame: &mut Frame, area: Rect, state: &mut AppState) {
         let is_focused = state.ui.focused_pane == FocusedPane::QueryWindow;
+        let sql_panes_enabled = state.are_sql_panes_enabled();
+
+        if !sql_panes_enabled {
+            // Show disabled state with a message
+            let disabled_block = Block::default()
+                .title(" SQL Query Editor [DISABLED] ")
+                .borders(Borders::ALL)
+                .border_style(Style::default().fg(Color::DarkGray));
+
+            let disabled_message = Paragraph::new(vec![
+                Line::from(""),
+                Line::from(vec![Span::styled(
+                    "🔒 Connect to a database to enable SQL editing",
+                    Style::default()
+                        .fg(Color::DarkGray)
+                        .add_modifier(Modifier::BOLD),
+                )]),
+                Line::from(""),
+                Line::from(vec![Span::styled(
+                    "Select a connection and press Enter to connect",
+                    Style::default().fg(Color::DarkGray),
+                )]),
+            ])
+            .block(disabled_block)
+            .alignment(ratatui::layout::Alignment::Center);
+
+            frame.render_widget(disabled_message, area);
+            return;
+        }
 
         // Update the QueryEditor component state
         state.query_editor.set_focused(is_focused);
