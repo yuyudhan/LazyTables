@@ -5,7 +5,7 @@ use crate::{
     database::{AppStateDb, ConnectionConfig, ConnectionManager, ConnectionStatus, DatabaseType},
     state::{ui::UIState, DatabaseState},
     ui::components::{
-        ConnectionModalState, DebugView, QueryEditor, TableCreatorState, TableEditorState,
+        ConnectionMode, ConnectionModalState, DebugView, QueryEditor, TableCreatorState, TableEditorState,
         TableViewerState, ToastManager,
     },
 };
@@ -47,6 +47,8 @@ pub struct AppState {
     pub query_editor: QueryEditor,
     /// Debug view component
     pub debug_view: DebugView,
+    /// Connection mode component (for full-screen connection management)
+    pub connection_mode: Option<ConnectionMode>,
     /// Application state database
     pub app_state_db: AppStateDb,
     /// Persistent connection manager
@@ -80,6 +82,7 @@ impl AppState {
             toast_manager: ToastManager::new(),
             query_editor: QueryEditor::new(),
             debug_view: DebugView::new(),
+            connection_mode: None,
             app_state_db: AppStateDb::new(),
             connection_manager: ConnectionManager::new(),
         };

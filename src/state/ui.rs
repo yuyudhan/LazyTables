@@ -166,6 +166,15 @@ pub enum QueryEditMode {
     Insert,
 }
 
+/// Connection mode type (Add new or Edit existing)
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+pub enum ConnectionModeType {
+    /// Adding a new connection
+    Add,
+    /// Editing an existing connection
+    Edit,
+}
+
 /// UI State - All UI-related state that can be saved/restored
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct UIState {
@@ -239,6 +248,13 @@ pub struct UIState {
     pub show_debug_view: bool,
     /// Debug view scroll offset
     pub debug_view_scroll_offset: usize,
+
+    /// Show connection mode (full screen connection management)
+    pub show_connection_mode: bool,
+    /// Connection mode type (Add or Edit)
+    pub connection_mode_type: ConnectionModeType,
+    /// Connection mode scroll offset
+    pub connection_mode_scroll_offset: usize,
 
     /// Confirmation modal state
     #[serde(skip)]
@@ -338,6 +354,9 @@ impl UIState {
             show_table_editor: false,
             show_debug_view: false,
             debug_view_scroll_offset: 0,
+            show_connection_mode: false,
+            connection_mode_type: ConnectionModeType::Add,
+            connection_mode_scroll_offset: 0,
             confirmation_modal: None,
             expanded_schemas: std::collections::HashSet::new(),
             expanded_object_groups: {
@@ -595,6 +614,7 @@ impl UIState {
         self.show_table_creator = false;
         self.show_table_editor = false;
         self.show_debug_view = false;
+        self.show_connection_mode = false;
     }
 
     /// Enter vim command mode
@@ -1184,6 +1204,42 @@ impl UIState {
     /// Go to bottom of debug view
     pub fn debug_view_go_to_bottom(&mut self, max_lines: usize) {
         self.debug_view_scroll_offset = max_lines.saturating_sub(1);
+    }
+
+    // === CONNECTION MODE FUNCTIONALITY ===
+
+    /// Enter connection mode for adding a new connection
+    pub fn enter_add_connection_mode(&mut self) {
+        self.show_connection_mode = true;
+        self.connection_mode_type = ConnectionModeType::Add;
+        self.connection_mode_scroll_offset = 0;
+    }
+
+    /// Enter connection mode for editing an existing connection
+    pub fn enter_edit_connection_mode(&mut self) {
+        self.show_connection_mode = true;
+        self.connection_mode_type = ConnectionModeType::Edit;
+        self.connection_mode_scroll_offset = 0;
+    }
+
+    /// Exit connection mode
+    pub fn exit_connection_mode(&mut self) {
+        self.show_connection_mode = false;
+        self.connection_mode_scroll_offset = 0;
+    }
+
+    /// Scroll connection mode down
+    pub fn connection_mode_scroll_down(&mut self, max_lines: usize) {
+        if max_lines > 0 && self.connection_mode_scroll_offset < max_lines.saturating_sub(1) {
+            self.connection_mode_scroll_offset += 1;
+        }
+    }
+
+    /// Scroll connection mode up
+    pub fn connection_mode_scroll_up(&mut self) {
+        if self.connection_mode_scroll_offset > 0 {
+            self.connection_mode_scroll_offset -= 1;
+        }
     }
 
     // === CONNECTIONS SEARCH FUNCTIONALITY ===

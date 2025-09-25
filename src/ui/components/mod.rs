@@ -1,6 +1,7 @@
 // FilePath: src/ui/components/mod.rs
 
 pub mod connection_modal;
+pub mod connection_mode;
 pub mod debug_view;
 pub mod query_editor;
 pub mod table_creator;
@@ -10,6 +11,7 @@ pub mod tables_pane;
 pub mod toast;
 
 pub use connection_modal::*;
+pub use connection_mode::*;
 pub use debug_view::*;
 pub use query_editor::*;
 pub use table_creator::*;
