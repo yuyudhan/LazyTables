@@ -1928,15 +1928,6 @@ impl App {
                     self.state.connection_modal_state.go_back();
                 }
             }
-            KeyCode::Char('t') => {
-                // Test connection shortcut
-                if self.state.connection_modal_state.current_step
-                    == crate::ui::components::ModalStep::ConnectionDetails
-                {
-                    // Test the connection
-                    self.test_connection_from_modal().await;
-                }
-            }
             _ => {}
         }
         Ok(())
