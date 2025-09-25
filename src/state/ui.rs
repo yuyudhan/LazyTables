@@ -905,8 +905,12 @@ impl UIState {
         while next_index < self.selectable_table_items.len() {
             if self.selectable_table_items[next_index].is_selectable {
                 self.selected_table_item_index = next_index;
-                crate::log_debug!("Moved table selection down from {} to {} (table: '{}')",
-                                  old_index, next_index, self.selectable_table_items[next_index].object_name);
+                crate::log_debug!(
+                    "Moved table selection down from {} to {} (table: '{}')",
+                    old_index,
+                    next_index,
+                    self.selectable_table_items[next_index].object_name
+                );
                 self.update_tables_list_state_selection();
                 return;
             }
@@ -915,7 +919,10 @@ impl UIState {
 
         // If we reached the end, wrap to first selectable item
         self.selected_table_item_index = self.find_first_selectable_index();
-        crate::log_debug!("Wrapped table selection to first item at index {}", self.selected_table_item_index);
+        crate::log_debug!(
+            "Wrapped table selection to first item at index {}",
+            self.selected_table_item_index
+        );
         self.update_tables_list_state_selection();
     }
 
@@ -935,8 +942,12 @@ impl UIState {
             loop {
                 if self.selectable_table_items[prev_index].is_selectable {
                     self.selected_table_item_index = prev_index;
-                    crate::log_debug!("Moved table selection up from {} to {} (table: '{}')",
-                                      old_index, prev_index, self.selectable_table_items[prev_index].object_name);
+                    crate::log_debug!(
+                        "Moved table selection up from {} to {} (table: '{}')",
+                        old_index,
+                        prev_index,
+                        self.selectable_table_items[prev_index].object_name
+                    );
                     self.update_tables_list_state_selection();
                     return;
                 }
@@ -951,8 +962,11 @@ impl UIState {
         for i in (0..self.selectable_table_items.len()).rev() {
             if self.selectable_table_items[i].is_selectable {
                 self.selected_table_item_index = i;
-                crate::log_debug!("Wrapped table selection to last item at index {} (table: '{}')",
-                                  i, self.selectable_table_items[i].object_name);
+                crate::log_debug!(
+                    "Wrapped table selection to last item at index {} (table: '{}')",
+                    i,
+                    self.selectable_table_items[i].object_name
+                );
                 self.update_tables_list_state_selection();
                 return;
             }
@@ -999,7 +1013,10 @@ impl UIState {
 
     /// Exit search mode for tables pane
     pub fn exit_tables_search(&mut self) {
-        crate::log_debug!("Exiting tables search mode (query was: '{}')", self.tables_search_query);
+        crate::log_debug!(
+            "Exiting tables search mode (query was: '{}')",
+            self.tables_search_query
+        );
         self.tables_search_active = false;
         self.tables_search_query.clear();
         self.filtered_table_items.clear();
@@ -1012,7 +1029,11 @@ impl UIState {
     pub fn add_to_tables_search(&mut self, ch: char) {
         if self.tables_search_active {
             self.tables_search_query.push(ch);
-            crate::log_debug!("Added '{}' to tables search query, now: '{}'", ch, self.tables_search_query);
+            crate::log_debug!(
+                "Added '{}' to tables search query, now: '{}'",
+                ch,
+                self.tables_search_query
+            );
             self.update_filtered_table_items();
         }
     }
@@ -1021,7 +1042,10 @@ impl UIState {
     pub fn backspace_tables_search(&mut self) {
         if self.tables_search_active && !self.tables_search_query.is_empty() {
             self.tables_search_query.pop();
-            crate::log_debug!("Removed character from tables search query, now: '{}'", self.tables_search_query);
+            crate::log_debug!(
+                "Removed character from tables search query, now: '{}'",
+                self.tables_search_query
+            );
             self.update_filtered_table_items();
         }
     }
@@ -1046,8 +1070,11 @@ impl UIState {
             }
         }
 
-        crate::log_debug!("Filtered tables with query '{}': found {} matches",
-                          self.tables_search_query, self.filtered_table_items.len());
+        crate::log_debug!(
+            "Filtered tables with query '{}': found {} matches",
+            self.tables_search_query,
+            self.filtered_table_items.len()
+        );
 
         // Reset selection to first filtered item
         self.selected_table_item_index = 0;

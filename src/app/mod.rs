@@ -240,16 +240,43 @@ impl App {
                     self.state.ui.help_scroll_down(100);
                     return Ok(());
                 }
-                // Page Up/Down for faster scrolling
-                (KeyModifiers::NONE, KeyCode::PageUp)
-                | (KeyModifiers::CONTROL, KeyCode::Char('u')) => {
+                // Page Up/Down for faster scrolling - only consume Ctrl+D/Ctrl+U when help is actively being used
+                (KeyModifiers::NONE, KeyCode::PageUp) => {
                     self.state.ui.help_page_up(10);
                     return Ok(());
                 }
-                (KeyModifiers::NONE, KeyCode::PageDown)
-                | (KeyModifiers::CONTROL, KeyCode::Char('d')) => {
+                (KeyModifiers::NONE, KeyCode::PageDown) => {
                     self.state.ui.help_page_down(100, 10);
                     return Ok(());
+                }
+                // Only handle Ctrl+U/Ctrl+D in help mode if no other pane needs them (fall through)
+                (KeyModifiers::CONTROL, KeyCode::Char('u')) => {
+                    crate::log_debug!("Help mode: Ctrl+U pressed, focused_pane: {:?}", self.state.ui.focused_pane);
+                    // Check if any other pane specifically needs this key
+                    if self.state.ui.focused_pane == FocusedPane::TabularOutput
+                        || self.state.ui.focused_pane == FocusedPane::QueryWindow
+                    {
+                        crate::log_debug!("Help mode: Letting Ctrl+U pass through to focused pane");
+                        // Let other handlers process this
+                    } else {
+                        crate::log_debug!("Help mode: Consuming Ctrl+U for help scrolling");
+                        self.state.ui.help_page_up(10);
+                        return Ok(());
+                    }
+                }
+                (KeyModifiers::CONTROL, KeyCode::Char('d')) => {
+                    crate::log_debug!("Help mode: Ctrl+D pressed, focused_pane: {:?}", self.state.ui.focused_pane);
+                    // Check if any other pane specifically needs this key
+                    if self.state.ui.focused_pane == FocusedPane::TabularOutput
+                        || self.state.ui.focused_pane == FocusedPane::QueryWindow
+                    {
+                        crate::log_debug!("Help mode: Letting Ctrl+D pass through to focused pane");
+                        // Let other handlers process this
+                    } else {
+                        crate::log_debug!("Help mode: Consuming Ctrl+D for help scrolling");
+                        self.state.ui.help_page_down(100, 10);
+                        return Ok(());
+                    }
                 }
                 // Tab to switch between panes
                 (KeyModifiers::NONE, KeyCode::Tab) => {
@@ -1360,9 +1387,13 @@ impl App {
                     }
                     // Pagination
                     (KeyModifiers::CONTROL, KeyCode::Char('d')) => {
+                        crate::log_debug!("Table pagination: Ctrl+D reached, focused_pane: {:?}", self.state.ui.focused_pane);
                         if self.state.ui.focused_pane == FocusedPane::TabularOutput {
+                            crate::log_debug!("Table pagination: Processing Ctrl+D for TabularOutput");
                             if let Some(tab) = self.state.table_viewer_state.current_tab_mut() {
+                                crate::log_debug!("Table pagination: Current tab found, attempting page_down()");
                                 if tab.page_down() {
+                                    crate::log_debug!("Table pagination: page_down() returned true, reloading data");
                                     // Need to reload data
                                     let tab_idx = self.state.table_viewer_state.active_tab;
                                     if let Err(e) = self.state.load_table_data(tab_idx).await {
@@ -1370,14 +1401,24 @@ impl App {
                                             .toast_manager
                                             .error(format!("Failed to load next page: {e}"));
                                     }
+                                } else {
+                                    crate::log_debug!("Table pagination: page_down() returned false (already at last page?)");
                                 }
+                            } else {
+                                crate::log_debug!("Table pagination: No current tab found");
                             }
+                        } else {
+                            crate::log_debug!("Table pagination: Not in TabularOutput pane, ignoring Ctrl+D");
                         }
                     }
                     (KeyModifiers::CONTROL, KeyCode::Char('u')) => {
+                        crate::log_debug!("Table pagination: Ctrl+U reached, focused_pane: {:?}", self.state.ui.focused_pane);
                         if self.state.ui.focused_pane == FocusedPane::TabularOutput {
+                            crate::log_debug!("Table pagination: Processing Ctrl+U for TabularOutput");
                             if let Some(tab) = self.state.table_viewer_state.current_tab_mut() {
+                                crate::log_debug!("Table pagination: Current tab found, attempting page_up()");
                                 if tab.page_up() {
+                                    crate::log_debug!("Table pagination: page_up() returned true, reloading data");
                                     // Need to reload data
                                     let tab_idx = self.state.table_viewer_state.active_tab;
                                     if let Err(e) = self.state.load_table_data(tab_idx).await {
@@ -1385,8 +1426,14 @@ impl App {
                                             .toast_manager
                                             .error(format!("Failed to load previous page: {e}"));
                                     }
+                                } else {
+                                    crate::log_debug!("Table pagination: page_up() returned false (already at first page?)");
                                 }
+                            } else {
+                                crate::log_debug!("Table pagination: No current tab found");
                             }
+                        } else {
+                            crate::log_debug!("Table pagination: Not in TabularOutput pane, ignoring Ctrl+U");
                         }
                     }
                     // Jump navigation in table viewer and tables pane
@@ -1898,11 +1945,17 @@ impl App {
                         KeyCode::Char('I') => {
                             self.state.query_editor.insert_at_line_start();
                         }
-                        // Page scrolling (Ctrl+d, Ctrl+u)
-                        KeyCode::Char('d') if key.modifiers.contains(KeyModifiers::CONTROL) => {
+                        // Page scrolling (Ctrl+d, Ctrl+u) - only when QueryWindow is focused
+                        KeyCode::Char('d')
+                            if key.modifiers.contains(KeyModifiers::CONTROL)
+                                && self.state.ui.focused_pane == FocusedPane::QueryWindow =>
+                        {
                             self.state.scroll_half_page_down();
                         }
-                        KeyCode::Char('u') if key.modifiers.contains(KeyModifiers::CONTROL) => {
+                        KeyCode::Char('u')
+                            if key.modifiers.contains(KeyModifiers::CONTROL)
+                                && self.state.ui.focused_pane == FocusedPane::QueryWindow =>
+                        {
                             self.state.scroll_half_page_up();
                         }
                         // Legacy shortcuts (Ctrl+s, Ctrl+n)

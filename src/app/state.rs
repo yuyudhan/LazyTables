@@ -657,7 +657,9 @@ impl AppState {
             let result = self.load_query_file(&filename);
             match &result {
                 Ok(_) => crate::log_info!("=== LOAD SELECTED SQL FILE DEBUG END - SUCCESS ==="),
-                Err(e) => crate::log_info!("=== LOAD SELECTED SQL FILE DEBUG END - ERROR: {} ===", e),
+                Err(e) => {
+                    crate::log_info!("=== LOAD SELECTED SQL FILE DEBUG END - ERROR: {} ===", e)
+                }
             }
             result
         } else {
@@ -794,7 +796,10 @@ impl AppState {
         crate::log_info!("=== LOAD QUERY FILE DEBUG START ===");
         crate::log_info!("Attempting to load file: {}", filename);
         crate::log_info!("Selected connection index: {}", self.ui.selected_connection);
-        crate::log_info!("Total connections: {}", self.db.connections.connections.len());
+        crate::log_info!(
+            "Total connections: {}",
+            self.db.connections.connections.len()
+        );
 
         // Get connection-specific directory - require active connection
         let connection = self
@@ -804,7 +809,11 @@ impl AppState {
             .get(self.ui.selected_connection)
             .ok_or("No connection selected")?;
 
-        crate::log_info!("Found connection: {} (status: {:?})", connection.name, connection.status);
+        crate::log_info!(
+            "Found connection: {} (status: {:?})",
+            connection.name,
+            connection.status
+        );
 
         // Allow loading files even if connection is not active (user might want to work offline)
         if !connection.is_connected() {
@@ -823,7 +832,11 @@ impl AppState {
         let content = fs::read_to_string(&file_path)?;
 
         // Debug: Log the content being loaded
-        crate::log_info!("Loading SQL file '{}' with content length: {}", filename, content.len());
+        crate::log_info!(
+            "Loading SQL file '{}' with content length: {}",
+            filename,
+            content.len()
+        );
         crate::log_info!("Loading from file path: {:?}", &file_path);
 
         self.query_content = content.clone();
@@ -1213,11 +1226,17 @@ impl AppState {
         self.query_content = self.query_editor.get_content().to_string();
 
         // Debug: Log the content being saved
-        crate::log_info!("Query editor content length: {}", self.query_editor.get_content().len());
+        crate::log_info!(
+            "Query editor content length: {}",
+            self.query_editor.get_content().len()
+        );
         crate::log_info!("Synced query_content length: {}", self.query_content.len());
         crate::log_info!("Current SQL file: {:?}", self.ui.current_sql_file);
         crate::log_info!("Selected connection index: {}", self.ui.selected_connection);
-        crate::log_info!("Total connections: {}", self.db.connections.connections.len());
+        crate::log_info!(
+            "Total connections: {}",
+            self.db.connections.connections.len()
+        );
 
         // Get the current connection name - allow saving even without active connection
         let connection_name = if let Some(connection) = self
@@ -1226,11 +1245,19 @@ impl AppState {
             .connections
             .get(self.ui.selected_connection)
         {
-            crate::log_info!("Found connection: {} (type: {:?}, status: {:?})", connection.name, connection.database_type, connection.status);
+            crate::log_info!(
+                "Found connection: {} (type: {:?}, status: {:?})",
+                connection.name,
+                connection.database_type,
+                connection.status
+            );
             // Use connection name regardless of connection status
             connection.name.clone()
         } else {
-            crate::log_info!("No connection found at index {}, using 'default'", self.ui.selected_connection);
+            crate::log_info!(
+                "No connection found at index {}, using 'default'",
+                self.ui.selected_connection
+            );
             "default".to_string()
         };
 
@@ -1561,11 +1588,18 @@ impl AppState {
 
             // Load table schema from database
             if let Err(e) = self.load_table_schema_for_editor(&table_name).await {
-                crate::log_error!("Failed to load table schema for editor (table '{}'): {}", table_name, e);
+                crate::log_error!(
+                    "Failed to load table schema for editor (table '{}'): {}",
+                    table_name,
+                    e
+                );
                 self.table_editor_state.error_message =
                     Some(format!("Failed to load table schema: {e}"));
             } else {
-                crate::log_debug!("Successfully loaded table schema for editor (table '{}')", table_name);
+                crate::log_debug!(
+                    "Successfully loaded table schema for editor (table '{}')",
+                    table_name
+                );
             }
         } else {
             crate::log_warn!("Attempted to open table editor but no table is selected");
@@ -1767,7 +1801,11 @@ impl AppState {
             crate::log_info!("Opening table '{}' for viewing", table_name);
             // Add tab to viewer
             let tab_idx = self.table_viewer_state.add_tab(table_name.clone());
-            crate::log_debug!("Created new tab with index {} for table '{}'", tab_idx, table_name);
+            crate::log_debug!(
+                "Created new tab with index {} for table '{}'",
+                tab_idx,
+                table_name
+            );
 
             // Load table data
             if let Err(e) = self.load_table_data(tab_idx).await {
@@ -1798,7 +1836,10 @@ impl AppState {
 
             // Switch focus to tabular output
             self.ui.focused_pane = FocusedPane::TabularOutput;
-            crate::log_debug!("Switched focus to tabular output for table '{}'", table_name);
+            crate::log_debug!(
+                "Switched focus to tabular output for table '{}'",
+                table_name
+            );
         } else {
             crate::log_warn!("Attempted to open table but no table is selected");
         }
