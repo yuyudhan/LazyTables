@@ -13,7 +13,7 @@ use std::time::Duration;
 
 pub mod state;
 
-pub use state::{AppState, FocusedPane};
+pub use state::{AppState, FocusedPane, QueryEditMode};
 
 // Simplified internal mode for compatibility - not shown to user
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -884,6 +884,9 @@ impl App {
                             || self.state.ui.focused_pane == FocusedPane::SqlFiles
                         {
                             self.mode = Mode::Query;
+                            // Set QueryEditor to insert mode when entering Query mode with 'i'
+                            self.state.query_editor.set_insert_mode(true);
+                            self.state.ui.query_edit_mode = QueryEditMode::Insert;
                         } else {
                             self.mode = Mode::Insert;
                         }
@@ -1548,6 +1551,52 @@ impl App {
             Mode::Query => {
                 use crate::app::state::QueryEditMode;
 
+                // Handle global pane navigation even in Query mode
+                match (key.modifiers, key.code) {
+                    // Pane navigation with Ctrl+h/j/k/l (works in all modes)
+                    (KeyModifiers::CONTROL, KeyCode::Char('h')) => {
+                        self.state.ui.cancel_pending_gg();
+                        self.state.move_focus_left();
+                        // If we moved away from QueryWindow, exit Query mode
+                        if self.state.ui.focused_pane != crate::app::state::FocusedPane::QueryWindow
+                        {
+                            self.mode = Mode::Normal;
+                        }
+                        return Ok(());
+                    }
+                    (KeyModifiers::CONTROL, KeyCode::Char('j')) => {
+                        self.state.ui.cancel_pending_gg();
+                        self.state.move_focus_down();
+                        // If we moved away from QueryWindow, exit Query mode
+                        if self.state.ui.focused_pane != crate::app::state::FocusedPane::QueryWindow
+                        {
+                            self.mode = Mode::Normal;
+                        }
+                        return Ok(());
+                    }
+                    (KeyModifiers::CONTROL, KeyCode::Char('k')) => {
+                        self.state.ui.cancel_pending_gg();
+                        self.state.move_focus_up();
+                        // If we moved away from QueryWindow, exit Query mode
+                        if self.state.ui.focused_pane != crate::app::state::FocusedPane::QueryWindow
+                        {
+                            self.mode = Mode::Normal;
+                        }
+                        return Ok(());
+                    }
+                    (KeyModifiers::CONTROL, KeyCode::Char('l')) => {
+                        self.state.ui.cancel_pending_gg();
+                        self.state.move_focus_right();
+                        // If we moved away from QueryWindow, exit Query mode
+                        if self.state.ui.focused_pane != crate::app::state::FocusedPane::QueryWindow
+                        {
+                            self.mode = Mode::Normal;
+                        }
+                        return Ok(());
+                    }
+                    _ => {}
+                }
+
                 // Handle vim command mode
                 if self.state.ui.in_vim_command {
                     match key.code {
@@ -1601,31 +1650,44 @@ impl App {
                         _ => {}
                     }
                 } else if self.state.ui.query_edit_mode == QueryEditMode::Insert {
-                    // Insert mode - handle text input
+                    // Insert mode - handle text input using QueryEditor
                     match key.code {
                         KeyCode::Esc => {
                             self.state.ui.query_edit_mode = QueryEditMode::Normal;
+                            self.state.query_editor.set_insert_mode(false);
                         }
                         KeyCode::Enter => {
-                            self.state.insert_char_at_cursor('\n');
+                            self.state.query_editor.insert_newline();
+                            // Sync content back to legacy field
+                            self.state.query_content =
+                                self.state.query_editor.get_content().to_string();
+                            self.state.ui.query_modified = true;
                         }
                         KeyCode::Char(c) => {
-                            self.state.insert_char_at_cursor(c);
+                            self.state.query_editor.insert_char(c);
+                            // Sync content back to legacy field
+                            self.state.query_content =
+                                self.state.query_editor.get_content().to_string();
+                            self.state.ui.query_modified = true;
                         }
                         KeyCode::Backspace => {
-                            self.state.delete_char_at_cursor();
+                            self.state.query_editor.backspace();
+                            // Sync content back to legacy field
+                            self.state.query_content =
+                                self.state.query_editor.get_content().to_string();
+                            self.state.ui.query_modified = true;
                         }
                         KeyCode::Left => {
-                            self.state.move_left();
+                            self.state.query_editor.move_cursor_left();
                         }
                         KeyCode::Right => {
-                            self.state.move_right();
+                            self.state.query_editor.move_cursor_right();
                         }
                         KeyCode::Up => {
-                            self.state.move_up();
+                            self.state.query_editor.move_cursor_up();
                         }
                         KeyCode::Down => {
-                            self.state.move_down();
+                            self.state.query_editor.move_cursor_down();
                         }
                         _ => {}
                     }
@@ -1637,23 +1699,24 @@ impl App {
                         }
                         KeyCode::Char('i') => {
                             self.state.ui.query_edit_mode = QueryEditMode::Insert;
+                            self.state.query_editor.set_insert_mode(true);
                         }
                         KeyCode::Char(':') => {
                             self.state.ui.in_vim_command = true;
                             self.state.ui.vim_command_buffer.clear();
                         }
-                        // Vim navigation
+                        // Vim navigation using QueryEditor methods
                         KeyCode::Char('h') => {
-                            self.state.move_left();
+                            self.state.query_editor.move_cursor_left();
                         }
                         KeyCode::Char('j') => {
-                            self.state.move_down();
+                            self.state.query_editor.move_cursor_down();
                         }
                         KeyCode::Char('k') => {
-                            self.state.move_up();
+                            self.state.query_editor.move_cursor_up();
                         }
                         KeyCode::Char('l') => {
-                            self.state.move_right();
+                            self.state.query_editor.move_cursor_right();
                         }
                         // Word navigation
                         KeyCode::Char('w') => {
