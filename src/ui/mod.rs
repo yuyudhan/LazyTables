@@ -39,6 +39,7 @@ pub enum ConfirmationAction {
     DeleteTable(String),
     DeleteSqlFile(usize),
     ExitApplication,
+    QuitQueryEditor,
     // Add more actions as needed
 }
 
