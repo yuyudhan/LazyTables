@@ -928,7 +928,7 @@ impl QueryEditor {
                 self.pending_command = Some("d".to_string());
                 true
             }
-            'X' => {
+            'x' => {
                 // Delete character under cursor
                 self.delete_char_under_cursor();
                 true
