@@ -1128,266 +1128,56 @@ impl UI {
         }
     }
 
-    /// Draw the query window area
+    /// Draw the query window area using the QueryEditor component
     fn draw_query_window(&self, frame: &mut Frame, area: Rect, state: &mut AppState) {
         let is_focused = state.ui.focused_pane == FocusedPane::QueryWindow;
-        let border_style = if is_focused {
-            Style::default().fg(self.theme.get_color("active_border"))
-        } else {
-            Style::default().fg(self.theme.get_color("border"))
-        };
 
-        // Calculate the available height for the editor (accounting for borders and status)
-        // Reserve lines for: border(2) + mode/file info(4 if focused)
-        let reserved_lines = if is_focused { 6 } else { 2 };
-        let available_height = area.height.saturating_sub(reserved_lines) as usize;
+        // Update the QueryEditor component state
+        state.query_editor.set_focused(is_focused);
+        state
+            .query_editor
+            .set_insert_mode(state.ui.query_edit_mode == crate::app::state::QueryEditMode::Insert);
 
-        // Update the viewport height in state
-        state.ui.query_viewport_height = available_height;
-
-        // Check if there's an active connection for better help messages
-        let has_active_connection = state
-            .db
-            .connections
-            .connections
-            .iter()
-            .any(|conn| conn.is_connected());
-
-        // Get query content lines with viewport
-        let mut query_lines: Vec<Line> = if state.query_content.is_empty() {
-            if !has_active_connection {
-                vec![
-                    Line::from(Span::styled(
-                        "-- SQL Query Editor",
-                        Style::default()
-                            .fg(Color::Gray)
-                            .add_modifier(Modifier::BOLD),
-                    )),
-                    Line::from(""),
-                    Line::from(Span::styled(
-                        "-- Connect to a database first",
-                        Style::default().fg(Color::Gray),
-                    )),
-                    Line::from(Span::styled(
-                        "-- Then write your SQL queries here",
-                        Style::default().fg(Color::Gray),
-                    )),
-                    Line::from(""),
-                    Line::from(Span::styled(
-                        "-- Example:",
-                        Style::default().fg(Color::Gray),
-                    )),
-                    Line::from(Span::styled(
-                        "-- SELECT * FROM users LIMIT 10;",
-                        Style::default().fg(Color::DarkGray),
-                    )),
-                ]
-            } else {
-                vec![
-                    Line::from(Span::styled(
-                        "-- SQL Query Editor",
-                        Style::default()
-                            .fg(Color::Gray)
-                            .add_modifier(Modifier::BOLD),
-                    )),
-                    Line::from(""),
-                    Line::from(Span::styled(
-                        "-- Write your SQL queries here",
-                        Style::default().fg(Color::Gray),
-                    )),
-                    Line::from(Span::styled(
-                        "-- Press Ctrl+Enter to execute",
-                        Style::default().fg(Color::Gray),
-                    )),
-                    Line::from(""),
-                    Line::from(Span::styled(
-                        "-- Example:",
-                        Style::default().fg(Color::Gray),
-                    )),
-                    Line::from(Span::styled(
-                        "-- SELECT * FROM users LIMIT 10;",
-                        Style::default().fg(Color::DarkGray),
-                    )),
-                ]
-            }
-        } else {
-            // Collect all lines into a vector for viewport calculation
-            let all_lines: Vec<&str> = state.query_content.lines().collect();
-            let total_lines = all_lines.len();
-
-            // Calculate the visible range
-            let viewport_start = state.ui.query_viewport_offset;
-            let viewport_end = (viewport_start + available_height).min(total_lines);
-
-            // Get only the visible lines
-            all_lines[viewport_start..viewport_end]
-                .iter()
-                .enumerate()
-                .map(|(relative_idx, line)| {
-                    let actual_line_idx = viewport_start + relative_idx;
-
-                    // Add line numbers for better navigation visibility
-                    let line_number = format!("{:>4} ", actual_line_idx + 1);
-                    let line_number_style = if actual_line_idx == state.ui.query_cursor_line {
-                        Style::default()
-                            .fg(Color::Yellow)
-                            .add_modifier(Modifier::BOLD)
-                    } else {
-                        Style::default().fg(Color::DarkGray)
-                    };
-
-                    let mut spans = vec![Span::styled(line_number, line_number_style)];
-
-                    // Render the line content with cursor if needed
-                    if actual_line_idx == state.ui.query_cursor_line && is_focused {
-                        // Highlight current line with cursor
-                        if state.ui.query_cursor_column > 0
-                            && state.ui.query_cursor_column <= line.len()
-                        {
-                            spans.push(Span::raw(&line[..state.ui.query_cursor_column]));
-                        }
-
-                        // Render cursor
-                        let cursor_char = if state.ui.query_cursor_column < line.len() {
-                            &line[state.ui.query_cursor_column..state.ui.query_cursor_column + 1]
-                        } else {
-                            " "
-                        };
-
-                        let cursor_style = if state.ui.query_edit_mode
-                            == crate::app::state::QueryEditMode::Insert
-                        {
-                            Style::default().bg(Color::Green).fg(Color::Black)
-                        } else {
-                            Style::default().bg(Color::Gray).fg(Color::Black)
-                        };
-
-                        spans.push(Span::styled(cursor_char, cursor_style));
-
-                        if state.ui.query_cursor_column + 1 < line.len() {
-                            spans.push(Span::raw(&line[state.ui.query_cursor_column + 1..]));
-                        } else if state.ui.query_cursor_column > 0
-                            && state.ui.query_cursor_column == line.len()
-                        {
-                            // Cursor is at end of line - already handled above
-                        }
-                    } else {
-                        // Normal line without cursor
-                        spans.push(Span::raw(*line));
-                    }
-
-                    Line::from(spans)
-                })
-                .collect()
-        };
-
-        // Add file info and keybinding help if focused
-        if is_focused {
-            query_lines.push(Line::from(""));
-
-            // Show current file info
-            let file_info = if let Some(ref filename) = state.ui.current_sql_file {
-                let modified_indicator = if state.ui.query_modified { " [+]" } else { "" };
-                format!("File: {filename}{modified_indicator}")
-            } else {
-                "New file (unsaved)".to_string()
-            };
-
-            query_lines.push(Line::from(vec![Span::styled(
-                file_info,
-                Style::default().fg(Color::Gray),
-            )]));
-
-            // Show vim mode and command
-            let mode_info = if state.ui.in_vim_command {
-                format!(":{}", state.ui.vim_command_buffer)
-            } else {
-                match state.ui.query_edit_mode {
-                    crate::app::state::QueryEditMode::Normal => "-- NORMAL --".to_string(),
-                    crate::app::state::QueryEditMode::Insert => "-- INSERT --".to_string(),
-                }
-            };
-
-            query_lines.push(Line::from(vec![Span::styled(
-                mode_info,
-                Style::default()
-                    .fg(
-                        if state.ui.query_edit_mode == crate::app::state::QueryEditMode::Insert {
-                            Color::Green
-                        } else {
-                            Color::Yellow
-                        },
-                    )
-                    .add_modifier(Modifier::BOLD),
-            )]));
-
-            // Add keybinding help
-            query_lines.push(Line::from(""));
-            query_lines.push(Line::from(vec![
-                Span::styled(
-                    "i",
-                    Style::default()
-                        .fg(Color::Yellow)
-                        .add_modifier(Modifier::BOLD),
-                ),
-                Span::styled(" insert | ", Style::default().fg(Color::Gray)),
-                Span::styled(
-                    ":w",
-                    Style::default()
-                        .fg(Color::Yellow)
-                        .add_modifier(Modifier::BOLD),
-                ),
-                Span::styled(" save | ", Style::default().fg(Color::Gray)),
-                Span::styled(
-                    ":q",
-                    Style::default()
-                        .fg(Color::Yellow)
-                        .add_modifier(Modifier::BOLD),
-                ),
-                Span::styled(" quit | ", Style::default().fg(Color::Gray)),
-                Span::styled(
-                    "Ctrl+Enter",
-                    Style::default()
-                        .fg(Color::Yellow)
-                        .add_modifier(Modifier::BOLD),
-                ),
-                Span::styled(" execute", Style::default().fg(Color::Gray)),
-            ]));
+        // Set database type if we have an active connection
+        if let Some(connection) = state.get_selected_connection() {
+            state
+                .query_editor
+                .set_database_type(Some(connection.database_type.clone()));
         }
 
-        // Create title with scroll indicator
-        let total_lines = state.query_content.lines().count();
-        let title = if total_lines > 0 {
-            let current_line = state.ui.query_cursor_line + 1;
-            let scroll_percent = if total_lines > 1 {
-                ((state.ui.query_viewport_offset as f32
-                    / (total_lines.saturating_sub(available_height).max(1)) as f32)
-                    * 100.0) as u32
-            } else {
-                0
-            };
-            format!(
-                " SQL Query Editor [{}:{}/{}] {}% ",
-                current_line,
-                state.ui.query_cursor_column + 1,
-                total_lines,
-                scroll_percent
-            )
-        } else {
-            " SQL Query Editor ".to_string()
-        };
+        // Set file info
+        state
+            .query_editor
+            .set_current_file(state.ui.current_sql_file.clone());
 
-        let query_editor = Paragraph::new(query_lines)
-            .block(
-                Block::default()
-                    .title(title)
-                    .borders(Borders::ALL)
-                    .border_style(border_style),
-            )
-            .style(Style::default().fg(self.theme.get_color("text")))
-            .wrap(Wrap { trim: false });
+        // Sync content between legacy state and QueryEditor
+        if state.query_editor.get_content() != state.query_content {
+            state.query_editor.set_content(state.query_content.clone());
+        }
 
-        frame.render_widget(query_editor, area);
+        // Set available tables and columns for suggestions
+        if let Some(db_objects) = &state.db.database_objects {
+            let table_names: Vec<String> =
+                db_objects.tables.iter().map(|t| t.name.clone()).collect();
+            state.query_editor.set_tables(table_names);
+        }
+
+        // Set columns for current table if available
+        if let Some(metadata) = &state.db.current_table_metadata {
+            let column_names: Vec<String> = metadata.columns_summary.iter()
+                .map(|c| c.name.clone()).collect();
+            state.query_editor.set_table_columns(metadata.table_name.clone(), column_names);
+        }
+
+        // Render the QueryEditor component
+        state.query_editor.render(frame, area);
+
+        // Sync content back to legacy state if it was modified
+        let new_content = state.query_editor.get_content().to_string();
+        if new_content != state.query_content {
+            state.query_content = new_content;
+            state.ui.query_modified = state.query_editor.is_modified();
+        }
     }
 
     /// Draw the status bar
