@@ -5,8 +5,10 @@ use crate::database::{
     connection::ConnectionConfig, Connection, DataType, TableColumn, TableMetadata,
 };
 use async_trait::async_trait;
+use serde_json;
 use sqlx::postgres::{PgPool, PgPoolOptions};
 use sqlx::{Column, Row};
+use uuid;
 
 /// PostgreSQL database connection implementation
 #[derive(Debug)]
@@ -991,6 +993,12 @@ impl PostgresConnection {
                 ORDER BY ordinal_position
             ";
 
+            crate::log_debug!(
+                "get_table_data: Looking for columns for table '{}' in schema '{}'",
+                table,
+                schema
+            );
+
             let column_rows = sqlx::query(columns_query)
                 .bind(table)
                 .bind(schema)
@@ -1001,6 +1009,11 @@ impl PostgresConnection {
                 .iter()
                 .map(|row| row.get::<String, _>("column_name"))
                 .collect();
+
+            crate::log_debug!(
+                "get_table_data: Found columns from schema: {:?}",
+                column_names
+            );
 
             if column_names.is_empty() {
                 return Ok(Vec::new());
@@ -1048,10 +1061,13 @@ impl PostgresConnection {
     /// Execute a raw SQL query and return columns and rows
     pub async fn execute_raw_query(&self, query: &str) -> Result<(Vec<String>, Vec<Vec<String>>)> {
         if let Some(pool) = &self.pool {
-            // Try to execute the query
+            crate::log_debug!("execute_raw_query: Executing query: {}", query);
+
+            // Execute the query
             let rows = sqlx::query(query).fetch_all(pool).await?;
 
             if rows.is_empty() {
+                crate::log_debug!("execute_raw_query: No rows returned");
                 return Ok((Vec::new(), Vec::new()));
             }
 
@@ -1062,18 +1078,28 @@ impl PostgresConnection {
             let column_names: Vec<String> =
                 columns.iter().map(|col| col.name().to_string()).collect();
 
-            // Extract data from all rows
+            crate::log_debug!(
+                "execute_raw_query: Column names: {:?}",
+                column_names
+            );
+            crate::log_debug!("execute_raw_query: Number of rows: {}", rows.len());
+
+            // Extract data from all rows with proper PostgreSQL type handling
             let mut result_rows = Vec::new();
             for row in &rows {
                 let mut row_data = Vec::new();
                 for col in columns {
-                    // Try to get value as string
-                    let value: Option<String> = row.try_get(col.ordinal()).ok();
-                    row_data.push(value.unwrap_or_else(|| "NULL".to_string()));
+                    let value = extract_postgres_value(row, col);
+                    row_data.push(value);
                 }
                 result_rows.push(row_data);
             }
 
+            crate::log_debug!(
+                "execute_raw_query: Returning {} columns and {} rows",
+                column_names.len(),
+                result_rows.len()
+            );
             Ok((column_names, result_rows))
         } else {
             Err(LazyTablesError::Connection(
@@ -1081,6 +1107,7 @@ impl PostgresConnection {
             ))
         }
     }
+
 }
 
 /// Implement ManagedConnection trait for PostgresConnection to work with ConnectionManager
@@ -1130,6 +1157,153 @@ impl Drop for PostgresConnection {
             tokio::spawn(async move {
                 pool.close().await;
             });
+        }
+    }
+}
+
+/// Extract a PostgreSQL value from a row and column, handling different data types robustly
+fn extract_postgres_value(row: &sqlx::postgres::PgRow, col: &sqlx::postgres::PgColumn) -> String {
+    use sqlx::{Column, Row, TypeInfo};
+
+    let col_name = col.name();
+    let col_type = col.type_info().name();
+    let col_ordinal = col.ordinal();
+
+    crate::log_debug!(
+        "extract_postgres_value: Extracting column '{}' (type: {}, ordinal: {})",
+        col_name,
+        col_type,
+        col_ordinal
+    );
+
+    // Try to extract based on PostgreSQL type information
+    match col_type {
+        // Text types
+        "TEXT" | "VARCHAR" | "CHAR" | "BPCHAR" => {
+            if let Ok(val) = row.try_get::<Option<String>, _>(col_ordinal) {
+                val.unwrap_or_else(|| "NULL".to_string())
+            } else {
+                "NULL".to_string()
+            }
+        }
+
+        // Integer types
+        "INT2" | "SMALLINT" => {
+            if let Ok(val) = row.try_get::<Option<i16>, _>(col_ordinal) {
+                val.map(|v| v.to_string()).unwrap_or_else(|| "NULL".to_string())
+            } else {
+                "NULL".to_string()
+            }
+        }
+
+        "INT4" | "INTEGER" | "SERIAL" => {
+            if let Ok(val) = row.try_get::<Option<i32>, _>(col_ordinal) {
+                val.map(|v| v.to_string()).unwrap_or_else(|| "NULL".to_string())
+            } else {
+                "NULL".to_string()
+            }
+        }
+
+        "INT8" | "BIGINT" | "BIGSERIAL" => {
+            if let Ok(val) = row.try_get::<Option<i64>, _>(col_ordinal) {
+                val.map(|v| v.to_string()).unwrap_or_else(|| "NULL".to_string())
+            } else {
+                "NULL".to_string()
+            }
+        }
+
+        // Floating point types
+        "FLOAT4" | "REAL" => {
+            if let Ok(val) = row.try_get::<Option<f32>, _>(col_ordinal) {
+                val.map(|v| v.to_string()).unwrap_or_else(|| "NULL".to_string())
+            } else {
+                "NULL".to_string()
+            }
+        }
+
+        "FLOAT8" | "DOUBLE PRECISION" => {
+            if let Ok(val) = row.try_get::<Option<f64>, _>(col_ordinal) {
+                val.map(|v| v.to_string()).unwrap_or_else(|| "NULL".to_string())
+            } else {
+                "NULL".to_string()
+            }
+        }
+
+        // Boolean type
+        "BOOL" | "BOOLEAN" => {
+            if let Ok(val) = row.try_get::<Option<bool>, _>(col_ordinal) {
+                val.map(|v| v.to_string()).unwrap_or_else(|| "NULL".to_string())
+            } else {
+                "NULL".to_string()
+            }
+        }
+
+        // UUID type
+        "UUID" => {
+            if let Ok(val) = row.try_get::<Option<uuid::Uuid>, _>(col_ordinal) {
+                val.map(|v| v.to_string()).unwrap_or_else(|| "NULL".to_string())
+            } else {
+                // Fallback: try as string
+                if let Ok(val) = row.try_get::<Option<String>, _>(col_ordinal) {
+                    val.unwrap_or_else(|| "NULL".to_string())
+                } else {
+                    "NULL".to_string()
+                }
+            }
+        }
+
+        // Date/time types
+        "DATE" | "TIME" | "TIMESTAMP" | "TIMESTAMPTZ" => {
+            // Try to get as string representation first
+            if let Ok(val) = row.try_get::<Option<String>, _>(col_ordinal) {
+                val.unwrap_or_else(|| "NULL".to_string())
+            } else {
+                "NULL".to_string()
+            }
+        }
+
+        // Numeric/decimal types
+        "NUMERIC" | "DECIMAL" => {
+            // Try to get as string representation
+            if let Ok(val) = row.try_get::<Option<String>, _>(col_ordinal) {
+                val.unwrap_or_else(|| "NULL".to_string())
+            } else {
+                "NULL".to_string()
+            }
+        }
+
+        // JSON types
+        "JSON" | "JSONB" => {
+            if let Ok(val) = row.try_get::<Option<serde_json::Value>, _>(col_ordinal) {
+                val.map(|v| v.to_string()).unwrap_or_else(|| "NULL".to_string())
+            } else if let Ok(val) = row.try_get::<Option<String>, _>(col_ordinal) {
+                val.unwrap_or_else(|| "NULL".to_string())
+            } else {
+                "NULL".to_string()
+            }
+        }
+
+        // Unknown or other types - fallback to string conversion
+        _ => {
+            crate::log_debug!(
+                "extract_postgres_value: Unknown PostgreSQL type '{}' for column '{}', trying string fallback",
+                col_type,
+                col_name
+            );
+
+            // Try various fallback approaches
+            if let Ok(val) = row.try_get::<Option<String>, _>(col_ordinal) {
+                val.unwrap_or_else(|| "NULL".to_string())
+            } else if let Ok(val) = row.try_get::<String, _>(col_ordinal) {
+                val
+            } else {
+                crate::log_warn!(
+                    "extract_postgres_value: Failed to extract value for column '{}' (type: {})",
+                    col_name,
+                    col_type
+                );
+                "NULL".to_string()
+            }
         }
     }
 }
