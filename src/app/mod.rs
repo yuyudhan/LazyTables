@@ -1785,6 +1785,19 @@ impl App {
                         KeyCode::Char('l') => {
                             self.state.query_editor.move_cursor_right();
                         }
+                        // Arrow key navigation (same as vim keys for consistency)
+                        KeyCode::Left => {
+                            self.state.query_editor.move_cursor_left();
+                        }
+                        KeyCode::Right => {
+                            self.state.query_editor.move_cursor_right();
+                        }
+                        KeyCode::Up => {
+                            self.state.query_editor.move_cursor_up();
+                        }
+                        KeyCode::Down => {
+                            self.state.query_editor.move_cursor_down();
+                        }
                         // Word navigation
                         KeyCode::Char('w') => {
                             self.state.query_editor.move_to_next_word();
