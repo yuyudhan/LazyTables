@@ -187,6 +187,19 @@ impl HelpSystem {
         Self::add_command(lines, "↑/↓", "Navigate search results");
         lines.push(Line::from(""));
         lines.push(Line::from(Span::styled(
+            "Connection Modal Commands:",
+            Style::default()
+                .fg(Color::Gray)
+                .add_modifier(Modifier::ITALIC),
+        )));
+        Self::add_command(lines, "Enter", "Test connection");
+        Self::add_command(lines, "←/→", "Navigate form steps");
+        Self::add_command(lines, "Tab/S-Tab", "Navigate form fields");
+        Self::add_command(lines, "i", "Enter insert mode (text fields)");
+        Self::add_command(lines, "ESC", "Exit insert/cancel modal");
+        Self::add_command(lines, "t", "Toggle connection method");
+        lines.push(Line::from(""));
+        lines.push(Line::from(Span::styled(
             "Connection Status:",
             Style::default()
                 .fg(Color::Gray)
