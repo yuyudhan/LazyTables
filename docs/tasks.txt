@@ -1,3 +1,14 @@
+MAJOR features pending.
+Table structure editing.
+sql pane features to be done properly.
+Help modal can be moved into a mode similar to debug mode and connection mode? Think on it first.
+
+=======================================
+the SQL editor when I am in insert mode and I press escape to go into normal mode then I am not able to see the cursor so the cursor visibility should be there so that I can know which line I am on also create line numbers by default and always present
+=======================================
+=======================================
+=======================================
+=======================================
 =======================================
 In the connection creation and connection edit modal. This is the feature I want you to implement.
   🔄 Connection String Mode Preservation
