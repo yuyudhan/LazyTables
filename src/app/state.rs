@@ -492,6 +492,9 @@ impl AppState {
             // Clear table metadata
             self.db.current_table_metadata = None;
 
+            // Reset query editor when switching connections
+            self.reset_query_editor();
+
             // Attempt connection based on database type
             let connection_name = connection.name.clone();
             let result = self.try_connect_to_database(&connection).await;
@@ -525,6 +528,9 @@ impl AppState {
 
                         // Clear table metadata
                         self.db.current_table_metadata = None;
+
+                        // Reset query editor when connection fails
+                        self.reset_query_editor();
 
                         self.toast_manager
                             .error(format!("Connection failed: {error_msg}"));
@@ -601,6 +607,9 @@ impl AppState {
 
             // Clear table metadata
             self.db.current_table_metadata = None;
+
+            // Reset query editor when disconnecting
+            self.reset_query_editor();
 
             // Note: App state database clearing is handled in the async version
 
@@ -1817,6 +1826,19 @@ impl AppState {
     /// Returns true only if there is an active connected connection AND a SQL file is selected
     pub fn is_query_editor_enabled(&self) -> bool {
         self.are_sql_panes_enabled() && self.ui.current_sql_file.is_some()
+    }
+
+    /// Reset the query editor to initial state (clear content, cursor position, etc.)
+    pub fn reset_query_editor(&mut self) {
+        self.query_editor.reset();
+        // Sync with legacy fields
+        self.query_content.clear();
+        self.ui.current_sql_file = None;
+        self.ui.query_modified = false;
+        self.ui.query_cursor_line = 0;
+        self.ui.query_cursor_column = 0;
+        self.ui.query_viewport_offset = 0;
+        self.ui.query_edit_mode = QueryEditMode::Normal;
     }
 
     /// Update query editor database context when connection changes
