@@ -501,7 +501,7 @@ impl QueryEditor {
         self.content = new_lines.join("\n");
     }
 
-    /// Delete character under cursor (X key)
+    /// Delete character under cursor (x key)
     pub fn delete_char_under_cursor(&mut self) {
         if self.is_insert_mode {
             return;
@@ -524,6 +524,31 @@ impl QueryEditor {
                 if self.cursor_col > line.len() {
                     self.cursor_col = line.len();
                 }
+            }
+        }
+
+        self.content = new_lines.join("\n");
+    }
+
+    /// Delete character before cursor (X key)
+    pub fn delete_char_before_cursor(&mut self) {
+        if self.is_insert_mode {
+            return;
+        }
+
+        let lines: Vec<String> = self.content.lines().map(|s| s.to_string()).collect();
+        let mut new_lines = lines;
+
+        if self.cursor_line < new_lines.len() {
+            let line = &mut new_lines[self.cursor_line];
+            let mut chars: Vec<char> = line.chars().collect();
+
+            // Delete character before cursor position (if cursor is not at beginning)
+            if self.cursor_col > 0 {
+                chars.remove(self.cursor_col - 1);
+                *line = chars.into_iter().collect();
+                self.cursor_col -= 1; // Move cursor back by one position
+                self.is_modified = true;
             }
         }
 
@@ -933,6 +958,11 @@ impl QueryEditor {
                 self.delete_char_under_cursor();
                 true
             }
+            'X' => {
+                // Delete character before cursor
+                self.delete_char_before_cursor();
+                true
+            }
             _ => false,
         }
     }
@@ -1312,7 +1342,7 @@ mod tests {
         editor.cursor_line = 0;
         editor.cursor_col = 1;
 
-        // Test X command (delete character under cursor)
+        // Test x command (delete character under cursor)
         editor.delete_char_under_cursor();
 
         assert_eq!(editor.get_content(), "hllo world");
@@ -1329,7 +1359,7 @@ mod tests {
         editor.cursor_line = 0;
         editor.cursor_col = 5;
 
-        // Test X command at end of line (should do nothing)
+        // Test x command at end of line (should do nothing)
         editor.delete_char_under_cursor();
 
         assert_eq!(editor.get_content(), "hello"); // No change
@@ -1345,11 +1375,62 @@ mod tests {
         editor.cursor_line = 0;
         editor.cursor_col = 4;
 
-        // Test X command on last character
+        // Test x command on last character
         editor.delete_char_under_cursor();
 
         assert_eq!(editor.get_content(), "hell");
         assert_eq!(editor.cursor_col, 4); // Cursor should be adjusted to end of line
+        assert!(editor.is_modified());
+    }
+
+    #[test]
+    fn test_delete_char_before_cursor() {
+        let mut editor = QueryEditor::new();
+        editor.set_content("hello world".to_string());
+
+        // Position cursor at 'l' (position 2)
+        editor.cursor_line = 0;
+        editor.cursor_col = 2;
+
+        // Test X command (delete character before cursor)
+        editor.delete_char_before_cursor();
+
+        assert_eq!(editor.get_content(), "hllo world");
+        assert_eq!(editor.cursor_col, 1); // Cursor should move back by one position
+        assert!(editor.is_modified());
+    }
+
+    #[test]
+    fn test_delete_char_before_cursor_at_beginning_of_line() {
+        let mut editor = QueryEditor::new();
+        editor.set_content("hello".to_string());
+
+        // Position cursor at beginning of line (position 0)
+        editor.cursor_line = 0;
+        editor.cursor_col = 0;
+
+        // Test X command at beginning of line (should do nothing)
+        editor.delete_char_before_cursor();
+
+        assert_eq!(editor.get_content(), "hello"); // No change
+        assert_eq!(editor.cursor_col, 0);
+        assert!(!editor.is_modified()); // Should not be marked as modified
+    }
+
+    #[test]
+    fn test_delete_char_before_cursor_single_char() {
+        let mut editor = QueryEditor::new();
+        editor.set_content("a".to_string());
+
+        // Position cursor after the single character (position 1)
+        editor.cursor_line = 0;
+        editor.cursor_col = 1;
+
+        // Test X command on single character line
+        editor.delete_char_before_cursor();
+
+        assert_eq!(editor.get_content(), "");
+        assert_eq!(editor.cursor_col, 0); // Cursor should be at beginning
         assert!(editor.is_modified());
     }
 }
