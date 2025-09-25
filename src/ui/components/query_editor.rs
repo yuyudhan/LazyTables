@@ -3,7 +3,7 @@
 use super::{SqlSuggestionEngine, SuggestionPopup};
 use crate::database::DatabaseType;
 use ratatui::{
-    layout::{Constraint, Direction, Layout, Rect},
+    layout::Rect,
     style::{Color, Modifier, Style},
     text::{Line, Span, Text},
     widgets::{Block, Borders, Paragraph, Wrap},
@@ -14,7 +14,6 @@ use syntect::{
     easy::HighlightLines,
     highlighting::ThemeSet,
     parsing::{SyntaxReference, SyntaxSet},
-    util::LinesWithEndings,
 };
 
 #[derive(Debug)]
@@ -42,6 +41,8 @@ pub struct QueryEditor {
     current_file: Option<String>,
     /// Whether content has been modified
     is_modified: bool,
+    /// Pending vim command (for commands like 'dd', 'dw', etc.)
+    pending_command: Option<String>,
 }
 
 impl Clone for QueryEditor {
@@ -63,6 +64,7 @@ impl Clone for QueryEditor {
             table_columns: self.table_columns.clone(),
             current_file: self.current_file.clone(),
             is_modified: self.is_modified,
+            pending_command: None,
         }
     }
 }
@@ -92,6 +94,7 @@ impl QueryEditor {
             table_columns: HashMap::new(),
             current_file: None,
             is_modified: false,
+            pending_command: None,
         }
     }
 
@@ -177,6 +180,279 @@ impl QueryEditor {
                 self.cursor_line += 1;
                 self.cursor_col = 0;
                 self.adjust_scroll();
+            }
+        }
+    }
+
+    // Vim motion methods
+
+    /// Move to beginning of current line (0 key)
+    pub fn move_to_line_start(&mut self) {
+        self.cursor_col = 0;
+    }
+
+    /// Move to end of current line ($ key)
+    pub fn move_to_line_end(&mut self) {
+        let lines = self.content.lines().collect::<Vec<_>>();
+        if self.cursor_line < lines.len() {
+            self.cursor_col = lines[self.cursor_line].len();
+        }
+    }
+
+    /// Move to beginning of file (gg)
+    pub fn move_to_file_start(&mut self) {
+        self.cursor_line = 0;
+        self.cursor_col = 0;
+        self.scroll_offset = 0;
+    }
+
+    /// Move to end of file (G)
+    pub fn move_to_file_end(&mut self) {
+        let lines = self.content.lines().collect::<Vec<_>>();
+        if !lines.is_empty() {
+            self.cursor_line = lines.len() - 1;
+            self.cursor_col = lines[self.cursor_line].len();
+            self.adjust_scroll();
+        }
+    }
+
+    /// Move to next word (w key)
+    pub fn move_to_next_word(&mut self) {
+        let lines = self.content.lines().collect::<Vec<_>>();
+        if self.cursor_line >= lines.len() {
+            return;
+        }
+
+        let current_line = lines[self.cursor_line];
+        let chars: Vec<char> = current_line.chars().collect();
+
+        // If at end of line, move to beginning of next line
+        if self.cursor_col >= chars.len() {
+            if self.cursor_line < lines.len() - 1 {
+                self.cursor_line += 1;
+                self.cursor_col = 0;
+                self.adjust_scroll();
+                // Skip leading whitespace
+                self.skip_whitespace_forward();
+            }
+            return;
+        }
+
+        // Skip current word
+        while self.cursor_col < chars.len() && !chars[self.cursor_col].is_whitespace() {
+            self.cursor_col += 1;
+        }
+
+        // Skip whitespace
+        while self.cursor_col < chars.len() && chars[self.cursor_col].is_whitespace() {
+            self.cursor_col += 1;
+        }
+
+        // If we reached end of line, move to next line
+        if self.cursor_col >= chars.len() && self.cursor_line < lines.len() - 1 {
+            self.cursor_line += 1;
+            self.cursor_col = 0;
+            self.adjust_scroll();
+            self.skip_whitespace_forward();
+        }
+    }
+
+    /// Move to previous word (b key)
+    pub fn move_to_prev_word(&mut self) {
+        let lines = self.content.lines().collect::<Vec<_>>();
+        if self.cursor_line >= lines.len() {
+            return;
+        }
+
+        // If at beginning of line, move to end of previous line
+        if self.cursor_col == 0 {
+            if self.cursor_line > 0 {
+                self.cursor_line -= 1;
+                self.cursor_col = lines[self.cursor_line].len();
+                self.adjust_scroll();
+                // Move to beginning of last word on previous line
+                self.move_to_word_beginning();
+            }
+            return;
+        }
+
+        let current_line = lines[self.cursor_line];
+        let chars: Vec<char> = current_line.chars().collect();
+
+        // Move back to find beginning of current or previous word
+        if self.cursor_col > 0 {
+            self.cursor_col -= 1;
+        }
+
+        // Skip whitespace backwards
+        while self.cursor_col > 0
+            && self.cursor_col < chars.len()
+            && chars[self.cursor_col].is_whitespace()
+        {
+            self.cursor_col -= 1;
+        }
+
+        // Skip word backwards to find its beginning
+        while self.cursor_col > 0 && !chars[self.cursor_col - 1].is_whitespace() {
+            self.cursor_col -= 1;
+        }
+    }
+
+    /// Move to end of current word (e key)
+    pub fn move_to_end_of_word(&mut self) {
+        let lines = self.content.lines().collect::<Vec<_>>();
+        if self.cursor_line >= lines.len() {
+            return;
+        }
+
+        let current_line = lines[self.cursor_line];
+        let chars: Vec<char> = current_line.chars().collect();
+
+        if chars.is_empty() {
+            return;
+        }
+
+        // If we're at a word character, move to end of current word
+        if self.cursor_col < chars.len() && !chars[self.cursor_col].is_whitespace() {
+            while self.cursor_col < chars.len() - 1 && !chars[self.cursor_col + 1].is_whitespace() {
+                self.cursor_col += 1;
+            }
+        } else {
+            // Skip whitespace to find next word
+            while self.cursor_col < chars.len() && chars[self.cursor_col].is_whitespace() {
+                self.cursor_col += 1;
+            }
+            // Move to end of that word
+            while self.cursor_col < chars.len() - 1 && !chars[self.cursor_col + 1].is_whitespace() {
+                self.cursor_col += 1;
+            }
+        }
+    }
+
+    /// Delete current line (dd)
+    pub fn delete_current_line(&mut self) {
+        if self.is_insert_mode {
+            return;
+        }
+
+        let lines: Vec<String> = self.content.lines().map(|s| s.to_string()).collect();
+        if lines.is_empty() {
+            return;
+        }
+
+        let mut new_lines = lines;
+
+        // Remove current line
+        if self.cursor_line < new_lines.len() {
+            new_lines.remove(self.cursor_line);
+        }
+
+        // Adjust cursor position
+        if new_lines.is_empty() {
+            self.cursor_line = 0;
+            self.cursor_col = 0;
+        } else {
+            if self.cursor_line >= new_lines.len() {
+                self.cursor_line = new_lines.len() - 1;
+            }
+            self.adjust_cursor_column();
+        }
+
+        self.content = new_lines.join("\n");
+        self.is_modified = true;
+        self.adjust_scroll();
+    }
+
+    /// Delete to end of line (d$ or D)
+    pub fn delete_to_line_end(&mut self) {
+        if self.is_insert_mode {
+            return;
+        }
+
+        let lines: Vec<String> = self.content.lines().map(|s| s.to_string()).collect();
+        let mut new_lines = lines;
+
+        if self.cursor_line < new_lines.len() {
+            let line = &mut new_lines[self.cursor_line];
+            if self.cursor_col < line.len() {
+                line.truncate(self.cursor_col);
+                self.is_modified = true;
+            }
+        }
+
+        self.content = new_lines.join("\n");
+    }
+
+    /// Delete word under cursor (dw)
+    pub fn delete_word(&mut self) {
+        if self.is_insert_mode {
+            return;
+        }
+
+        let lines: Vec<String> = self.content.lines().map(|s| s.to_string()).collect();
+        let mut new_lines = lines;
+
+        if self.cursor_line < new_lines.len() {
+            let line = &mut new_lines[self.cursor_line];
+            let mut chars: Vec<char> = line.chars().collect();
+
+            if self.cursor_col < chars.len() {
+                let start_col = self.cursor_col;
+                let mut end_col = start_col;
+
+                // Find end of word
+                while end_col < chars.len() && !chars[end_col].is_whitespace() {
+                    end_col += 1;
+                }
+
+                // Include trailing whitespace
+                while end_col < chars.len() && chars[end_col].is_whitespace() {
+                    end_col += 1;
+                }
+
+                // Remove the word
+                chars.drain(start_col..end_col);
+                *line = chars.into_iter().collect();
+                self.is_modified = true;
+
+                // Adjust cursor
+                if self.cursor_col > line.len() {
+                    self.cursor_col = line.len();
+                }
+            }
+        }
+
+        self.content = new_lines.join("\n");
+    }
+
+    /// Helper method to skip whitespace forward
+    fn skip_whitespace_forward(&mut self) {
+        let lines = self.content.lines().collect::<Vec<_>>();
+        if self.cursor_line < lines.len() {
+            let chars: Vec<char> = lines[self.cursor_line].chars().collect();
+            while self.cursor_col < chars.len() && chars[self.cursor_col].is_whitespace() {
+                self.cursor_col += 1;
+            }
+        }
+    }
+
+    /// Helper method to move to beginning of word
+    fn move_to_word_beginning(&mut self) {
+        let lines = self.content.lines().collect::<Vec<_>>();
+        if self.cursor_line < lines.len() {
+            let chars: Vec<char> = lines[self.cursor_line].chars().collect();
+
+            // Skip whitespace backwards
+            while self.cursor_col > 0
+                && self.cursor_col <= chars.len()
+                && (self.cursor_col == chars.len() || chars[self.cursor_col].is_whitespace())
+            {
+                self.cursor_col -= 1;
+            }
+
+            // Move to beginning of word
+            while self.cursor_col > 0 && !chars[self.cursor_col - 1].is_whitespace() {
+                self.cursor_col -= 1;
             }
         }
     }
@@ -511,71 +787,134 @@ impl QueryEditor {
         self.suggestions_active
     }
 
-    fn apply_syntax_highlighting<'a>(&self, text: &'a str) -> Text<'a> {
+    /// Handle vim command input
+    pub fn handle_vim_command(&mut self, ch: char) -> bool {
+        // If we have a pending command, try to complete it
+        if let Some(ref pending) = self.pending_command.clone() {
+            let full_command = format!("{}{}", pending, ch);
+
+            match full_command.as_str() {
+                "dd" => {
+                    self.delete_current_line();
+                    self.pending_command = None;
+                    return true;
+                }
+                "dw" => {
+                    self.delete_word();
+                    self.pending_command = None;
+                    return true;
+                }
+                "d$" => {
+                    self.delete_to_line_end();
+                    self.pending_command = None;
+                    return true;
+                }
+                _ => {
+                    // Invalid command, clear pending
+                    self.pending_command = None;
+                    return false;
+                }
+            }
+        }
+
+        // Start new command
+        match ch {
+            'd' => {
+                self.pending_command = Some("d".to_string());
+                true
+            }
+            _ => false,
+        }
+    }
+
+    /// Cancel any pending vim command
+    pub fn cancel_pending_command(&mut self) {
+        self.pending_command = None;
+    }
+
+    /// Check if there's a pending vim command
+    pub fn has_pending_command(&self) -> bool {
+        self.pending_command.is_some()
+    }
+
+    /// Get the current pending command for display
+    pub fn get_pending_command(&self) -> Option<&String> {
+        self.pending_command.as_ref()
+    }
+
+    fn apply_syntax_highlighting_with_line_numbers(&self, text: &str) -> Text<'static> {
         let syntax = self.get_syntax();
         let theme = &self.theme_set.themes["base16-ocean.dark"];
 
         let mut highlighter = HighlightLines::new(syntax, theme);
         let mut styled_lines = Vec::new();
+        let lines: Vec<&str> = text.lines().collect();
+        let total_lines = lines.len();
+        let line_number_width = format!("{}", total_lines).len().max(3); // At least 3 digits
 
-        for line in LinesWithEndings::from(text) {
-            if let Ok(ranges) = highlighter.highlight_line(line, &self.syntax_set) {
-                let mut spans = Vec::new();
+        for (line_index, line_content) in lines.iter().enumerate() {
+            let line_number = line_index + 1;
 
-                for (style, text) in ranges {
-                    let fg_color = style.foreground;
-                    let color = Color::Rgb(fg_color.r, fg_color.g, fg_color.b);
-
-                    let mut ratatui_style = Style::default().fg(color);
-                    if style
-                        .font_style
-                        .contains(syntect::highlighting::FontStyle::BOLD)
-                    {
-                        ratatui_style = ratatui_style.add_modifier(Modifier::BOLD);
-                    }
-                    if style
-                        .font_style
-                        .contains(syntect::highlighting::FontStyle::ITALIC)
-                    {
-                        ratatui_style = ratatui_style.add_modifier(Modifier::ITALIC);
-                    }
-                    if style
-                        .font_style
-                        .contains(syntect::highlighting::FontStyle::UNDERLINE)
-                    {
-                        ratatui_style = ratatui_style.add_modifier(Modifier::UNDERLINED);
-                    }
-
-                    spans.push(Span::styled(text, ratatui_style));
-                }
-
-                styled_lines.push(Line::from(spans));
+            // Create line number span with proper formatting
+            let line_number_text = format!("{:>width$} │ ", line_number, width = line_number_width);
+            let line_number_style = if line_index == self.cursor_line {
+                // Highlight current line number
+                Style::default()
+                    .fg(Color::Yellow)
+                    .add_modifier(Modifier::BOLD)
             } else {
-                styled_lines.push(Line::from(line.to_string()));
+                Style::default().fg(Color::DarkGray)
+            };
+
+            let mut spans = vec![Span::styled(line_number_text, line_number_style)];
+
+            // Add syntax highlighting for the actual line content
+            let line_with_newline = format!("{}\n", line_content);
+            if let Ok(ranges) = highlighter.highlight_line(&line_with_newline, &self.syntax_set) {
+                for (style, text) in ranges {
+                    // Skip the newline character we added and convert to owned string
+                    let text_content = text.trim_end_matches('\n').to_string();
+                    if !text_content.is_empty() {
+                        let fg_color = style.foreground;
+                        let color = Color::Rgb(fg_color.r, fg_color.g, fg_color.b);
+
+                        let mut ratatui_style = Style::default().fg(color);
+                        if style
+                            .font_style
+                            .contains(syntect::highlighting::FontStyle::BOLD)
+                        {
+                            ratatui_style = ratatui_style.add_modifier(Modifier::BOLD);
+                        }
+                        if style
+                            .font_style
+                            .contains(syntect::highlighting::FontStyle::ITALIC)
+                        {
+                            ratatui_style = ratatui_style.add_modifier(Modifier::ITALIC);
+                        }
+                        if style
+                            .font_style
+                            .contains(syntect::highlighting::FontStyle::UNDERLINE)
+                        {
+                            ratatui_style = ratatui_style.add_modifier(Modifier::UNDERLINED);
+                        }
+
+                        spans.push(Span::styled(text_content, ratatui_style));
+                    }
+                }
+            } else {
+                // Fallback for lines that can't be highlighted
+                spans.push(Span::raw(line_content.to_string()));
             }
+
+            styled_lines.push(Line::from(spans));
         }
 
         Text::from(styled_lines)
     }
 
     pub fn render(&mut self, f: &mut Frame, area: Rect) {
-        // Create layout with help at the bottom
-        let help_height = if self.is_focused { 4 } else { 0 }; // Space for file info, mode, and keybindings
-
-        let chunks = Layout::default()
-            .direction(Direction::Vertical)
-            .constraints([
-                Constraint::Min(3),              // Editor area (at least 3 lines)
-                Constraint::Length(help_height), // Help area at bottom
-            ])
-            .split(area);
-
-        let editor_area = chunks[0];
-        let help_area = if help_height > 0 {
-            Some(chunks[1])
-        } else {
-            None
-        };
+        // No inline help - all help goes to help modal (accessible with '?')
+        let editor_area = area;
 
         // Create title with database type and mode info
         let title = format!(
@@ -648,8 +987,8 @@ impl QueryEditor {
 
             f.render_widget(welcome_paragraph, editor_inner);
         } else {
-            // Render syntax-highlighted content
-            let highlighted_text = self.apply_syntax_highlighting(&self.content);
+            // Render syntax-highlighted content with line numbers
+            let highlighted_text = self.apply_syntax_highlighting_with_line_numbers(&self.content);
 
             let paragraph = Paragraph::new(highlighted_text)
                 .wrap(Wrap { trim: false })
@@ -658,8 +997,8 @@ impl QueryEditor {
             f.render_widget(paragraph, editor_inner);
         }
 
-        // Set cursor position if in insert mode and focused
-        if self.is_focused && self.is_insert_mode && !self.content.is_empty() {
+        // Set cursor position if focused (both insert and normal modes)
+        if self.is_focused && !self.content.is_empty() {
             let lines: Vec<&str> = self.content.lines().collect();
             let cursor_y = if self.cursor_line >= self.scroll_offset {
                 (self.cursor_line - self.scroll_offset) as u16
@@ -667,20 +1006,20 @@ impl QueryEditor {
                 0
             };
 
+            // Calculate line number width to offset cursor position
+            let total_lines = lines.len();
+            let line_number_width = format!("{}", total_lines).len().max(3);
+            let line_number_offset = (line_number_width + 3) as u16; // +3 for " │ "
+
             let cursor_x = if self.cursor_line < lines.len() {
-                self.cursor_col.min(lines[self.cursor_line].len()) as u16
+                line_number_offset + self.cursor_col.min(lines[self.cursor_line].len()) as u16
             } else {
-                0
+                line_number_offset
             };
 
             if cursor_y < editor_inner.height && cursor_x < editor_inner.width {
                 f.set_cursor_position((editor_inner.x + cursor_x, editor_inner.y + cursor_y));
             }
-        }
-
-        // Render help area at bottom if focused
-        if let Some(help_area) = help_area {
-            self.render_help(f, help_area);
         }
 
         // Render suggestions popup if active
@@ -693,10 +1032,17 @@ impl QueryEditor {
                     editor_inner.y
                 };
 
+                // Calculate line number width to offset cursor position
+                let total_lines = lines.len();
+                let line_number_width = format!("{}", total_lines).len().max(3);
+                let line_number_offset = (line_number_width + 3) as u16; // +3 for " │ "
+
                 let cursor_x = if self.cursor_line < lines.len() {
-                    editor_inner.x + self.cursor_col.min(lines[self.cursor_line].len()) as u16
-                } else {
                     editor_inner.x
+                        + line_number_offset
+                        + self.cursor_col.min(lines[self.cursor_line].len()) as u16
+                } else {
+                    editor_inner.x + line_number_offset
                 };
 
                 (cursor_x, cursor_y)
@@ -706,85 +1052,6 @@ impl QueryEditor {
 
             self.suggestion_popup.render(f, cursor_screen_pos, area);
         }
-    }
-
-    /// Render help information at the bottom
-    fn render_help(&self, f: &mut Frame, area: Rect) {
-        let help_chunks = Layout::default()
-            .direction(Direction::Vertical)
-            .constraints([
-                Constraint::Length(1), // File info
-                Constraint::Length(1), // Mode info
-                Constraint::Length(2), // Keybindings
-            ])
-            .split(area);
-
-        // File info
-        let file_info = if let Some(ref filename) = self.current_file {
-            format!(
-                "File: {}{}",
-                filename,
-                if self.is_modified { " [modified]" } else { "" }
-            )
-        } else {
-            "New file (unsaved)".to_string()
-        };
-
-        let file_paragraph = Paragraph::new(file_info).style(Style::default().fg(Color::Gray));
-        f.render_widget(file_paragraph, help_chunks[0]);
-
-        // Mode info
-        let mode_info = if self.is_insert_mode {
-            "-- INSERT --"
-        } else {
-            "-- NORMAL --"
-        };
-
-        let mode_paragraph = Paragraph::new(mode_info).style(
-            Style::default()
-                .fg(if self.is_insert_mode {
-                    Color::Green
-                } else {
-                    Color::Yellow
-                })
-                .add_modifier(Modifier::BOLD),
-        );
-        f.render_widget(mode_paragraph, help_chunks[1]);
-
-        // Keybindings
-        let keybindings = Line::from(vec![
-            Span::styled(
-                "i",
-                Style::default()
-                    .fg(Color::Yellow)
-                    .add_modifier(Modifier::BOLD),
-            ),
-            Span::styled(" insert | ", Style::default().fg(Color::Gray)),
-            Span::styled(
-                "Esc",
-                Style::default()
-                    .fg(Color::Yellow)
-                    .add_modifier(Modifier::BOLD),
-            ),
-            Span::styled(" normal | ", Style::default().fg(Color::Gray)),
-            Span::styled(
-                "Ctrl+Enter",
-                Style::default()
-                    .fg(Color::Yellow)
-                    .add_modifier(Modifier::BOLD),
-            ),
-            Span::styled(" execute | ", Style::default().fg(Color::Gray)),
-            Span::styled(
-                "Tab",
-                Style::default()
-                    .fg(Color::Yellow)
-                    .add_modifier(Modifier::BOLD),
-            ),
-            Span::styled(" accept suggestion", Style::default().fg(Color::Gray)),
-        ]);
-
-        let keybindings_paragraph = Paragraph::new(keybindings);
-        f.render_widget(keybindings_paragraph, help_chunks[2]);
     }
 }
 
