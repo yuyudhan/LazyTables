@@ -35,7 +35,7 @@ In the connection creation and connection edit modal. This is the feature I want
 =======================================
 =======================================
 =======================================
-
+Instead of showing the buttons in the connection creation and connection edit pane, sorry not pane, I mean modal. Can we just show what keystrokes to press instead, like C for cancel, S for save, T for test.
 =======================================
 THIS WILL REQUIRE DOING AGAIN AND AGAIN:
 DONE:
