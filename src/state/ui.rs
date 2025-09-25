@@ -592,6 +592,11 @@ impl UIState {
             self.last_left_pane = self.focused_pane;
         }
 
+        // When focusing on QueryWindow, set to normal mode so vim commands work immediately
+        if new_pane == FocusedPane::QueryWindow {
+            self.query_edit_mode = QueryEditMode::Normal;
+        }
+
         self.focused_pane = new_pane;
     }
 
