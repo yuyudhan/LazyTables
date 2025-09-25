@@ -1156,32 +1156,57 @@ impl UI {
     fn draw_query_window(&self, frame: &mut Frame, area: Rect, state: &mut AppState) {
         let is_focused = state.ui.focused_pane == FocusedPane::QueryWindow;
         let sql_panes_enabled = state.are_sql_panes_enabled();
+        let query_editor_enabled = state.is_query_editor_enabled();
 
-        if !sql_panes_enabled {
-            // Show disabled state with a message
+        if !query_editor_enabled {
             let disabled_block = Block::default()
                 .title(" SQL Query Editor [DISABLED] ")
                 .borders(Borders::ALL)
                 .border_style(Style::default().fg(Color::DarkGray));
 
-            let disabled_message = Paragraph::new(vec![
-                Line::from(""),
-                Line::from(vec![Span::styled(
-                    "🔒 Connect to a database to enable SQL editing",
-                    Style::default()
-                        .fg(Color::DarkGray)
-                        .add_modifier(Modifier::BOLD),
-                )]),
-                Line::from(""),
-                Line::from(vec![Span::styled(
-                    "Select a connection and press Enter to connect",
-                    Style::default().fg(Color::DarkGray),
-                )]),
-            ])
-            .block(disabled_block)
-            .alignment(ratatui::layout::Alignment::Center);
+            let disabled_message = if !sql_panes_enabled {
+                // No connection
+                Paragraph::new(vec![
+                    Line::from(""),
+                    Line::from(vec![Span::styled(
+                        "🔒 Connect to a database to enable SQL editing",
+                        Style::default()
+                            .fg(Color::DarkGray)
+                            .add_modifier(Modifier::BOLD),
+                    )]),
+                    Line::from(""),
+                    Line::from(vec![Span::styled(
+                        "Select a connection and press Enter to connect",
+                        Style::default().fg(Color::DarkGray),
+                    )]),
+                ])
+            } else {
+                // Connected but no file selected
+                Paragraph::new(vec![
+                    Line::from(""),
+                    Line::from(vec![Span::styled(
+                        "📄 Select an SQL file to start editing",
+                        Style::default()
+                            .fg(Color::DarkGray)
+                            .add_modifier(Modifier::BOLD),
+                    )]),
+                    Line::from(""),
+                    Line::from(vec![Span::styled(
+                        "Navigate to SQL Files pane and press Enter on a file",
+                        Style::default().fg(Color::DarkGray),
+                    )]),
+                    Line::from(vec![Span::styled(
+                        "or press 'n' to create a new SQL file",
+                        Style::default().fg(Color::DarkGray),
+                    )]),
+                ])
+            };
 
-            frame.render_widget(disabled_message, area);
+            let final_message = disabled_message
+                .block(disabled_block)
+                .alignment(ratatui::layout::Alignment::Center);
+
+            frame.render_widget(final_message, area);
             return;
         }
 
