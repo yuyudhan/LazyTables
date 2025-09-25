@@ -383,3 +383,15 @@ macro_rules! log_span {
         tracing::span!($level, $name, $($fields)*)
     };
 }
+
+/// Add a debug message directly (for application-level debugging)
+pub fn add_debug_message(level: &str, target: &str, message: String) {
+    let debug_msg = DebugMessage {
+        timestamp: chrono::Utc::now(),
+        level: level.to_string(),
+        target: target.to_string(),
+        message,
+        location: None,
+    };
+    DEBUG_LOG_STORAGE.add_message(debug_msg);
+}
