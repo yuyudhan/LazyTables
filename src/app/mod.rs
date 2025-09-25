@@ -1757,14 +1757,67 @@ impl App {
                 }
             }
             KeyCode::Tab => {
-                // Use smart navigation that skips irrelevant fields
-                self.state.connection_modal_state.focused_field =
-                    self.state.connection_modal_state.get_smart_next_field();
+                // Enhanced Tab navigation that handles pane switching
+                match self.state.connection_modal_state.current_step {
+                    crate::ui::components::ModalStep::DatabaseTypeSelection => {
+                        match self.state.connection_modal_state.focused_field {
+                            ConnectionField::Cancel => {
+                                // From Cancel in database type selection, advance to connection details step
+                                self.state.connection_modal_state.advance_step();
+                            }
+                            _ => {
+                                // Use smart navigation within database type selection
+                                self.state.connection_modal_state.focused_field =
+                                    self.state.connection_modal_state.get_smart_next_field();
+                            }
+                        }
+                    }
+                    crate::ui::components::ModalStep::ConnectionDetails => {
+                        match self.state.connection_modal_state.focused_field {
+                            ConnectionField::Name => {
+                                // From Name field in connection details, go back to database type selection
+                                self.state.connection_modal_state.go_back();
+                            }
+                            _ => {
+                                // Use smart navigation within connection details
+                                self.state.connection_modal_state.focused_field =
+                                    self.state.connection_modal_state.get_smart_next_field();
+                            }
+                        }
+                    }
+                }
             }
             KeyCode::BackTab => {
-                // Use smart navigation that skips irrelevant fields
-                self.state.connection_modal_state.focused_field =
-                    self.state.connection_modal_state.get_smart_previous_field();
+                // Enhanced BackTab navigation that handles pane switching
+                match self.state.connection_modal_state.current_step {
+                    crate::ui::components::ModalStep::DatabaseTypeSelection => {
+                        match self.state.connection_modal_state.focused_field {
+                            ConnectionField::DatabaseType => {
+                                // From DatabaseType, go to Cancel (wrap around)
+                                self.state.connection_modal_state.focused_field =
+                                    ConnectionField::Cancel;
+                            }
+                            _ => {
+                                // Use smart navigation within database type selection
+                                self.state.connection_modal_state.focused_field =
+                                    self.state.connection_modal_state.get_smart_previous_field();
+                            }
+                        }
+                    }
+                    crate::ui::components::ModalStep::ConnectionDetails => {
+                        match self.state.connection_modal_state.focused_field {
+                            ConnectionField::Cancel => {
+                                // From Cancel field in connection details, go back to database type selection
+                                self.state.connection_modal_state.go_back();
+                            }
+                            _ => {
+                                // Use smart navigation within connection details
+                                self.state.connection_modal_state.focused_field =
+                                    self.state.connection_modal_state.get_smart_previous_field();
+                            }
+                        }
+                    }
+                }
             }
             KeyCode::Down
                 if matches!(
@@ -1926,6 +1979,47 @@ impl App {
                     == crate::ui::components::ModalStep::ConnectionDetails
                 {
                     self.state.connection_modal_state.go_back();
+                }
+            }
+            KeyCode::Char('t') => {
+                // Handle 'T' key based on modifiers
+                if key.modifiers.contains(KeyModifiers::CONTROL) {
+                    // Ctrl+T: Toggle between connection string and individual fields
+                    if self.state.connection_modal_state.current_step
+                        == crate::ui::components::ModalStep::ConnectionDetails
+                    {
+                        self.state.connection_modal_state.using_connection_string =
+                            !self.state.connection_modal_state.using_connection_string;
+
+                        // Clear the opposite fields when switching
+                        if self.state.connection_modal_state.using_connection_string {
+                            // Clear individual fields when switching to connection string
+                            self.state.connection_modal_state.host = "localhost".to_string();
+                            self.state.connection_modal_state.port_input =
+                                match self.state.connection_modal_state.database_type {
+                                    crate::database::DatabaseType::PostgreSQL => "5432".to_string(),
+                                    crate::database::DatabaseType::MySQL
+                                    | crate::database::DatabaseType::MariaDB => "3306".to_string(),
+                                    _ => "5432".to_string(),
+                                };
+                            self.state.connection_modal_state.database.clear();
+                            self.state.connection_modal_state.username.clear();
+                            self.state.connection_modal_state.password.clear();
+                        } else {
+                            // Clear connection string when switching to individual fields
+                            self.state.connection_modal_state.connection_string.clear();
+                        }
+
+                        // Clear any test status when switching input methods
+                        self.state.connection_modal_state.test_status = None;
+                    }
+                } else {
+                    // Plain T: Test connection shortcut - works from any field in connection details step
+                    if self.state.connection_modal_state.current_step
+                        == crate::ui::components::ModalStep::ConnectionDetails
+                    {
+                        self.test_connection_from_modal().await;
+                    }
                 }
             }
             _ => {}
@@ -2427,11 +2521,20 @@ impl App {
         let connection_mode = if self.state.connection_mode.is_none() {
             match self.state.ui.connection_mode_type {
                 crate::state::ui::ConnectionModeType::Add => {
-                    self.state.connection_mode = Some(crate::ui::components::ConnectionMode::new_add());
+                    self.state.connection_mode =
+                        Some(crate::ui::components::ConnectionMode::new_add());
                 }
                 crate::state::ui::ConnectionModeType::Edit => {
-                    if let Some(connection) = self.state.db.connections.connections.get(self.state.ui.selected_connection).cloned() {
-                        self.state.connection_mode = Some(crate::ui::components::ConnectionMode::new_edit(connection));
+                    if let Some(connection) = self
+                        .state
+                        .db
+                        .connections
+                        .connections
+                        .get(self.state.ui.selected_connection)
+                        .cloned()
+                    {
+                        self.state.connection_mode =
+                            Some(crate::ui::components::ConnectionMode::new_edit(connection));
                     } else {
                         // No connection to edit, exit mode
                         self.state.ui.exit_connection_mode();
@@ -2451,7 +2554,8 @@ impl App {
                 code: KeyCode::Char('j'),
                 modifiers: KeyModifiers::NONE,
                 ..
-            } | KeyEvent {
+            }
+            | KeyEvent {
                 code: KeyCode::Down,
                 modifiers: KeyModifiers::NONE,
                 ..
@@ -2462,7 +2566,8 @@ impl App {
                 code: KeyCode::Char('k'),
                 modifiers: KeyModifiers::NONE,
                 ..
-            } | KeyEvent {
+            }
+            | KeyEvent {
                 code: KeyCode::Up,
                 modifiers: KeyModifiers::NONE,
                 ..
@@ -2511,7 +2616,8 @@ impl App {
                         if let Ok(config) = connection_mode.to_connection_config() {
                             self.test_connection_mode_config(config).await;
                         } else {
-                            connection_mode.set_error("Invalid connection configuration".to_string());
+                            connection_mode
+                                .set_error("Invalid connection configuration".to_string());
                         }
                     }
                     crate::ui::components::ConnectionModeAction::Save => {
@@ -2520,21 +2626,41 @@ impl App {
                                 match self.state.ui.connection_mode_type {
                                     crate::state::ui::ConnectionModeType::Add => {
                                         // Add new connection
-                                        if let Err(e) = self.state.db.connections.add_connection(config) {
-                                            connection_mode.set_error(format!("Failed to save connection: {}", e));
+                                        if let Err(e) =
+                                            self.state.db.connections.add_connection(config)
+                                        {
+                                            connection_mode.set_error(format!(
+                                                "Failed to save connection: {}",
+                                                e
+                                            ));
                                         } else {
-                                            self.state.toast_manager.success("Connection saved successfully");
+                                            self.state
+                                                .toast_manager
+                                                .success("Connection saved successfully");
                                             self.state.ui.exit_connection_mode();
                                         }
                                     }
                                     crate::state::ui::ConnectionModeType::Edit => {
                                         // Update existing connection
-                                        if let Some(existing) = self.state.db.connections.connections.get(self.state.ui.selected_connection) {
+                                        if let Some(existing) = self
+                                            .state
+                                            .db
+                                            .connections
+                                            .connections
+                                            .get(self.state.ui.selected_connection)
+                                        {
                                             config.id = existing.id.clone();
-                                            if let Err(e) = self.state.db.connections.update_connection(config) {
-                                                connection_mode.set_error(format!("Failed to update connection: {}", e));
+                                            if let Err(e) =
+                                                self.state.db.connections.update_connection(config)
+                                            {
+                                                connection_mode.set_error(format!(
+                                                    "Failed to update connection: {}",
+                                                    e
+                                                ));
                                             } else {
-                                                self.state.toast_manager.success("Connection updated successfully");
+                                                self.state
+                                                    .toast_manager
+                                                    .success("Connection updated successfully");
                                                 self.state.ui.exit_connection_mode();
                                             }
                                         }
@@ -2568,29 +2694,40 @@ impl App {
             } if !connection_mode.insert_mode => {
                 // Same logic as Enter on Save action
                 match connection_mode.to_connection_config() {
-                    Ok(mut config) => {
-                        match self.state.ui.connection_mode_type {
-                            crate::state::ui::ConnectionModeType::Add => {
-                                if let Err(e) = self.state.db.connections.add_connection(config) {
-                                    connection_mode.set_error(format!("Failed to save connection: {}", e));
+                    Ok(mut config) => match self.state.ui.connection_mode_type {
+                        crate::state::ui::ConnectionModeType::Add => {
+                            if let Err(e) = self.state.db.connections.add_connection(config) {
+                                connection_mode
+                                    .set_error(format!("Failed to save connection: {}", e));
+                            } else {
+                                self.state
+                                    .toast_manager
+                                    .success("Connection saved successfully");
+                                self.state.ui.exit_connection_mode();
+                            }
+                        }
+                        crate::state::ui::ConnectionModeType::Edit => {
+                            if let Some(existing) = self
+                                .state
+                                .db
+                                .connections
+                                .connections
+                                .get(self.state.ui.selected_connection)
+                            {
+                                config.id = existing.id.clone();
+                                if let Err(e) = self.state.db.connections.update_connection(config)
+                                {
+                                    connection_mode
+                                        .set_error(format!("Failed to update connection: {}", e));
                                 } else {
-                                    self.state.toast_manager.success("Connection saved successfully");
+                                    self.state
+                                        .toast_manager
+                                        .success("Connection updated successfully");
                                     self.state.ui.exit_connection_mode();
                                 }
                             }
-                            crate::state::ui::ConnectionModeType::Edit => {
-                                if let Some(existing) = self.state.db.connections.connections.get(self.state.ui.selected_connection) {
-                                    config.id = existing.id.clone();
-                                    if let Err(e) = self.state.db.connections.update_connection(config) {
-                                        connection_mode.set_error(format!("Failed to update connection: {}", e));
-                                    } else {
-                                        self.state.toast_manager.success("Connection updated successfully");
-                                        self.state.ui.exit_connection_mode();
-                                    }
-                                }
-                            }
                         }
-                    }
+                    },
                     Err(e) => {
                         connection_mode.set_error(e);
                     }
@@ -2609,7 +2746,8 @@ impl App {
                 code: KeyCode::Char(c),
                 modifiers: KeyModifiers::NONE,
                 ..
-            } | KeyEvent {
+            }
+            | KeyEvent {
                 code: KeyCode::Char(c),
                 modifiers: KeyModifiers::SHIFT,
                 ..
@@ -2647,7 +2785,9 @@ impl App {
                     match conn.connect().await {
                         Ok(()) => match conn.test_connection().await {
                             Ok(()) => {
-                                self.state.toast_manager.success("Connection test successful!");
+                                self.state
+                                    .toast_manager
+                                    .success("Connection test successful!");
                             }
                             Err(e) => {
                                 connection_mode.set_error(format!("Connection test failed: {}", e));
@@ -2665,7 +2805,9 @@ impl App {
                     match conn.connect().await {
                         Ok(()) => match conn.test_connection().await {
                             Ok(()) => {
-                                self.state.toast_manager.success("Connection test successful!");
+                                self.state
+                                    .toast_manager
+                                    .success("Connection test successful!");
                             }
                             Err(e) => {
                                 connection_mode.set_error(format!("Connection test failed: {}", e));
@@ -2683,7 +2825,9 @@ impl App {
                     match conn.connect().await {
                         Ok(()) => match conn.test_connection().await {
                             Ok(()) => {
-                                self.state.toast_manager.success("Connection test successful!");
+                                self.state
+                                    .toast_manager
+                                    .success("Connection test successful!");
                             }
                             Err(e) => {
                                 connection_mode.set_error(format!("Connection test failed: {}", e));

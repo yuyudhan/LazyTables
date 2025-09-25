@@ -1082,6 +1082,13 @@ fn render_modal_header_with_hints(f: &mut Frame, modal_state: &ConnectionModalSt
             ),
             Span::styled(" - Test  •  ", Style::default().fg(Color::Gray)),
             Span::styled(
+                "Ctrl+T",
+                Style::default()
+                    .fg(Color::Cyan)
+                    .add_modifier(Modifier::BOLD),
+            ),
+            Span::styled(" - Toggle Input  •  ", Style::default().fg(Color::Gray)),
+            Span::styled(
                 "S",
                 Style::default()
                     .fg(Color::Green)
