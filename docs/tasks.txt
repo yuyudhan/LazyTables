@@ -1,51 +1,16 @@
-MAJOR features pending.
-Table structure editing.
-sql pane features to be done properly.
-Help modal can be moved into a mode similar to debug mode and connection mode? Think on it first.
-=======================================
-In the table data viewer pane, earlier when I was pressing Ctrl+D and Ctrl+U, it used to go to the next page and previous page. It is not working right now. Can you see if there is any issue in this?
-=======================================
-In the SQL query editor, once I have edited the file and I am in the normal mode, pressing E or CTRL+ENTER should execute the query, show a toast message as well as it should print in the debug mode toggle, the debug view that we have created, add more info, log, debug error messages as needed.
-=======================================
-In the SQL editor, I think my save functionality is all screwed up. Can you see how the files are being managed? Where the files are getting saved? So we have the SQL files pane which saves the files. SQL editor pane is where I will go and press colon W like whim to save the file in normal mode. But whenever I save, it is not saving. I have when I change. something go outside and come back. It is like before the changes that I made are not reflected. There is some bug. Can you find it out properly?
-=======================================
-DONE:
-In the debug mode window, there is a log statistics that is mentioned. Actually it is flickering a lot. It is sometimes showing info error. It is switching at a very high frequency, like per second, two, three times. Is there some issue with that?
-=======================================
-In the SQL query editor, I think there is something wrong. When I press colon W, it should save the file. I don't know if it is saving. Can you verify if it is saving correctly and make it work?
-=======================================
-DONE:
-In the SQL query editor, I don't think I'm able to go to lines above and lines below by using the J and K keys in the normal mode. Why do you think this is happening? Can you make it happen? Even the arrow keys are not helping me go up and down. I am able to use the arrow keys to go up and down in the insert mode but in the normal mode it is not working. Can you check and resolve this behaviour please?
 
-=======================================
-
-When the connection is switched or connection is disconnected, the SQL query editor should get reset. If I changed connection to some other connection, then also SQL query editor should get reset.
 =======================================
 In the SQL Editor we have VIM modes active. In that VIM mode I want you to implement pressing X in normal mode to delete the character under cursor.
-=======================================
 
-I want you to implement the query execution feature properly. The errors of the query should show in the toast if there are any errors. I should be able to press Ctrl+Enter to execute the query which is in focus of my cursor and the result should show in the data pane.
 =======================================
 This is for the SQL query editor pane. Can you implement pressing O to insert new line and going into edit mode pressing shift O to create a line above and going to insert mode pressing capital A to go at the end of the line pressing capital I to start editing from the below beginning of the line. These are the standard vim motions.
+
 =======================================
 =======================================
 =======================================
 =======================================
 I am seeing a strange behavior when I am in the SQL query editor. When I press Q and then press Y, it does not quit. But when I press Q and press Y, the application gets quit correctly. I don't know why this is happening. Can you find out the issue and resolve it? This is happening when I am in insert mode and then I go into normal mode. This happens only when I come back to normal mode after going into insert mode. What might be the issue?
-=======================================
-DONE:
-the SQL editor when I am in insert mode and I press escape to go into normal mode then I am not able to see the cursor so the cursor visibility should be there so that I can know which line I am on also create line numbers by default and always present
-=======================================
-DONE:
-When the SQL suggestions come, there is no way to escape from the SQL suggestions pop-up box. When I press escape, it should close the box. I don't want solution, so I will press escape.
-=======================================
-DONE:
-SQL query editor and SQL files should be kind of disabled till a connection is selected because all the SQL files will be always related to a connection only.
-=======================================
-DONE:
-The SQL query editor should be disabled till a SQL file is selected because you can edit a file only so without SQL file being selected by pressing enter in the SQL files pane the SQL query should be disabled and it should just give a guidance and select an SQL file on the SQL files pane
-=======================================
-In the SQL query editor, can you add the standard key bindings for basic motions like GG, capital G, small double G, then dollar to go to the last line, zero to go to the first line, DD to delete the line. All the basics can you add please.
+
 =======================================
 =======================================
 =======================================
@@ -107,73 +72,13 @@ I want you to complete the edit functionality modal in the connections pane so t
 =======================================
 =======================================
 =======================================
-
 =======================================
-DONE:
-In the SQL files pane, I think when we do the slash based search, it is searching and showing the matching files only. But when I press on a file which is searched and then I press enter, I don't think it is loading. Can you validate if this issue exists and can you fix it?
-
 =======================================
-DONE:
-I want you to implement the search functionality in the connection screen. The search shall be triggered by pressing the slash command. And after the search is done, I should be able to use the arrow keys to search within the connections. And when I press enter on anything pointed, even after searching, it should open that connection.
-
 =======================================
-DONE:
-In the table details pane, when I press j, it does a scrolling. But even after when all the lines have been shown, even then the J keeps on going further down. So it initially as an example shows one out of five, which is table details one slash five. But when I press j 20 times, it will say table details 20 slash five. Why is this happening? Can you resolve this bug? I don't want cycling in this pane.
-
 =======================================
-DONE:
-Now let us focus on the table data viewer section. So in this, when we are in a particular cell, we should have a keyboard shortcut to edit the contents of that cell. And once we press enter, the value should get updated. This is supposed to act as a edit mechanism for the data in the tables. Focus on the data viewing data table pane table data pane and ensure that this feature is properly implemented. The toast should give the message properly when the data gets updated or if there is any error.
-
 =======================================
-DONE:
-I think for the debug mode full screen pane mode switch, we created the shortcut called control D but control D and control U were the shortcuts for the table data viewing pane for going to the next page and going to the previous page I think they are conflicting so can you update the shortcut for going into the control B which is currently set for going into the debug pane to get the debug logs.
-
 =======================================
-DONE:
-the connections pane, connection search functionality which is triggered by pressing the forward slash is not working correctly as soon as I press forward slash I don't see any connections it says no connections are configured however when we are not in the search mode the connections that are configured are listed down properly please correct this work and make the search functionality work correctly.
-
 =======================================
-DONE:
-THIS WILL NEED TO BE DONE AGAIN AND AGAIN
-Can you check the help modal that opens when pressing question mark? It should align with all the panes, current options that are there. So it should not show anything different from what options are available in each of the panes.
-
 =======================================
-DONE:
-There is a table details view pane where we see the tabular data and the schema. I think there is something wrong with the pane because like for other panes, when we focus on that pane only, then it is shown in blue color in a highlighted manner. But the details of the table, I mean the data of the table and the table schema, the pane this is always showing to be highlighted in blue color. Can you resolve this particular problem?
-
 =======================================
-DONE:
-the table data viewer so basically we are showing 20 rows but one problem I am seeing when all the 20 rows are not coming within the panes allotted size in the screen what is happening is while pressing J it is going down but I don't think the scrolling is happening properly can you please validate and see if this is the problem and if you can resolve it please
-
-=======================================
-DONE
-When I press Q, it basically closes the application. So if accidentally somebody presses Q, then the application will get closed and their connection will get lost and they have to again open the app. So when Q is pressed, can you ensure to ask a confirmation from the user in the confirmation? When you're asking for the confirmation, you should basically tell the connection will be closed. And do you want to confirm that you want to exit the application? Make a proper message and get that confirmation, please. You can try and identify the right key bindings for the confirmation box. In the confirmation box, you should show a proper message.The buttons that are shown should have a key binding of them their own.
-
-=======================================
-DONE:
-In the table data view mechanism in the heading I don't see the number of columns I see the number of rows can you also display the number of columns along with this also another functionality which is missing is the horizontal scrolling so horizontal scrolling should scroll to the right and left if the number of columns don't fit in the width that is present. I think the number of columns to be displayed you have fixed it somewhere can you just verify if this is the case and make it dynamic and horizontally scrollable.
-
-=======================================
-DONE:
-In the table/views listing option, I think when you press J to go down and when you reach the last, it cycles back to the first one after pressing another J. But when you are at the first one, when you press K to go up, it doesn't cycle to the last one. Can you verify if this is the case and fix this bug?
-
-=======================================
-DONE:
-from the help menu that comes after pressing question mark in the lazy tables application the parent modal only should be black background there should be no transparency actually I am seeing that the text from the behind and some residual characters are still showing so we don't need to clear the entire screen maybe but the modal only can have a black background so that the background text does not show.
-
-=======================================
-DONE:
-In the SQL files pane, we have the suggestions, enter to load and for new are, rename the delete C copy slash search. We want to remove these help items from the pane. Instead, it should come after the key question mark has been pressed while the SQL files pane is focused. From the SQL files, remove the help assistance, just put the assistance in the help model which is triggered by pressing question mark.
-
-=======================================
-DONE:
-From the table details pane, remove the help and actions and assistance related things. They should be shown while the question mark is put. I mean question mark is pressed while the table details pane is focused. We want the help to be in the help model only as a standard across the application. So, do it for the table details pane. Once the question mark is pressed, then in the help model, the details related to table details are put, but not within the table details pane. We don't want to show any help and actions.
-
-=======================================
-DONE:
-In the connections pane, we have a lot of help assistance details provided within the pane. We don't want it to be there. We want it to be in the help modal. Help modal is triggered while we press question mark. So when we are focused on the connections pane and then press question mark, then the help modal should open with the details of the connections pane. In the pane specific, section of the help modal.
-
-=======================================
-DONE:
-In the table slash views, I want you to remove all the help items from this pane. The pane items, sorry, the help item should only be available from the pressing of question mark and opening of help model. Help model is the standard mechanism of providing all the help. So remove everything from table slash views and move it to the help model. Also, I see press Ctrl + H to go to connections. This is wrong. You can just remove it from the table slash views pane.
 

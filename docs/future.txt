@@ -1,2 +1,7 @@
 Configuration for theming should also be in the ~/.config/lazytables directory.
 
+MAJOR features pending.
+Table structure editing.
+sql pane features to be done properly.
+Help modal can be moved into a mode similar to debug mode and connection mode? Think on it first.
+
