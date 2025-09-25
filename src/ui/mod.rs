@@ -1164,9 +1164,14 @@ impl UI {
 
         // Set columns for current table if available
         if let Some(metadata) = &state.db.current_table_metadata {
-            let column_names: Vec<String> = metadata.columns_summary.iter()
-                .map(|c| c.name.clone()).collect();
-            state.query_editor.set_table_columns(metadata.table_name.clone(), column_names);
+            let column_names: Vec<String> = metadata
+                .columns_summary
+                .iter()
+                .map(|c| c.name.clone())
+                .collect();
+            state
+                .query_editor
+                .set_table_columns(metadata.table_name.clone(), column_names);
         }
 
         // Render the QueryEditor component
