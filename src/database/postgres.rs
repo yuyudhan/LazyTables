@@ -1078,10 +1078,7 @@ impl PostgresConnection {
             let column_names: Vec<String> =
                 columns.iter().map(|col| col.name().to_string()).collect();
 
-            crate::log_debug!(
-                "execute_raw_query: Column names: {:?}",
-                column_names
-            );
+            crate::log_debug!("execute_raw_query: Column names: {:?}", column_names);
             crate::log_debug!("execute_raw_query: Number of rows: {}", rows.len());
 
             // Extract data from all rows with proper PostgreSQL type handling
@@ -1107,7 +1104,6 @@ impl PostgresConnection {
             ))
         }
     }
-
 }
 
 /// Implement ManagedConnection trait for PostgresConnection to work with ConnectionManager
@@ -1190,7 +1186,8 @@ fn extract_postgres_value(row: &sqlx::postgres::PgRow, col: &sqlx::postgres::PgC
         // Integer types
         "INT2" | "SMALLINT" => {
             if let Ok(val) = row.try_get::<Option<i16>, _>(col_ordinal) {
-                val.map(|v| v.to_string()).unwrap_or_else(|| "NULL".to_string())
+                val.map(|v| v.to_string())
+                    .unwrap_or_else(|| "NULL".to_string())
             } else {
                 "NULL".to_string()
             }
@@ -1198,7 +1195,8 @@ fn extract_postgres_value(row: &sqlx::postgres::PgRow, col: &sqlx::postgres::PgC
 
         "INT4" | "INTEGER" | "SERIAL" => {
             if let Ok(val) = row.try_get::<Option<i32>, _>(col_ordinal) {
-                val.map(|v| v.to_string()).unwrap_or_else(|| "NULL".to_string())
+                val.map(|v| v.to_string())
+                    .unwrap_or_else(|| "NULL".to_string())
             } else {
                 "NULL".to_string()
             }
@@ -1206,7 +1204,8 @@ fn extract_postgres_value(row: &sqlx::postgres::PgRow, col: &sqlx::postgres::PgC
 
         "INT8" | "BIGINT" | "BIGSERIAL" => {
             if let Ok(val) = row.try_get::<Option<i64>, _>(col_ordinal) {
-                val.map(|v| v.to_string()).unwrap_or_else(|| "NULL".to_string())
+                val.map(|v| v.to_string())
+                    .unwrap_or_else(|| "NULL".to_string())
             } else {
                 "NULL".to_string()
             }
@@ -1215,7 +1214,8 @@ fn extract_postgres_value(row: &sqlx::postgres::PgRow, col: &sqlx::postgres::PgC
         // Floating point types
         "FLOAT4" | "REAL" => {
             if let Ok(val) = row.try_get::<Option<f32>, _>(col_ordinal) {
-                val.map(|v| v.to_string()).unwrap_or_else(|| "NULL".to_string())
+                val.map(|v| v.to_string())
+                    .unwrap_or_else(|| "NULL".to_string())
             } else {
                 "NULL".to_string()
             }
@@ -1223,7 +1223,8 @@ fn extract_postgres_value(row: &sqlx::postgres::PgRow, col: &sqlx::postgres::PgC
 
         "FLOAT8" | "DOUBLE PRECISION" => {
             if let Ok(val) = row.try_get::<Option<f64>, _>(col_ordinal) {
-                val.map(|v| v.to_string()).unwrap_or_else(|| "NULL".to_string())
+                val.map(|v| v.to_string())
+                    .unwrap_or_else(|| "NULL".to_string())
             } else {
                 "NULL".to_string()
             }
@@ -1232,7 +1233,8 @@ fn extract_postgres_value(row: &sqlx::postgres::PgRow, col: &sqlx::postgres::PgC
         // Boolean type
         "BOOL" | "BOOLEAN" => {
             if let Ok(val) = row.try_get::<Option<bool>, _>(col_ordinal) {
-                val.map(|v| v.to_string()).unwrap_or_else(|| "NULL".to_string())
+                val.map(|v| v.to_string())
+                    .unwrap_or_else(|| "NULL".to_string())
             } else {
                 "NULL".to_string()
             }
@@ -1241,7 +1243,8 @@ fn extract_postgres_value(row: &sqlx::postgres::PgRow, col: &sqlx::postgres::PgC
         // UUID type
         "UUID" => {
             if let Ok(val) = row.try_get::<Option<uuid::Uuid>, _>(col_ordinal) {
-                val.map(|v| v.to_string()).unwrap_or_else(|| "NULL".to_string())
+                val.map(|v| v.to_string())
+                    .unwrap_or_else(|| "NULL".to_string())
             } else {
                 // Fallback: try as string
                 if let Ok(val) = row.try_get::<Option<String>, _>(col_ordinal) {
@@ -1275,7 +1278,8 @@ fn extract_postgres_value(row: &sqlx::postgres::PgRow, col: &sqlx::postgres::PgC
         // JSON types
         "JSON" | "JSONB" => {
             if let Ok(val) = row.try_get::<Option<serde_json::Value>, _>(col_ordinal) {
-                val.map(|v| v.to_string()).unwrap_or_else(|| "NULL".to_string())
+                val.map(|v| v.to_string())
+                    .unwrap_or_else(|| "NULL".to_string())
             } else if let Ok(val) = row.try_get::<Option<String>, _>(col_ordinal) {
                 val.unwrap_or_else(|| "NULL".to_string())
             } else {
