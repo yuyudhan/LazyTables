@@ -1733,8 +1733,34 @@ impl App {
                         }
                         _ => {}
                     }
+                } else if key.modifiers == KeyModifiers::CONTROL {
+                    // Handle Ctrl key combinations in query mode
+                    if key.code == KeyCode::Enter {
+                        // Execute query at cursor position
+                        match self.state.execute_query_at_cursor().await {
+                            Ok(()) => {
+                                // Query executed successfully, result is already in the data pane
+                            }
+                            Err(_) => {
+                                // Error is already shown in toast notification
+                            }
+                        }
+                    }
                 } else {
                     // Normal mode - vim navigation
+                    if let (KeyModifiers::CONTROL, KeyCode::Enter) = (key.modifiers, key.code) {
+                        // Execute query at cursor position
+                        match self.state.execute_query_at_cursor().await {
+                            Ok(()) => {
+                                // Query executed successfully, result is already in the data pane
+                            }
+                            Err(_) => {
+                                // Error is already shown in toast notification
+                            }
+                        }
+                    }
+
+                    // Handle normal mode key presses (no modifiers)
                     match key.code {
                         KeyCode::Esc => {
                             // Cancel any pending vim commands first
@@ -1785,6 +1811,17 @@ impl App {
                         KeyCode::Char('l') => {
                             self.state.query_editor.move_cursor_right();
                         }
+                        KeyCode::Char('E') => {
+                            // Execute query at cursor position with 'E' key
+                            match self.state.execute_query_at_cursor().await {
+                                Ok(()) => {
+                                    // Query executed successfully, result is already in the data pane
+                                }
+                                Err(_) => {
+                                    // Error is already shown in toast notification
+                                }
+                            }
+                        }
                         // Arrow key navigation (same as vim keys for consistency)
                         KeyCode::Left => {
                             self.state.query_editor.move_cursor_left();
@@ -1832,6 +1869,27 @@ impl App {
                             self.state.query_content =
                                 self.state.query_editor.get_content().to_string();
                             self.state.ui.query_modified = true;
+                        }
+                        // Vim insert mode commands
+                        KeyCode::Char('o') => {
+                            self.state.query_editor.insert_line_below();
+                            // Sync content back to legacy field
+                            self.state.query_content =
+                                self.state.query_editor.get_content().to_string();
+                            self.state.ui.query_modified = true;
+                        }
+                        KeyCode::Char('O') => {
+                            self.state.query_editor.insert_line_above();
+                            // Sync content back to legacy field
+                            self.state.query_content =
+                                self.state.query_editor.get_content().to_string();
+                            self.state.ui.query_modified = true;
+                        }
+                        KeyCode::Char('A') => {
+                            self.state.query_editor.append_to_line_end();
+                        }
+                        KeyCode::Char('I') => {
+                            self.state.query_editor.insert_at_line_start();
                         }
                         // Page scrolling (Ctrl+d, Ctrl+u)
                         KeyCode::Char('d') if key.modifiers.contains(KeyModifiers::CONTROL) => {

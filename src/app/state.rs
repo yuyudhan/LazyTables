@@ -1884,6 +1884,148 @@ impl AppState {
         self.update_query_editor_context();
         Ok(())
     }
+
+    /// Execute the SQL statement at cursor position
+    pub async fn execute_query_at_cursor(&mut self) -> Result<(), String> {
+        // First, ensure we have a connected database
+        let selected_connection_idx = self.ui.selected_connection;
+
+        // Check if we have a valid connection
+        if selected_connection_idx >= self.db.connections.connections.len() {
+            self.toast_manager.error("No connection selected");
+            return Err("No connection selected".to_string());
+        }
+
+        let connection = &self.db.connections.connections[selected_connection_idx];
+        if !connection.is_connected() {
+            self.toast_manager.error("Not connected to database");
+            return Err("Not connected to database".to_string());
+        }
+
+        // Get the SQL statement at cursor position
+        let query = match self.query_editor.get_statement_at_cursor() {
+            Some(stmt) => stmt.trim().to_string(),
+            None => {
+                self.toast_manager
+                    .warning("No SQL statement found at cursor position");
+                return Err("No SQL statement found at cursor position".to_string());
+            }
+        };
+
+        if query.is_empty() {
+            self.toast_manager.warning("Empty query");
+            return Err("Empty query".to_string());
+        }
+
+        // Get the active connection from the connection manager
+        let connection_id = &connection.id;
+
+        // Execute the query
+        self.toast_manager.info(format!(
+            "Executing query: {}",
+            if query.len() > 50 {
+                format!("{}...", &query[..50])
+            } else {
+                query.clone()
+            }
+        ));
+
+        // Add debug message for query execution start
+        crate::logging::add_debug_message(
+            "INFO",
+            "query_execution",
+            format!("Starting query execution: {}", query),
+        );
+
+        match self
+            .connection_manager
+            .execute_raw_query(connection_id, &query)
+            .await
+        {
+            Ok((columns, rows)) => {
+                // Create a new table tab or update existing one
+                let tab_name =
+                    format!("Query Result ({})", chrono::Local::now().format("%H:%M:%S"));
+
+                let tab_index = self.table_viewer_state.add_tab(tab_name);
+
+                if let Some(tab) = self.table_viewer_state.tabs.get_mut(tab_index) {
+                    // Convert string columns to ColumnInfo
+                    tab.columns = columns
+                        .iter()
+                        .map(|col_name| {
+                            crate::ui::components::ColumnInfo {
+                                name: col_name.clone(),
+                                data_type: "TEXT".to_string(), // Default type
+                                is_nullable: true,
+                                is_primary_key: false,
+                                max_display_width: col_name.len().clamp(10, 30),
+                            }
+                        })
+                        .collect();
+
+                    tab.rows = rows;
+                    tab.total_rows = tab.rows.len();
+                    tab.loading = false;
+                    tab.error = None;
+                }
+
+                // Switch focus to the results pane
+                self.ui.focused_pane = FocusedPane::TabularOutput;
+
+                let row_count = self
+                    .table_viewer_state
+                    .tabs
+                    .get(tab_index)
+                    .map(|t| t.total_rows)
+                    .unwrap_or(0);
+
+                self.toast_manager.success(format!(
+                    "Query executed successfully ({} rows returned): {}",
+                    row_count,
+                    if query.len() > 40 {
+                        format!("{}...", &query[..40])
+                    } else {
+                        query.clone()
+                    }
+                ));
+
+                // Add debug message for successful query execution
+                crate::logging::add_debug_message(
+                    "INFO",
+                    "query_execution",
+                    format!(
+                        "Query executed successfully: {} rows returned, {} columns | Query: {}",
+                        row_count,
+                        columns.len(),
+                        query
+                    ),
+                );
+
+                Ok(())
+            }
+            Err(e) => {
+                self.toast_manager.error(format!(
+                    "Query execution failed: {} | Query: {}",
+                    e,
+                    if query.len() > 30 {
+                        format!("{}...", &query[..30])
+                    } else {
+                        query.clone()
+                    }
+                ));
+
+                // Add debug message for failed query execution
+                crate::logging::add_debug_message(
+                    "ERROR",
+                    "query_execution",
+                    format!("Query execution failed: {} | Query: {}", e, query),
+                );
+
+                Err(e.to_string())
+            }
+        }
+    }
 }
 
 impl Default for AppState {
