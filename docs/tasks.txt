@@ -4,6 +4,18 @@ sql pane features to be done properly.
 Help modal can be moved into a mode similar to debug mode and connection mode? Think on it first.
 
 =======================================
+In the SQL query editor, I don't think I'm able to go to lines above and lines below by using the J and K keys in the normal mode. Why do you think this is happening? Can you make it happen? Even the arrow keys are not helping me go up and down. I am able to use the arrow keys to go up and down in the insert mode but in the normal mode it is not working. Can you check and resolve this behaviour please?
+
+=======================================
+I want you to implement the query execution feature properly. The errors of the query should show in the toast if there are any errors. I should be able to press Ctrl+Enter to execute the query which is in focus of my cursor and the result should show in the data pane.
+=======================================
+This is for the SQL query editor pane. Can you implement pressing O to insert new line and going into edit mode pressing shift O to create a line above and going to insert mode pressing capital A to go at the end of the line pressing capital I to start editing from the below beginning of the line. These are the standard vim motions.
+=======================================
+=======================================
+=======================================
+=======================================
+I am seeing a strange behavior when I am in the SQL query editor. When I press Q and then press Y, it does not quit. But when I press Q and press Y, the application gets quit correctly. I don't know why this is happening. Can you find out the issue and resolve it? This is happening when I am in insert mode and then I go into normal mode. This happens only when I come back to normal mode after going into insert mode. What might be the issue?
+=======================================
 DONE:
 the SQL editor when I am in insert mode and I press escape to go into normal mode then I am not able to see the cursor so the cursor visibility should be there so that I can know which line I am on also create line numbers by default and always present
 =======================================
