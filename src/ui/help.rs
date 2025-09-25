@@ -176,90 +176,180 @@ impl HelpSystem {
     }
 
     fn add_connections_commands(lines: &mut Vec<Line<'static>>) {
-        Self::add_command(lines, "j/k", "Navigate up/down");
-        Self::add_command(lines, "Enter/Space", "Connect to database");
-        Self::add_command(lines, "x", "Disconnect connection");
-        Self::add_command(lines, "a", "Add connection");
-        Self::add_command(lines, "e", "Edit connection");
-        Self::add_command(lines, "d", "Delete connection");
-        Self::add_command(lines, "/", "Search connections");
+        // Basic Navigation
+        Self::add_command(lines, "j/k", "Navigate up/down connections");
+        Self::add_command(lines, "Enter/Space", "Connect to selected database");
+        Self::add_command(lines, "x", "Disconnect current connection");
+        lines.push(Line::from(""));
+
+        // Connection Management
+        lines.push(Line::from(vec![Span::styled(
+            "🔧 Connection Management",
+            Style::default()
+                .fg(Color::Rgb(120, 180, 255))
+                .add_modifier(Modifier::BOLD | Modifier::UNDERLINED),
+        )]));
+        Self::add_command(lines, "a", "Add new connection");
+        Self::add_command(lines, "e", "Edit selected connection");
+        Self::add_command(lines, "d", "Delete connection (with confirmation)");
+        lines.push(Line::from(""));
+
+        // Search Functions
+        lines.push(Line::from(vec![Span::styled(
+            "🔍 Search & Filter",
+            Style::default()
+                .fg(Color::Rgb(255, 200, 100))
+                .add_modifier(Modifier::BOLD | Modifier::UNDERLINED),
+        )]));
+        Self::add_command(lines, "/", "Start search mode");
         Self::add_command(lines, "ESC", "Exit search mode");
         Self::add_command(lines, "↑/↓", "Navigate search results");
         lines.push(Line::from(""));
-        lines.push(Line::from(Span::styled(
-            "Connection Modal Commands:",
+
+        // Connection Modal Commands
+        lines.push(Line::from(vec![Span::styled(
+            "⚙️  Connection Modal",
             Style::default()
-                .fg(Color::Gray)
-                .add_modifier(Modifier::ITALIC),
-        )));
-        Self::add_command(lines, "Enter", "Test connection");
+                .fg(Color::Rgb(180, 140, 255))
+                .add_modifier(Modifier::BOLD | Modifier::UNDERLINED),
+        )]));
+        Self::add_command(lines, "Enter", "Save/Test connection");
         Self::add_command(lines, "←/→", "Navigate form steps");
         Self::add_command(lines, "Tab/S-Tab", "Navigate form fields");
         Self::add_command(lines, "i", "Enter insert mode (text fields)");
-        Self::add_command(lines, "ESC", "Exit insert/cancel modal");
-        Self::add_command(lines, "t", "Toggle connection method");
+        Self::add_command(lines, "ESC", "Cancel modal/exit insert");
+        Self::add_command(lines, "Ctrl+T", "Toggle connection method");
+        Self::add_command(lines, "c/b", "Cancel/Go back");
         lines.push(Line::from(""));
-        lines.push(Line::from(Span::styled(
-            "Connection Status:",
+
+        // Connection Status Indicators
+        lines.push(Line::from(vec![Span::styled(
+            "📊 Connection Status",
             Style::default()
-                .fg(Color::Gray)
-                .add_modifier(Modifier::ITALIC),
-        )));
+                .fg(Color::Rgb(100, 220, 180))
+                .add_modifier(Modifier::BOLD | Modifier::UNDERLINED),
+        )]));
         lines.push(Line::from(vec![
-            Span::styled("✓ ", Style::default().fg(Color::Green)),
-            Span::raw("Connected"),
+            Span::styled("  ✓ ", Style::default().fg(Color::Green)),
+            Span::raw("Connected to database"),
         ]));
         lines.push(Line::from(vec![
-            Span::styled("— ", Style::default().fg(Color::DarkGray)),
+            Span::styled("  — ", Style::default().fg(Color::DarkGray)),
             Span::raw("Not connected"),
         ]));
         lines.push(Line::from(vec![
-            Span::styled("✗ ", Style::default().fg(Color::Red)),
-            Span::raw("Failed"),
+            Span::styled("  ✗ ", Style::default().fg(Color::Red)),
+            Span::raw("Connection failed"),
         ]));
         lines.push(Line::from(vec![
-            Span::styled("⟳ ", Style::default().fg(Color::Yellow)),
-            Span::raw("Connecting"),
+            Span::styled("  ⟳ ", Style::default().fg(Color::Yellow)),
+            Span::raw("Connecting in progress"),
+        ]));
+        lines.push(Line::from(""));
+
+        // Display Format Info
+        lines.push(Line::from(vec![Span::styled(
+            "📋 Display Format",
+            Style::default()
+                .fg(Color::Gray)
+                .add_modifier(Modifier::ITALIC),
+        )]));
+        lines.push(Line::from(vec![
+            Span::styled("  🐘 ", Style::default().fg(Color::Cyan)),
+            Span::raw("Database type icon"),
+        ]));
+        lines.push(Line::from(vec![
+            Span::raw("  Format: "),
+            Span::styled(
+                "[Icon] [Status] Name (type) [DB: name] Status",
+                Style::default().fg(Color::Gray),
+            ),
         ]));
     }
 
     fn add_tables_commands(lines: &mut Vec<Line<'static>>) {
-        Self::add_command(lines, "j/k", "Navigate up/down");
-        Self::add_command(lines, "gg/G", "First/last table");
-        Self::add_command(lines, "Enter/Space", "Open table");
-        Self::add_command(lines, "n", "Create table");
-        Self::add_command(lines, "e", "Edit structure");
-        Self::add_command(lines, "/", "Search tables");
+        // Basic Navigation
+        Self::add_command(lines, "j/k", "Navigate up/down tables");
+        Self::add_command(lines, "gg/G", "Jump to first/last table");
+        Self::add_command(lines, "Enter/Space", "Open table for viewing");
+        lines.push(Line::from(""));
+
+        // Table Management
+        lines.push(Line::from(vec![Span::styled(
+            "🗂️ Table Management",
+            Style::default()
+                .fg(Color::Rgb(120, 180, 255))
+                .add_modifier(Modifier::BOLD | Modifier::UNDERLINED),
+        )]));
+        Self::add_command(lines, "n", "Create new table (when connected)");
+        Self::add_command(lines, "e", "Edit table structure");
+        lines.push(Line::from(""));
+
+        // Search & Filter
+        lines.push(Line::from(vec![Span::styled(
+            "🔍 Search & Filter",
+            Style::default()
+                .fg(Color::Rgb(255, 200, 100))
+                .add_modifier(Modifier::BOLD | Modifier::UNDERLINED),
+        )]));
+        Self::add_command(lines, "/", "Start search mode");
         Self::add_command(lines, "ESC", "Exit search mode");
         Self::add_command(lines, "↑/↓", "Navigate search results");
+        Self::add_command(lines, "Enter", "Open selected search result");
         lines.push(Line::from(""));
-        lines.push(Line::from(Span::styled(
-            "Objects Displayed:",
+
+        // Database Objects Info
+        lines.push(Line::from(vec![Span::styled(
+            "📊 Database Objects Displayed",
+            Style::default()
+                .fg(Color::Rgb(100, 220, 180))
+                .add_modifier(Modifier::BOLD | Modifier::UNDERLINED),
+        )]));
+        lines.push(Line::from(vec![
+            Span::styled("  🗃️ ", Style::default().fg(Color::Cyan)),
+            Span::raw("Tables with row counts and sizes"),
+        ]));
+        lines.push(Line::from(vec![
+            Span::styled("  👁️ ", Style::default().fg(Color::Blue)),
+            Span::raw("Views and materialized views"),
+        ]));
+        lines.push(Line::from(vec![
+            Span::styled("  🌍 ", Style::default().fg(Color::Green)),
+            Span::raw("Foreign tables (if supported)"),
+        ]));
+        lines.push(Line::from(vec![
+            Span::styled("  📁 ", Style::default().fg(Color::Yellow)),
+            Span::raw("Schema grouping (multi-schema databases)"),
+        ]));
+        lines.push(Line::from(""));
+
+        // Connection Status Messages
+        lines.push(Line::from(vec![Span::styled(
+            "📋 Connection Status Messages",
             Style::default()
                 .fg(Color::Gray)
                 .add_modifier(Modifier::ITALIC),
-        )));
-        lines.push(Line::from(Span::raw("• Tables with row counts and sizes")));
-        lines.push(Line::from(Span::raw("• Views and materialized views")));
-        lines.push(Line::from(Span::raw("• Foreign tables (if supported)")));
-        lines.push(Line::from(Span::raw(
-            "• Schema information (multi-schema databases)",
-        )));
-        lines.push(Line::from(""));
-        lines.push(Line::from(Span::styled(
-            "Status Messages:",
-            Style::default()
-                .fg(Color::Gray)
-                .add_modifier(Modifier::ITALIC),
-        )));
-        lines.push(Line::from(Span::raw(
-            "• Choose a connection from Connections pane",
-        )));
-        lines.push(Line::from(Span::raw("• No tables in database")));
-        lines.push(Line::from(Span::raw(
-            "• Connection failed (see status bar)",
-        )));
-        lines.push(Line::from(Span::raw("• Search results with filter count")));
+        )]));
+        lines.push(Line::from(vec![
+            Span::styled("  🔗 ", Style::default().fg(Color::Gray)),
+            Span::raw("\"Choose a connection from Connections pane\""),
+        ]));
+        lines.push(Line::from(vec![
+            Span::styled("  📭 ", Style::default().fg(Color::Yellow)),
+            Span::raw("\"No tables in database\""),
+        ]));
+        lines.push(Line::from(vec![
+            Span::styled("  ❌ ", Style::default().fg(Color::Red)),
+            Span::raw("\"Connection failed (see status bar)\""),
+        ]));
+        lines.push(Line::from(vec![
+            Span::styled("  🔄 ", Style::default().fg(Color::Blue)),
+            Span::raw("\"Connecting to database...\""),
+        ]));
+        lines.push(Line::from(vec![
+            Span::styled("  🔍 ", Style::default().fg(Color::Cyan)),
+            Span::raw("Search results with match count"),
+        ]));
     }
 
     fn add_details_commands(lines: &mut Vec<Line<'static>>) {
@@ -296,105 +386,342 @@ impl HelpSystem {
     }
 
     fn add_tabular_commands(lines: &mut Vec<Line<'static>>) {
-        Self::add_command(lines, "h/j/k/l", "Navigate cells");
-        Self::add_command(lines, "gg/G", "First/last row");
-        Self::add_command(lines, "0/$", "First/last col");
-        Self::add_command(lines, "i", "Edit cell (insert mode)");
-        Self::add_command(lines, "ESC/Enter", "Save cell changes");
-        Self::add_command(lines, "C-c", "Cancel cell edit");
+        // Basic Navigation
+        lines.push(Line::from(vec![Span::styled(
+            "🧭 Table Navigation",
+            Style::default()
+                .fg(Color::Rgb(100, 220, 180))
+                .add_modifier(Modifier::BOLD | Modifier::UNDERLINED),
+        )]));
+        Self::add_command(lines, "h/j/k/l", "Navigate table cells");
+        Self::add_command(lines, "Arrow Keys", "Alternative cell navigation");
+        Self::add_command(lines, "gg/G", "Jump to first/last row");
+        Self::add_command(lines, "0/$", "Jump to first/last column");
+        Self::add_command(lines, "Ctrl+D/U", "Page down/up through data");
         lines.push(Line::from(""));
-        Self::add_command(lines, "dd", "Delete row (with confirm)");
-        Self::add_command(lines, "yy", "Copy row (CSV)");
-        Self::add_command(lines, "/", "Search in table");
-        Self::add_command(lines, "n/N", "Next/prev match");
-        Self::add_command(lines, "r", "Refresh table data");
-        Self::add_command(lines, "t", "Toggle Data/Schema view");
+
+        // Cell Editing
+        lines.push(Line::from(vec![Span::styled(
+            "✏️  Cell Editing",
+            Style::default()
+                .fg(Color::Rgb(255, 200, 100))
+                .add_modifier(Modifier::BOLD | Modifier::UNDERLINED),
+        )]));
+        Self::add_command(lines, "i", "Enter edit mode for current cell");
+        Self::add_command(lines, "Enter", "Save cell changes and exit edit");
+        Self::add_command(lines, "ESC", "Cancel cell edit and revert");
+        Self::add_command(lines, "Ctrl+C", "Cancel edit (alternative)");
         lines.push(Line::from(""));
-        Self::add_command(lines, "S/D", "Prev/next tab");
+
+        // Search & Filter
+        lines.push(Line::from(vec![Span::styled(
+            "🔍 Search & Filter",
+            Style::default()
+                .fg(Color::Rgb(180, 140, 255))
+                .add_modifier(Modifier::BOLD | Modifier::UNDERLINED),
+        )]));
+        Self::add_command(lines, "/", "Start search mode");
+        Self::add_command(lines, "n/N", "Navigate to next/previous match");
+        Self::add_command(lines, "ESC", "Exit search mode");
+        lines.push(Line::from(""));
+
+        // Row Management
+        lines.push(Line::from(vec![Span::styled(
+            "📋 Row Operations",
+            Style::default()
+                .fg(Color::Rgb(255, 160, 160))
+                .add_modifier(Modifier::BOLD | Modifier::UNDERLINED),
+        )]));
+        Self::add_command(lines, "dd", "Delete current row (with confirmation)");
+        Self::add_command(lines, "yy", "Copy row data to clipboard (CSV format)");
+        lines.push(Line::from(""));
+
+        // View Controls
+        lines.push(Line::from(vec![Span::styled(
+            "👁️  View Management",
+            Style::default()
+                .fg(Color::Rgb(120, 200, 255))
+                .add_modifier(Modifier::BOLD | Modifier::UNDERLINED),
+        )]));
+        Self::add_command(lines, "t", "Toggle between Data and Schema view");
+        Self::add_command(lines, "r", "Refresh/reload current table data");
+        lines.push(Line::from(""));
+
+        // Tab Management
+        lines.push(Line::from(vec![Span::styled(
+            "📑 Tab Management",
+            Style::default()
+                .fg(Color::Rgb(255, 220, 120))
+                .add_modifier(Modifier::BOLD | Modifier::UNDERLINED),
+        )]));
         Self::add_command(lines, "x", "Close current tab");
-        Self::add_command(lines, "C-d/u", "Page down/up");
+        Self::add_command(lines, "S/D", "Switch to previous/next tab");
+        lines.push(Line::from(""));
+
+        // Status Information
+        lines.push(Line::from(vec![Span::styled(
+            "📊 View Modes",
+            Style::default()
+                .fg(Color::Rgb(200, 180, 255))
+                .add_modifier(Modifier::BOLD | Modifier::UNDERLINED),
+        )]));
+        lines.push(Line::from(vec![
+            Span::styled("  📋 ", Style::default().fg(Color::Cyan)),
+            Span::raw("Data View - Shows table rows and columns"),
+        ]));
+        lines.push(Line::from(vec![
+            Span::styled("  🏗️  ", Style::default().fg(Color::Yellow)),
+            Span::raw("Schema View - Shows table structure and metadata"),
+        ]));
+        lines.push(Line::from(""));
     }
 
     fn add_sql_files_commands(lines: &mut Vec<Line<'static>>) {
-        Self::add_command(lines, "j/k", "Navigate files");
-        Self::add_command(lines, "Enter/Space", "Load file");
-        Self::add_command(lines, "n", "Create new file");
-        Self::add_command(lines, "r", "Rename file");
-        Self::add_command(lines, "d", "Delete file (with confirmation)");
+        // Basic Navigation
+        Self::add_command(lines, "j/k", "Navigate up/down files");
+        Self::add_command(lines, "Enter/Space", "Load selected SQL file");
+        lines.push(Line::from(""));
+
+        // File Management
+        lines.push(Line::from(vec![Span::styled(
+            "📁 File Management",
+            Style::default()
+                .fg(Color::Rgb(120, 180, 255))
+                .add_modifier(Modifier::BOLD | Modifier::UNDERLINED),
+        )]));
         Self::add_command(lines, "c", "Copy/duplicate file");
-        Self::add_command(lines, "/", "Search files");
-        Self::add_command(lines, "ESC", "Exit input modes");
-        Self::add_command(lines, "i", "Enter Query mode");
+        Self::add_command(lines, "d", "Delete file (with confirmation)");
+        Self::add_command(lines, "r", "Rename file (enter rename mode)");
         lines.push(Line::from(""));
-        Self::add_command(lines, "C-s", "Save current query");
+
+        // Create New Files
+        lines.push(Line::from(vec![Span::styled(
+            "📝 Create New Files",
+            Style::default()
+                .fg(Color::Rgb(100, 220, 180))
+                .add_modifier(Modifier::BOLD | Modifier::UNDERLINED),
+        )]));
+        Self::add_command(lines, "i", "Enter Query mode for editing");
+        Self::add_command(lines, "C-n", "Create new timestamped query");
+        lines.push(Line::from(""));
+
+        // Search & Filter
+        lines.push(Line::from(vec![Span::styled(
+            "🔍 Search & Filter",
+            Style::default()
+                .fg(Color::Rgb(255, 200, 100))
+                .add_modifier(Modifier::BOLD | Modifier::UNDERLINED),
+        )]));
+        Self::add_command(lines, "/", "Start search mode");
+        Self::add_command(lines, "j/k", "Navigate search results");
+        Self::add_command(lines, "Enter", "Load selected search result");
+        Self::add_command(lines, "ESC", "Exit search mode");
+        lines.push(Line::from(""));
+
+        // Query Editor Integration
+        lines.push(Line::from(vec![Span::styled(
+            "⚡ Query Editor Integration",
+            Style::default()
+                .fg(Color::Rgb(180, 140, 255))
+                .add_modifier(Modifier::BOLD | Modifier::UNDERLINED),
+        )]));
+        Self::add_command(lines, "C-s", "Save current query to file");
         Self::add_command(lines, "C-o", "Refresh file list");
-        Self::add_command(lines, "C-n", "New timestamped query");
         lines.push(Line::from(""));
-        lines.push(Line::from(Span::styled(
-            "File Operations:",
+
+        // Input Modes
+        lines.push(Line::from(vec![Span::styled(
+            "✏️ Input Modes",
+            Style::default()
+                .fg(Color::Rgb(255, 180, 120))
+                .add_modifier(Modifier::BOLD | Modifier::UNDERLINED),
+        )]));
+        lines.push(Line::from(vec![
+            Span::styled("  🔍 ", Style::default().fg(Color::Yellow)),
+            Span::raw("Search Mode: Type to filter files by name"),
+        ]));
+        lines.push(Line::from(vec![
+            Span::styled("  ✏️ ", Style::default().fg(Color::Cyan)),
+            Span::raw("Rename Mode: Type new filename, Enter to confirm"),
+        ]));
+        lines.push(Line::from(vec![
+            Span::styled("  📝 ", Style::default().fg(Color::Green)),
+            Span::raw("Create Mode: Type filename for new file"),
+        ]));
+        lines.push(Line::from(vec![
+            Span::styled("  ⌨️ ", Style::default().fg(Color::Gray)),
+            Span::raw("Backspace to edit, ESC to cancel in any mode"),
+        ]));
+        lines.push(Line::from(""));
+
+        // File Storage & Organization
+        lines.push(Line::from(vec![Span::styled(
+            "💾 Storage & Organization",
             Style::default()
                 .fg(Color::Gray)
                 .add_modifier(Modifier::ITALIC),
-        )));
-        lines.push(Line::from(Span::raw(
-            "• Files stored per connection in ~/.lazytables/",
-        )));
-        lines.push(Line::from(Span::raw(
-            "• File metadata shown (size, modified time)",
-        )));
-        lines.push(Line::from(Span::raw(
-            "• Current file indicated with ● symbol",
-        )));
-        lines.push(Line::from(Span::raw("• Search mode shows current query")));
+        )]));
+        lines.push(Line::from(vec![
+            Span::styled("  📂 ", Style::default().fg(Color::Cyan)),
+            Span::raw("Files stored in ~/.lazytables/sql_files/"),
+        ]));
+        lines.push(Line::from(vec![
+            Span::styled("  📊 ", Style::default().fg(Color::Blue)),
+            Span::raw("File metadata displayed (size, modified time)"),
+        ]));
+        lines.push(Line::from(vec![
+            Span::styled("  ● ", Style::default().fg(Color::Green)),
+            Span::raw("Current file indicator"),
+        ]));
+        lines.push(Line::from(vec![
+            Span::styled("  🔍 ", Style::default().fg(Color::Yellow)),
+            Span::raw("Live search query display"),
+        ]));
         lines.push(Line::from(""));
-        lines.push(Line::from(Span::styled(
-            "Input Modes:",
+
+        // Status Messages
+        lines.push(Line::from(vec![Span::styled(
+            "📋 Status Messages",
             Style::default()
                 .fg(Color::Gray)
                 .add_modifier(Modifier::ITALIC),
-        )));
-        lines.push(Line::from(Span::raw("• Search: Type to filter files")));
-        lines.push(Line::from(Span::raw("• Rename: Enter new filename")));
-        lines.push(Line::from(Span::raw(
-            "• Create: Enter filename for new file",
-        )));
-        lines.push(Line::from(""));
-        lines.push(Line::from(Span::styled(
-            "Status Messages:",
-            Style::default()
-                .fg(Color::Gray)
-                .add_modifier(Modifier::ITALIC),
-        )));
-        lines.push(Line::from(Span::raw(
-            "• No SQL files found (create with 'n')",
-        )));
-        lines.push(Line::from(Span::raw(
-            "• [SEARCH], [RENAME], [CREATE] mode indicators",
-        )));
+        )]));
+        lines.push(Line::from(vec![
+            Span::styled("  📭 ", Style::default().fg(Color::Yellow)),
+            Span::raw("\"No SQL files found (create with 'i' or Ctrl+N)\""),
+        ]));
+        lines.push(Line::from(vec![
+            Span::styled("  🏷️ ", Style::default().fg(Color::Cyan)),
+            Span::raw("[SEARCH], [RENAME], [CREATE] mode indicators"),
+        ]));
     }
 
     fn add_query_window_commands(lines: &mut Vec<Line<'static>>) {
-        Self::add_command(lines, "i", "Enter Query mode (full editor)");
-        Self::add_command(lines, "h/j/k/l", "Navigate cursor");
-        Self::add_command(lines, "C-Enter", "Execute query at cursor");
+        // Entering Query Mode
+        Self::add_command(lines, "i", "Enter full-screen Query mode");
+        Self::add_command(lines, "h/j/k/l", "Navigate cursor (normal mode)");
         lines.push(Line::from(""));
-        lines.push(Line::from(Span::styled(
-            "Query Mode (Vim-style):",
+
+        // Query Execution
+        lines.push(Line::from(vec![Span::styled(
+            "⚡ Query Execution",
+            Style::default()
+                .fg(Color::Rgb(100, 220, 180))
+                .add_modifier(Modifier::BOLD | Modifier::UNDERLINED),
+        )]));
+        Self::add_command(lines, "Ctrl+Enter", "Execute query at cursor position");
+        Self::add_command(lines, "E", "Execute query at cursor (in Query mode)");
+        lines.push(Line::from(""));
+
+        // Query Mode Navigation & Editing
+        lines.push(Line::from(vec![Span::styled(
+            "🎯 Query Mode (Vim-style Navigation)",
+            Style::default()
+                .fg(Color::Rgb(120, 180, 255))
+                .add_modifier(Modifier::BOLD | Modifier::UNDERLINED),
+        )]));
+        lines.push(Line::from(vec![
+            Span::styled("  ⌥ ", Style::default().fg(Color::Gray)),
+            Span::raw("Mode Control:"),
+        ]));
+        Self::add_command(lines, "ESC", "Exit Query mode / Exit insert mode");
+        Self::add_command(lines, "i", "Enter insert mode for text editing");
+        Self::add_command(lines, "q", "Quit with confirmation (save prompt)");
+        lines.push(Line::from(""));
+
+        lines.push(Line::from(vec![
+            Span::styled("  🧭 ", Style::default().fg(Color::Cyan)),
+            Span::raw("Cursor Navigation:"),
+        ]));
+        Self::add_command(lines, "h/j/k/l", "Left/Down/Up/Right (vim keys)");
+        Self::add_command(lines, "←/↓/↑/→", "Arrow key navigation");
+        Self::add_command(lines, "w/b/e", "Next word/Previous word/End word");
+        Self::add_command(lines, "0/$", "Line start/Line end");
+        Self::add_command(lines, "g/G", "File start/File end (gg for start)");
+        lines.push(Line::from(""));
+
+        // Insert Mode Features
+        lines.push(Line::from(vec![Span::styled(
+            "✏️ Insert Mode Features",
+            Style::default()
+                .fg(Color::Rgb(255, 180, 120))
+                .add_modifier(Modifier::BOLD | Modifier::UNDERLINED),
+        )]));
+        lines.push(Line::from(vec![
+            Span::styled("  💡 ", Style::default().fg(Color::Yellow)),
+            Span::raw("Auto-completion & Suggestions:"),
+        ]));
+        Self::add_command(lines, "Tab", "Accept selected suggestion");
+        Self::add_command(lines, "↑/↓", "Navigate suggestions (when active)");
+        Self::add_command(lines, "ESC", "Hide suggestions and stay in insert");
+        lines.push(Line::from(""));
+
+        lines.push(Line::from(vec![
+            Span::styled("  ⌨️ ", Style::default().fg(Color::White)),
+            Span::raw("Text Editing:"),
+        ]));
+        Self::add_command(lines, "Enter", "Insert new line");
+        Self::add_command(lines, "Backspace", "Delete character before cursor");
+        Self::add_command(lines, "←/→/↑/↓", "Move cursor in insert mode");
+        lines.push(Line::from(""));
+
+        // Vim Command Mode
+        lines.push(Line::from(vec![Span::styled(
+            "🔧 Vim Command Mode",
+            Style::default()
+                .fg(Color::Rgb(180, 140, 255))
+                .add_modifier(Modifier::BOLD | Modifier::UNDERLINED),
+        )]));
+        Self::add_command(lines, ":", "Enter vim command mode");
+        lines.push(Line::from(vec![
+            Span::styled("  📝 ", Style::default().fg(Color::Green)),
+            Span::raw("Available Commands:"),
+        ]));
+        Self::add_command(lines, ":w", "Save current query to file");
+        Self::add_command(lines, ":q", "Quit with confirmation prompt");
+        Self::add_command(lines, ":q!", "Force quit without saving");
+        Self::add_command(lines, ":wq", "Save and quit");
+        lines.push(Line::from(""));
+
+        // File Management Integration
+        lines.push(Line::from(vec![Span::styled(
+            "💾 File Management",
+            Style::default()
+                .fg(Color::Rgb(255, 200, 100))
+                .add_modifier(Modifier::BOLD | Modifier::UNDERLINED),
+        )]));
+        Self::add_command(lines, "Ctrl+S", "Save query to current file");
+        Self::add_command(lines, "Ctrl+O", "Refresh SQL file list");
+        Self::add_command(lines, "Ctrl+N", "Create new timestamped query");
+        lines.push(Line::from(""));
+
+        // Advanced Features
+        lines.push(Line::from(vec![Span::styled(
+            "🚀 Advanced Features",
             Style::default()
                 .fg(Color::Gray)
                 .add_modifier(Modifier::ITALIC),
-        )));
-        Self::add_command(lines, "ESC", "Exit Query mode");
-        Self::add_command(lines, "i", "Insert mode (within Query)");
-        Self::add_command(lines, ":", "Vim command mode (:w, :q)");
-        Self::add_command(lines, "w/e", "Word navigation");
-        Self::add_command(lines, "0/$", "Line start/end");
-        Self::add_command(lines, "gg/G", "File start/end");
-        Self::add_command(lines, "C-d/u", "Half page scroll");
-        lines.push(Line::from(""));
-        Self::add_command(lines, "C-s", "Save query");
-        Self::add_command(lines, "C-o", "Refresh file list");
-        Self::add_command(lines, "C-n", "New timestamped query");
+        )]));
+        lines.push(Line::from(vec![
+            Span::styled("  🎨 ", Style::default().fg(Color::Magenta)),
+            Span::raw("Syntax highlighting for SQL queries"),
+        ]));
+        lines.push(Line::from(vec![
+            Span::styled("  🧠 ", Style::default().fg(Color::Blue)),
+            Span::raw("Context-aware auto-completion"),
+        ]));
+        lines.push(Line::from(vec![
+            Span::styled("  📍 ", Style::default().fg(Color::Green)),
+            Span::raw("Execute specific SQL statement at cursor"),
+        ]));
+        lines.push(Line::from(vec![
+            Span::styled("  💫 ", Style::default().fg(Color::Cyan)),
+            Span::raw("Full vim-style editing with modes"),
+        ]));
+        lines.push(Line::from(vec![
+            Span::styled("  🔄 ", Style::default().fg(Color::Yellow)),
+            Span::raw("Real-time query validation and suggestions"),
+        ]));
     }
 
     /// Render the help overlay
