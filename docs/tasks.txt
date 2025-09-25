@@ -6,6 +6,14 @@ Help modal can be moved into a mode similar to debug mode and connection mode? T
 =======================================
 the SQL editor when I am in insert mode and I press escape to go into normal mode then I am not able to see the cursor so the cursor visibility should be there so that I can know which line I am on also create line numbers by default and always present
 =======================================
+When the SQL suggestions come, there is no way to escape from the SQL suggestions pop-up box. When I press escape, it should close the box. I don't want solution, so I will press escape.
+=======================================
+DONE:
+SQL query editor and SQL files should be kind of disabled till a connection is selected because all the SQL files will be always related to a connection only.
+=======================================
+The SQL query editor should be disabled till a SQL file is selected because you can edit a file only so without SQL file being selected by pressing enter in the SQL files pane the SQL query should be disabled and it should just give a guidance and select an SQL file on the SQL files pane
+=======================================
+=======================================
 =======================================
 =======================================
 =======================================
