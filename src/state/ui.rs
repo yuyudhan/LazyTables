@@ -433,12 +433,21 @@ impl UIState {
     }
 
     /// Cycle focus to the next pane (connection-aware)
-    pub fn cycle_focus_forward(&mut self, sql_panes_enabled: bool) {
+    pub fn cycle_focus_forward(&mut self, sql_panes_enabled: bool, query_editor_enabled: bool) {
         let mut new_pane = self.focused_pane.next();
 
-        // Skip disabled SQL panes
+        // Skip disabled panes
         if !sql_panes_enabled {
             while matches!(new_pane, FocusedPane::QueryWindow | FocusedPane::SqlFiles) {
+                new_pane = new_pane.next();
+                // Prevent infinite loop if we end up back where we started
+                if new_pane == self.focused_pane {
+                    break;
+                }
+            }
+        } else if !query_editor_enabled {
+            // SQL files enabled, but query editor disabled
+            while matches!(new_pane, FocusedPane::QueryWindow) {
                 new_pane = new_pane.next();
                 // Prevent infinite loop if we end up back where we started
                 if new_pane == self.focused_pane {
@@ -451,12 +460,21 @@ impl UIState {
     }
 
     /// Cycle focus to the previous pane (connection-aware)
-    pub fn cycle_focus_backward(&mut self, sql_panes_enabled: bool) {
+    pub fn cycle_focus_backward(&mut self, sql_panes_enabled: bool, query_editor_enabled: bool) {
         let mut new_pane = self.focused_pane.previous();
 
-        // Skip disabled SQL panes
+        // Skip disabled panes
         if !sql_panes_enabled {
             while matches!(new_pane, FocusedPane::QueryWindow | FocusedPane::SqlFiles) {
+                new_pane = new_pane.previous();
+                // Prevent infinite loop if we end up back where we started
+                if new_pane == self.focused_pane {
+                    break;
+                }
+            }
+        } else if !query_editor_enabled {
+            // SQL files enabled, but query editor disabled
+            while matches!(new_pane, FocusedPane::QueryWindow) {
                 new_pane = new_pane.previous();
                 // Prevent infinite loop if we end up back where we started
                 if new_pane == self.focused_pane {
@@ -469,7 +487,7 @@ impl UIState {
     }
 
     /// Move focus left (Ctrl+h) (connection-aware)
-    pub fn move_focus_left(&mut self, sql_panes_enabled: bool) {
+    pub fn move_focus_left(&mut self, sql_panes_enabled: bool, query_editor_enabled: bool) {
         let new_pane = match self.focused_pane {
             FocusedPane::TabularOutput => {
                 // Smart selection: go to the last focused left pane
@@ -481,16 +499,19 @@ impl UIState {
                 }
             }
             FocusedPane::QueryWindow => {
-                if sql_panes_enabled {
+                if query_editor_enabled {
                     FocusedPane::Details
                 } else {
-                    // SQL panes disabled, go to tabular output instead
+                    // Query editor disabled, go to tabular output instead
                     FocusedPane::TabularOutput
                 }
             }
             FocusedPane::SqlFiles => {
-                if sql_panes_enabled {
+                if query_editor_enabled {
                     FocusedPane::QueryWindow
+                } else if sql_panes_enabled {
+                    // Query editor disabled but files enabled, go to tabular output
+                    FocusedPane::TabularOutput
                 } else {
                     // SQL panes disabled, go to tabular output instead
                     FocusedPane::TabularOutput
@@ -531,15 +552,18 @@ impl UIState {
     }
 
     /// Move focus right (Ctrl+l) (connection-aware)
-    pub fn move_focus_right(&mut self, sql_panes_enabled: bool) {
+    pub fn move_focus_right(&mut self, sql_panes_enabled: bool, query_editor_enabled: bool) {
         let new_pane = match self.focused_pane {
             FocusedPane::Connections => FocusedPane::TabularOutput,
             FocusedPane::Tables => FocusedPane::TabularOutput,
             FocusedPane::Details => {
-                if sql_panes_enabled {
+                if query_editor_enabled {
                     FocusedPane::QueryWindow
+                } else if sql_panes_enabled {
+                    // SQL files enabled but query editor disabled, go to files
+                    FocusedPane::SqlFiles
                 } else {
-                    // SQL panes disabled, stay in place or go to tabular output
+                    // SQL panes disabled, stay in place
                     self.focused_pane
                 }
             }

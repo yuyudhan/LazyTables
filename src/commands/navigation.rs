@@ -216,6 +216,7 @@ impl Command for NextPaneCommand {
         use FocusedPane::*;
 
         let sql_panes_enabled = context.state.are_sql_panes_enabled();
+        let query_editor_enabled = context.state.is_query_editor_enabled();
         let mut new_pane = match context.state.ui.focused_pane {
             Connections => Tables,
             Tables => Details,
@@ -225,7 +226,7 @@ impl Command for NextPaneCommand {
             QueryWindow => Connections,
         };
 
-        // Skip disabled SQL panes
+        // Skip disabled panes
         if !sql_panes_enabled {
             while matches!(new_pane, SqlFiles | QueryWindow) {
                 new_pane = match new_pane {
@@ -235,6 +236,22 @@ impl Command for NextPaneCommand {
                     TabularOutput => Connections, // Skip SQL panes, go to connections
                     SqlFiles => Connections,      // Skip to connections
                     QueryWindow => Connections,   // Skip to connections
+                };
+                // Prevent infinite loop
+                if new_pane == context.state.ui.focused_pane {
+                    break;
+                }
+            }
+        } else if !query_editor_enabled {
+            // SQL files enabled, but query editor disabled
+            while matches!(new_pane, QueryWindow) {
+                new_pane = match new_pane {
+                    Connections => Tables,
+                    Tables => Details,
+                    Details => TabularOutput,
+                    TabularOutput => SqlFiles,
+                    SqlFiles => Connections, // Skip query window, go to connections
+                    QueryWindow => Connections, // Skip to connections
                 };
                 // Prevent infinite loop
                 if new_pane == context.state.ui.focused_pane {
@@ -272,6 +289,7 @@ impl Command for PreviousPaneCommand {
         use FocusedPane::*;
 
         let sql_panes_enabled = context.state.are_sql_panes_enabled();
+        let query_editor_enabled = context.state.is_query_editor_enabled();
         let mut new_pane = match context.state.ui.focused_pane {
             Connections => QueryWindow,
             Tables => Connections,
@@ -281,7 +299,7 @@ impl Command for PreviousPaneCommand {
             QueryWindow => SqlFiles,
         };
 
-        // Skip disabled SQL panes
+        // Skip disabled panes
         if !sql_panes_enabled {
             while matches!(new_pane, SqlFiles | QueryWindow) {
                 new_pane = match new_pane {
@@ -291,6 +309,22 @@ impl Command for PreviousPaneCommand {
                     TabularOutput => Details,
                     SqlFiles => TabularOutput,    // Skip to tabular output
                     QueryWindow => TabularOutput, // Skip to tabular output
+                };
+                // Prevent infinite loop
+                if new_pane == context.state.ui.focused_pane {
+                    break;
+                }
+            }
+        } else if !query_editor_enabled {
+            // SQL files enabled, but query editor disabled
+            while matches!(new_pane, QueryWindow) {
+                new_pane = match new_pane {
+                    Connections => TabularOutput, // Skip query window, go to tabular output
+                    Tables => Connections,
+                    Details => Tables,
+                    TabularOutput => Details,
+                    SqlFiles => TabularOutput, // Skip query window, go to tabular output
+                    QueryWindow => SqlFiles,   // Skip to SQL files
                 };
                 // Prevent infinite loop
                 if new_pane == context.state.ui.focused_pane {
