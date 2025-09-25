@@ -5,8 +5,8 @@ use crate::{
     database::{AppStateDb, ConnectionConfig, ConnectionManager, ConnectionStatus, DatabaseType},
     state::{ui::UIState, DatabaseState},
     ui::components::{
-        ConnectionMode, ConnectionModalState, DebugView, QueryEditor, TableCreatorState, TableEditorState,
-        TableViewerState, ToastManager,
+        ConnectionModalState, ConnectionMode, DebugView, QueryEditor, TableCreatorState,
+        TableEditorState, TableViewerState, ToastManager,
     },
 };
 
