@@ -3,6 +3,7 @@ Table structure editing.
 sql pane features to be done properly.
 Help modal can be moved into a mode similar to debug mode and connection mode? Think on it first.
 =======================================
+In the table data viewer pane, earlier when I was pressing Ctrl+D and Ctrl+U, it used to go to the next page and previous page. It is not working right now. Can you see if there is any issue in this?
 =======================================
 In the SQL query editor, once I have edited the file and I am in the normal mode, pressing E or CTRL+ENTER should execute the query, show a toast message as well as it should print in the debug mode toggle, the debug view that we have created, add more info, log, debug error messages as needed.
 =======================================

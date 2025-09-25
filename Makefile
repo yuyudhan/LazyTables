@@ -16,6 +16,7 @@ help:
 	@echo "  make dev              - Run application in development mode"
 	@echo "  make build            - Build release binary"
 	@echo "  make run              - Run debug build"
+	@echo "  make run-debug        - Run with debug logging enabled"
 	@echo ""
 	@echo "Testing & Quality:"
 	@echo "  make test             - Run all tests"
@@ -32,6 +33,9 @@ dev:
 
 run:
 	cargo run
+
+run-debug:
+	cargo run -- --log-level debug
 
 build:
 	cargo build --release

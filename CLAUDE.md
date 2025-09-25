@@ -49,13 +49,10 @@ make lint             # Run clippy linter
 make format           # Auto-format code with rustfmt
 make check            # Run format check and clippy
 
-# Database operations
-make db-up            # Start test PostgreSQL in Docker
-make db-down          # Stop test PostgreSQL
-
-# Docker
-make docker-build     # Build Docker image
-make docker-dev       # Run in Docker container
+# Installation
+make install          # Install LazyTables via cargo
+make uninstall        # Remove LazyTables from system
+make install-deps     # Install development dependencies
 
 # Cleanup
 make clean            # Clean build artifacts
@@ -174,21 +171,28 @@ make clean            # Clean build artifacts
 └── backups/          # Backup files
 ```
 
-## Repository Structure (Planned)
+## Current Repository Structure
 
 ```
 lazytables/
 ├── src/
-│   ├── core/         # Core functionality
-│   ├── ui/           # TUI components
-│   ├── adapters/     # Database adapters
-│   ├── plugins/      # Plugin system
-│   └── themes/       # Theme engine
-├── plugins/          # Built-in plugins
-├── themes/           # Default themes
-├── docs/             # Documentation
-├── tests/            # Test suite
-└── examples/         # Usage examples
+│   ├── app/          # Application state management
+│   ├── cli/          # Command line interface
+│   ├── commands/     # Command handlers
+│   ├── config/       # Configuration management
+│   ├── core/         # Core functionality and error handling
+│   ├── database/     # Database drivers and connection management
+│   ├── event/        # Event handling system
+│   ├── security/     # Credential storage and encryption
+│   ├── state/        # Application state structures
+│   ├── themes/       # Theme definitions
+│   └── ui/           # TUI components
+│       ├── components/   # Individual UI components
+│       ├── layout/      # Layout management
+│       ├── theme/       # Theme loading and application
+│       └── widgets/     # Custom widgets
+├── target/           # Build artifacts (ignored)
+└── Cargo.toml        # Project configuration
 ```
 
 ## Development Notes
