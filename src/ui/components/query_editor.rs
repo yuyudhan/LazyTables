@@ -1,13 +1,15 @@
 // FilePath: src/ui/components/query_editor.rs
 
+use super::{SqlSuggestionEngine, SuggestionPopup};
 use crate::database::DatabaseType;
 use ratatui::{
-    layout::Rect,
+    layout::{Constraint, Direction, Layout, Rect},
     style::{Color, Modifier, Style},
     text::{Line, Span, Text},
     widgets::{Block, Borders, Paragraph, Wrap},
     Frame,
 };
+use std::collections::HashMap;
 use syntect::{
     easy::HighlightLines,
     highlighting::ThemeSet,
@@ -26,6 +28,20 @@ pub struct QueryEditor {
     database_type: Option<DatabaseType>,
     syntax_set: SyntaxSet,
     theme_set: ThemeSet,
+    /// SQL suggestion engine
+    suggestion_engine: SqlSuggestionEngine,
+    /// Suggestion popup
+    suggestion_popup: SuggestionPopup,
+    /// Whether suggestions are currently active
+    suggestions_active: bool,
+    /// Available tables for suggestions
+    tables: Vec<String>,
+    /// Table columns for suggestions
+    table_columns: HashMap<String, Vec<String>>,
+    /// Current SQL file name
+    current_file: Option<String>,
+    /// Whether content has been modified
+    is_modified: bool,
 }
 
 impl Clone for QueryEditor {
@@ -40,6 +56,13 @@ impl Clone for QueryEditor {
             database_type: self.database_type.clone(),
             syntax_set: SyntaxSet::load_defaults_newlines(),
             theme_set: ThemeSet::load_defaults(),
+            suggestion_engine: SqlSuggestionEngine::new(),
+            suggestion_popup: SuggestionPopup::new(),
+            suggestions_active: false,
+            tables: self.tables.clone(),
+            table_columns: self.table_columns.clone(),
+            current_file: self.current_file.clone(),
+            is_modified: self.is_modified,
         }
     }
 }
@@ -62,6 +85,13 @@ impl QueryEditor {
             database_type: None,
             syntax_set: SyntaxSet::load_defaults_newlines(),
             theme_set: ThemeSet::load_defaults(),
+            suggestion_engine: SqlSuggestionEngine::new(),
+            suggestion_popup: SuggestionPopup::new(),
+            suggestions_active: false,
+            tables: Vec::new(),
+            table_columns: HashMap::new(),
+            current_file: None,
+            is_modified: false,
         }
     }
 
@@ -70,6 +100,8 @@ impl QueryEditor {
         self.cursor_line = 0;
         self.cursor_col = 0;
         self.scroll_offset = 0;
+        self.is_modified = false;
+        self.hide_suggestions();
     }
 
     pub fn get_content(&self) -> &str {
@@ -77,7 +109,8 @@ impl QueryEditor {
     }
 
     pub fn set_database_type(&mut self, db_type: Option<DatabaseType>) {
-        self.database_type = db_type;
+        self.database_type = db_type.clone();
+        self.suggestion_engine.set_database_type(db_type);
     }
 
     pub fn get_database_type(&self) -> Option<DatabaseType> {
@@ -171,8 +204,12 @@ impl QueryEditor {
 
         line.insert(self.cursor_col, ch);
         self.cursor_col += 1;
+        self.is_modified = true;
 
         self.content = new_lines.join("\n");
+
+        // Trigger suggestions after character insertion
+        self.update_suggestions();
     }
 
     pub fn insert_newline(&mut self) {
@@ -199,9 +236,11 @@ impl QueryEditor {
 
         self.cursor_line += 1;
         self.cursor_col = 0;
+        self.is_modified = true;
         self.adjust_scroll();
 
         self.content = new_lines.join("\n");
+        self.hide_suggestions();
     }
 
     pub fn backspace(&mut self) {
@@ -310,6 +349,168 @@ impl QueryEditor {
         }
     }
 
+    // Suggestion-related methods
+
+    /// Set available tables for suggestions
+    pub fn set_tables(&mut self, tables: Vec<String>) {
+        self.tables = tables.clone();
+        self.suggestion_engine.set_tables(tables);
+    }
+
+    /// Set columns for a specific table
+    pub fn set_table_columns(&mut self, table: String, columns: Vec<String>) {
+        self.table_columns.insert(table.clone(), columns.clone());
+        self.suggestion_engine.set_table_columns(table, columns);
+    }
+
+    /// Set current file name
+    pub fn set_current_file(&mut self, filename: Option<String>) {
+        self.current_file = filename;
+    }
+
+    /// Get current file name
+    pub fn get_current_file(&self) -> Option<&String> {
+        self.current_file.as_ref()
+    }
+
+    /// Check if content has been modified
+    pub fn is_modified(&self) -> bool {
+        self.is_modified
+    }
+
+    /// Mark content as saved (not modified)
+    pub fn mark_saved(&mut self) {
+        self.is_modified = false;
+    }
+
+    /// Update suggestions based on current cursor position
+    fn update_suggestions(&mut self) {
+        if !self.is_insert_mode || !self.is_focused {
+            self.hide_suggestions();
+            return;
+        }
+
+        let suggestions = self.suggestion_engine.get_suggestions(
+            &self.content,
+            self.cursor_line,
+            self.cursor_col,
+        );
+
+        if suggestions.is_empty() {
+            self.hide_suggestions();
+        } else {
+            self.suggestion_popup.show_suggestions(suggestions);
+            self.suggestions_active = true;
+        }
+    }
+
+    /// Hide suggestions popup
+    pub fn hide_suggestions(&mut self) {
+        self.suggestion_popup.hide();
+        self.suggestions_active = false;
+    }
+
+    /// Move suggestion selection up
+    pub fn move_suggestion_up(&mut self) {
+        if self.suggestions_active {
+            self.suggestion_popup.select_previous();
+        }
+    }
+
+    /// Move suggestion selection down
+    pub fn move_suggestion_down(&mut self) {
+        if self.suggestions_active {
+            self.suggestion_popup.select_next();
+        }
+    }
+
+    /// Accept current suggestion
+    pub fn accept_suggestion(&mut self) {
+        if !self.suggestions_active {
+            return;
+        }
+
+        if let Some(suggestion) = self.suggestion_popup.get_selected_suggestion() {
+            // Get the partial word being replaced
+            let partial_word = self.get_partial_word_at_cursor();
+
+            // Clone the suggestion text to avoid borrowing issues
+            let insert_text = suggestion.text.clone();
+
+            // Replace the partial word with the suggestion
+            self.replace_word_at_cursor(&partial_word, &insert_text);
+
+            self.hide_suggestions();
+        }
+    }
+
+    /// Get partial word at cursor position
+    fn get_partial_word_at_cursor(&self) -> String {
+        let lines: Vec<&str> = self.content.lines().collect();
+
+        if self.cursor_line >= lines.len() {
+            return String::new();
+        }
+
+        let line = lines[self.cursor_line];
+        if self.cursor_col > line.len() {
+            return String::new();
+        }
+
+        // Find word boundaries around cursor
+        let mut start = self.cursor_col;
+        let mut end = self.cursor_col;
+
+        let chars: Vec<char> = line.chars().collect();
+
+        // Find start of word
+        while start > 0 && (chars[start - 1].is_alphanumeric() || chars[start - 1] == '_') {
+            start -= 1;
+        }
+
+        // Find end of word
+        while end < chars.len() && (chars[end].is_alphanumeric() || chars[end] == '_') {
+            end += 1;
+        }
+
+        line[start..end].to_string()
+    }
+
+    /// Replace word at cursor with new text
+    fn replace_word_at_cursor(&mut self, old_word: &str, new_text: &str) {
+        let lines: Vec<String> = self.content.lines().map(|s| s.to_string()).collect();
+        let mut new_lines = lines;
+
+        if self.cursor_line < new_lines.len() {
+            let line = &mut new_lines[self.cursor_line];
+            let chars: Vec<char> = line.chars().collect();
+
+            // Find start of the word to replace
+            let mut start = self.cursor_col;
+            while start > 0 && (chars[start - 1].is_alphanumeric() || chars[start - 1] == '_') {
+                start -= 1;
+            }
+
+            let end = start + old_word.len();
+
+            if start < line.len() && end <= line.len() {
+                let before = &line[..start];
+                let after = &line[end..];
+
+                *line = format!("{}{}{}", before, new_text, after);
+                self.cursor_col = start + new_text.len();
+                self.is_modified = true;
+            }
+        }
+
+        self.content = new_lines.join("\n");
+    }
+
+    /// Check if suggestions are active
+    pub fn are_suggestions_active(&self) -> bool {
+        self.suggestions_active
+    }
+
     fn apply_syntax_highlighting<'a>(&self, text: &'a str) -> Text<'a> {
         let syntax = self.get_syntax();
         let theme = &self.theme_set.themes["base16-ocean.dark"];
@@ -357,28 +558,55 @@ impl QueryEditor {
         Text::from(styled_lines)
     }
 
-    pub fn render(&self, f: &mut Frame, area: Rect) {
+    pub fn render(&mut self, f: &mut Frame, area: Rect) {
+        // Create layout with help at the bottom
+        let help_height = if self.is_focused { 4 } else { 0 }; // Space for file info, mode, and keybindings
+
+        let chunks = Layout::default()
+            .direction(Direction::Vertical)
+            .constraints([
+                Constraint::Min(3),              // Editor area (at least 3 lines)
+                Constraint::Length(help_height), // Help area at bottom
+            ])
+            .split(area);
+
+        let editor_area = chunks[0];
+        let help_area = if help_height > 0 {
+            Some(chunks[1])
+        } else {
+            None
+        };
+
+        // Create title with database type and mode info
+        let title = format!(
+            "SQL Query Editor{}{}{}",
+            if let Some(ref db_type) = self.database_type {
+                format!(
+                    " ({})",
+                    match db_type {
+                        DatabaseType::PostgreSQL => "PostgreSQL",
+                        DatabaseType::MySQL => "MySQL",
+                        DatabaseType::MariaDB => "MariaDB",
+                        DatabaseType::SQLite => "SQLite",
+                        DatabaseType::Oracle => "Oracle",
+                        DatabaseType::Redis => "Redis",
+                        DatabaseType::MongoDB => "MongoDB",
+                    }
+                )
+            } else {
+                String::new()
+            },
+            if self.is_modified { " [+]" } else { "" },
+            if self.is_insert_mode {
+                " [INSERT]"
+            } else {
+                " [NORMAL]"
+            }
+        );
+
+        // Create editor block
         let block = Block::default()
-            .title(format!(
-                "SQL Query Editor{}{}",
-                if let Some(ref db_type) = self.database_type {
-                    format!(
-                        " ({})",
-                        match db_type {
-                            DatabaseType::PostgreSQL => "PostgreSQL",
-                            DatabaseType::MySQL => "MySQL",
-                            DatabaseType::MariaDB => "MariaDB",
-                            DatabaseType::SQLite => "SQLite",
-                            DatabaseType::Oracle => "Oracle",
-                            DatabaseType::Redis => "Redis",
-                            DatabaseType::MongoDB => "MongoDB",
-                        }
-                    )
-                } else {
-                    String::new()
-                },
-                if self.is_insert_mode { " [INSERT]" } else { "" }
-            ))
+            .title(title)
             .borders(Borders::ALL)
             .border_style(if self.is_focused {
                 Style::default().fg(Color::Cyan)
@@ -386,18 +614,52 @@ impl QueryEditor {
                 Style::default().fg(Color::Gray)
             });
 
-        let inner = block.inner(area);
-        f.render_widget(block, area);
+        let editor_inner = block.inner(editor_area);
+        f.render_widget(block, editor_area);
 
-        let highlighted_text = self.apply_syntax_highlighting(&self.content);
+        // Render editor content
+        if self.content.is_empty() {
+            // Show welcome message when empty
+            let welcome_text = Text::from(vec![
+                Line::from(""),
+                Line::from(Span::styled(
+                    "-- Welcome to LazyTables SQL Query Editor --",
+                    Style::default()
+                        .fg(Color::Gray)
+                        .add_modifier(Modifier::BOLD),
+                )),
+                Line::from(""),
+                Line::from(Span::styled(
+                    "Press 'i' to enter INSERT mode and start typing SQL",
+                    Style::default().fg(Color::Gray),
+                )),
+                Line::from(Span::styled(
+                    "Press Ctrl+Enter to execute your query",
+                    Style::default().fg(Color::Gray),
+                )),
+                Line::from(""),
+                Line::from(Span::styled(
+                    "Example: SELECT * FROM users LIMIT 10;",
+                    Style::default().fg(Color::DarkGray),
+                )),
+            ]);
 
-        let paragraph = Paragraph::new(highlighted_text)
-            .wrap(Wrap { trim: false })
-            .scroll((self.scroll_offset as u16, 0));
+            let welcome_paragraph = Paragraph::new(welcome_text).wrap(Wrap { trim: false });
 
-        f.render_widget(paragraph, inner);
+            f.render_widget(welcome_paragraph, editor_inner);
+        } else {
+            // Render syntax-highlighted content
+            let highlighted_text = self.apply_syntax_highlighting(&self.content);
 
-        if self.is_focused && self.is_insert_mode {
+            let paragraph = Paragraph::new(highlighted_text)
+                .wrap(Wrap { trim: false })
+                .scroll((self.scroll_offset as u16, 0));
+
+            f.render_widget(paragraph, editor_inner);
+        }
+
+        // Set cursor position if in insert mode and focused
+        if self.is_focused && self.is_insert_mode && !self.content.is_empty() {
             let lines: Vec<&str> = self.content.lines().collect();
             let cursor_y = if self.cursor_line >= self.scroll_offset {
                 (self.cursor_line - self.scroll_offset) as u16
@@ -411,10 +673,118 @@ impl QueryEditor {
                 0
             };
 
-            if cursor_y < inner.height && cursor_x < inner.width {
-                f.set_cursor_position((inner.x + cursor_x, inner.y + cursor_y));
+            if cursor_y < editor_inner.height && cursor_x < editor_inner.width {
+                f.set_cursor_position((editor_inner.x + cursor_x, editor_inner.y + cursor_y));
             }
         }
+
+        // Render help area at bottom if focused
+        if let Some(help_area) = help_area {
+            self.render_help(f, help_area);
+        }
+
+        // Render suggestions popup if active
+        if self.suggestions_active {
+            let cursor_screen_pos = if self.is_focused && !self.content.is_empty() {
+                let lines: Vec<&str> = self.content.lines().collect();
+                let cursor_y = if self.cursor_line >= self.scroll_offset {
+                    editor_inner.y + (self.cursor_line - self.scroll_offset) as u16
+                } else {
+                    editor_inner.y
+                };
+
+                let cursor_x = if self.cursor_line < lines.len() {
+                    editor_inner.x + self.cursor_col.min(lines[self.cursor_line].len()) as u16
+                } else {
+                    editor_inner.x
+                };
+
+                (cursor_x, cursor_y)
+            } else {
+                (editor_inner.x, editor_inner.y)
+            };
+
+            self.suggestion_popup.render(f, cursor_screen_pos, area);
+        }
+    }
+
+    /// Render help information at the bottom
+    fn render_help(&self, f: &mut Frame, area: Rect) {
+        let help_chunks = Layout::default()
+            .direction(Direction::Vertical)
+            .constraints([
+                Constraint::Length(1), // File info
+                Constraint::Length(1), // Mode info
+                Constraint::Length(2), // Keybindings
+            ])
+            .split(area);
+
+        // File info
+        let file_info = if let Some(ref filename) = self.current_file {
+            format!(
+                "File: {}{}",
+                filename,
+                if self.is_modified { " [modified]" } else { "" }
+            )
+        } else {
+            "New file (unsaved)".to_string()
+        };
+
+        let file_paragraph = Paragraph::new(file_info).style(Style::default().fg(Color::Gray));
+        f.render_widget(file_paragraph, help_chunks[0]);
+
+        // Mode info
+        let mode_info = if self.is_insert_mode {
+            "-- INSERT --"
+        } else {
+            "-- NORMAL --"
+        };
+
+        let mode_paragraph = Paragraph::new(mode_info).style(
+            Style::default()
+                .fg(if self.is_insert_mode {
+                    Color::Green
+                } else {
+                    Color::Yellow
+                })
+                .add_modifier(Modifier::BOLD),
+        );
+        f.render_widget(mode_paragraph, help_chunks[1]);
+
+        // Keybindings
+        let keybindings = Line::from(vec![
+            Span::styled(
+                "i",
+                Style::default()
+                    .fg(Color::Yellow)
+                    .add_modifier(Modifier::BOLD),
+            ),
+            Span::styled(" insert | ", Style::default().fg(Color::Gray)),
+            Span::styled(
+                "Esc",
+                Style::default()
+                    .fg(Color::Yellow)
+                    .add_modifier(Modifier::BOLD),
+            ),
+            Span::styled(" normal | ", Style::default().fg(Color::Gray)),
+            Span::styled(
+                "Ctrl+Enter",
+                Style::default()
+                    .fg(Color::Yellow)
+                    .add_modifier(Modifier::BOLD),
+            ),
+            Span::styled(" execute | ", Style::default().fg(Color::Gray)),
+            Span::styled(
+                "Tab",
+                Style::default()
+                    .fg(Color::Yellow)
+                    .add_modifier(Modifier::BOLD),
+            ),
+            Span::styled(" accept suggestion", Style::default().fg(Color::Gray)),
+        ]);
+
+        let keybindings_paragraph = Paragraph::new(keybindings);
+        f.render_widget(keybindings_paragraph, help_chunks[2]);
     }
 }
 
