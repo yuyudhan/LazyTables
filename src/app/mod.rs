@@ -342,6 +342,10 @@ impl App {
                             // Exit the application
                             self.should_quit = true;
                         }
+                        crate::ui::ConfirmationAction::QuitQueryEditor => {
+                            // Quit query editor mode
+                            self.mode = Mode::Normal;
+                        }
                     }
                     self.state.ui.confirmation_modal = None;
                 }
@@ -432,9 +436,9 @@ impl App {
             }
         }
 
-        // Handle 'q' key globally to quit (except when in modals or editing)
+        // Handle 'q' key globally to quit (except when in modals, editing, or Query mode)
         if key.code == KeyCode::Char('q') && key.modifiers == KeyModifiers::NONE {
-            // Don't quit if we're in a modal or editing
+            // Don't quit if we're in a modal, editing, or in Query mode
             if !self.state.ui.show_add_connection_modal
                 && !self.state.ui.show_edit_connection_modal
                 && !self.state.ui.show_table_creator
@@ -445,6 +449,7 @@ impl App {
                 && !self.state.ui.sql_files_search_active
                 && !self.state.ui.sql_files_rename_mode
                 && !self.state.ui.sql_files_create_mode
+                && self.mode != Mode::Query
             {
                 // Check if we're editing in table viewer
                 if self.state.ui.focused_pane == FocusedPane::TabularOutput {
@@ -1616,13 +1621,24 @@ impl App {
                                     self.state.toast_manager.success("File saved");
                                 }
                             } else if command == "q" {
-                                // Quit query mode
+                                // Quit query mode with confirmation
                                 if self.state.ui.query_modified {
-                                    self.state.toast_manager.warning(
-                                        "Unsaved changes! Use :w to save or :q! to force quit",
-                                    );
+                                    // Show confirmation dialog for unsaved changes
+                                    self.state.ui.confirmation_modal = Some(crate::ui::ConfirmationModal {
+                                        title: "Quit Query Editor".to_string(),
+                                        message: "You have unsaved changes in the query editor.\nAre you sure you want to quit without saving?".to_string(),
+                                        action: crate::ui::ConfirmationAction::QuitQueryEditor,
+                                    });
                                 } else {
-                                    self.mode = Mode::Normal;
+                                    // No unsaved changes, still show confirmation
+                                    self.state.ui.confirmation_modal =
+                                        Some(crate::ui::ConfirmationModal {
+                                            title: "Quit Query Editor".to_string(),
+                                            message:
+                                                "Are you sure you want to quit the query editor?"
+                                                    .to_string(),
+                                            action: crate::ui::ConfirmationAction::QuitQueryEditor,
+                                        });
                                 }
                             } else if command == "q!" {
                                 // Force quit
@@ -1653,8 +1669,14 @@ impl App {
                     // Insert mode - handle text input using QueryEditor
                     match key.code {
                         KeyCode::Esc => {
-                            self.state.ui.query_edit_mode = QueryEditMode::Normal;
-                            self.state.query_editor.set_insert_mode(false);
+                            // First check if suggestions are active and hide them
+                            if self.state.query_editor.are_suggestions_active() {
+                                self.state.query_editor.hide_suggestions();
+                            } else {
+                                // No suggestions active, exit insert mode
+                                self.state.ui.query_edit_mode = QueryEditMode::Normal;
+                                self.state.query_editor.set_insert_mode(false);
+                            }
                         }
                         KeyCode::Enter => {
                             self.state.query_editor.insert_newline();
@@ -1684,10 +1706,30 @@ impl App {
                             self.state.query_editor.move_cursor_right();
                         }
                         KeyCode::Up => {
-                            self.state.query_editor.move_cursor_up();
+                            // If suggestions are active, navigate suggestions, otherwise move cursor
+                            if self.state.query_editor.are_suggestions_active() {
+                                self.state.query_editor.move_suggestion_up();
+                            } else {
+                                self.state.query_editor.move_cursor_up();
+                            }
                         }
                         KeyCode::Down => {
-                            self.state.query_editor.move_cursor_down();
+                            // If suggestions are active, navigate suggestions, otherwise move cursor
+                            if self.state.query_editor.are_suggestions_active() {
+                                self.state.query_editor.move_suggestion_down();
+                            } else {
+                                self.state.query_editor.move_cursor_down();
+                            }
+                        }
+                        KeyCode::Tab => {
+                            // Accept suggestion if available
+                            if self.state.query_editor.are_suggestions_active() {
+                                self.state.query_editor.accept_suggestion();
+                                // Sync content back to legacy field
+                                self.state.query_content =
+                                    self.state.query_editor.get_content().to_string();
+                                self.state.ui.query_modified = true;
+                            }
                         }
                         _ => {}
                     }
@@ -1695,7 +1737,12 @@ impl App {
                     // Normal mode - vim navigation
                     match key.code {
                         KeyCode::Esc => {
-                            self.mode = Mode::Normal;
+                            // Cancel any pending vim commands first
+                            if self.state.query_editor.has_pending_command() {
+                                self.state.query_editor.cancel_pending_command();
+                            } else {
+                                self.mode = Mode::Normal;
+                            }
                         }
                         KeyCode::Char('i') => {
                             self.state.ui.query_edit_mode = QueryEditMode::Insert;
@@ -1704,6 +1751,26 @@ impl App {
                         KeyCode::Char(':') => {
                             self.state.ui.in_vim_command = true;
                             self.state.ui.vim_command_buffer.clear();
+                        }
+                        KeyCode::Char('q') => {
+                            // Quit query mode with confirmation
+                            if self.state.ui.query_modified {
+                                // Show confirmation dialog for unsaved changes
+                                self.state.ui.confirmation_modal = Some(crate::ui::ConfirmationModal {
+                                    title: "Quit Query Editor".to_string(),
+                                    message: "You have unsaved changes in the query editor.\nAre you sure you want to quit without saving?".to_string(),
+                                    action: crate::ui::ConfirmationAction::QuitQueryEditor,
+                                });
+                            } else {
+                                // No unsaved changes, still show confirmation
+                                self.state.ui.confirmation_modal =
+                                    Some(crate::ui::ConfirmationModal {
+                                        title: "Quit Query Editor".to_string(),
+                                        message: "Are you sure you want to quit the query editor?"
+                                            .to_string(),
+                                        action: crate::ui::ConfirmationAction::QuitQueryEditor,
+                                    });
+                            }
                         }
                         // Vim navigation using QueryEditor methods
                         KeyCode::Char('h') => {
@@ -1720,44 +1787,47 @@ impl App {
                         }
                         // Word navigation
                         KeyCode::Char('w') => {
-                            self.state.move_to_next_word();
+                            self.state.query_editor.move_to_next_word();
                         }
-                        // Note: 'b' key navigation removed to avoid confusion with Ctrl+B debug toggle
+                        KeyCode::Char('b') => {
+                            self.state.query_editor.move_to_prev_word();
+                        }
                         KeyCode::Char('e') => {
-                            self.state.move_to_end_of_word();
+                            self.state.query_editor.move_to_end_of_word();
                         }
                         // Line navigation
                         KeyCode::Char('0') => {
-                            self.state.move_to_line_start();
+                            self.state.query_editor.move_to_line_start();
                         }
                         KeyCode::Char('$') => {
-                            self.state.move_to_line_end();
+                            self.state.query_editor.move_to_line_end();
                         }
                         // File navigation
                         KeyCode::Char('g') => {
                             // Check for double 'g' (gg command)
                             // Note: For simplicity, using single 'g' for now
                             // TODO: Implement proper double-key detection
-                            self.state.move_to_file_start();
+                            self.state.query_editor.move_to_file_start();
                         }
                         KeyCode::Char('G') => {
-                            self.state.move_to_file_end();
+                            self.state.query_editor.move_to_file_end();
                         }
-                        // Page scrolling
+                        // Line editing commands - need to handle in catch-all to support multi-char commands
+                        KeyCode::Char('D') => {
+                            self.state.query_editor.delete_to_line_end();
+                            // Sync content back to legacy field
+                            self.state.query_content =
+                                self.state.query_editor.get_content().to_string();
+                            self.state.ui.query_modified = true;
+                        }
+                        // Page scrolling (Ctrl+d, Ctrl+u)
                         KeyCode::Char('d') if key.modifiers.contains(KeyModifiers::CONTROL) => {
                             self.state.scroll_half_page_down();
                         }
                         KeyCode::Char('u') if key.modifiers.contains(KeyModifiers::CONTROL) => {
                             self.state.scroll_half_page_up();
                         }
-                        // Execute query
-                        KeyCode::Enter if key.modifiers.contains(KeyModifiers::CONTROL) => {
-                            if let Some(statement) = self.state.get_statement_under_cursor() {
-                                // TODO: Execute the SQL statement
-                                println!("Executing SQL: {statement}");
-                            }
-                        }
-                        // Legacy shortcuts still work in normal mode
+                        // Legacy shortcuts (Ctrl+s, Ctrl+n)
                         KeyCode::Char('s') if key.modifiers.contains(KeyModifiers::CONTROL) => {
                             if let Err(e) = self.state.save_sql_file_with_connection() {
                                 self.state
@@ -1782,6 +1852,24 @@ impl App {
                             self.state.ui.query_cursor_line = 0;
                             self.state.ui.query_cursor_column = 0;
                             self.state.toast_manager.success("New query file created");
+                        }
+                        // Catch-all for other characters (including vim commands)
+                        KeyCode::Char(c) => {
+                            // Try to handle as vim command (handles 'd', 'dd', 'dw', etc.)
+                            if self.state.query_editor.handle_vim_command(c) {
+                                // Command was handled, sync content
+                                self.state.query_content =
+                                    self.state.query_editor.get_content().to_string();
+                                self.state.ui.query_modified = true;
+                            }
+                            // If not handled as vim command, it's ignored (already handled above)
+                        }
+                        // Execute query
+                        KeyCode::Enter if key.modifiers.contains(KeyModifiers::CONTROL) => {
+                            if let Some(statement) = self.state.get_statement_under_cursor() {
+                                // TODO: Execute the SQL statement
+                                println!("Executing SQL: {statement}");
+                            }
                         }
                         _ => {}
                     }
