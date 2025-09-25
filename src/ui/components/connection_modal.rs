@@ -21,7 +21,7 @@ pub enum PasswordStorageType {
     Encrypted,
 }
 
-/// State for the connection creation modal
+/// State for the connection creation modal - SIMPLIFIED
 #[derive(Debug, Clone)]
 pub struct ConnectionModalState {
     /// Current modal step
@@ -66,6 +66,8 @@ pub struct ConnectionModalState {
     pub password_storage_list_state: ListState,
     /// Test connection status
     pub test_status: Option<TestConnectionStatus>,
+    /// Whether we're in insert mode for text editing (vim-style)
+    pub insert_mode: bool,
 }
 
 /// Status of test connection
@@ -242,6 +244,7 @@ impl Default for ConnectionModalState {
             using_connection_string: false,
             password_storage_list_state: ListState::default(),
             test_status: None,
+            insert_mode: false,
         }
     }
 }
@@ -366,6 +369,11 @@ impl ConnectionModalState {
 
     /// Handle character input for the current field
     pub fn handle_char_input(&mut self, c: char) {
+        // Only handle text input if we're in insert mode for text fields
+        if self.is_text_field() && !self.insert_mode {
+            return;
+        }
+
         match self.focused_field {
             ConnectionField::Name => {
                 self.name.push(c);
@@ -426,6 +434,11 @@ impl ConnectionModalState {
 
     /// Handle backspace for the current field
     pub fn handle_backspace(&mut self) {
+        // Only handle backspace if we're in insert mode for text fields
+        if self.is_text_field() && !self.insert_mode {
+            return;
+        }
+
         match self.focused_field {
             ConnectionField::Name => {
                 self.name.pop();
@@ -761,6 +774,30 @@ impl ConnectionModalState {
         *self = Self::new();
     }
 
+    /// Enter insert mode for text editing
+    pub fn enter_insert_mode(&mut self) {
+        if self.is_text_field() {
+            self.insert_mode = true;
+        }
+    }
+
+    /// Exit insert mode
+    pub fn exit_insert_mode(&mut self) {
+        self.insert_mode = false;
+    }
+
+    /// Toggle insert mode
+    pub fn toggle_insert_mode(&mut self) {
+        if self.is_text_field() {
+            self.insert_mode = !self.insert_mode;
+        }
+    }
+
+    /// Check if we're in insert mode
+    pub fn is_in_insert_mode(&self) -> bool {
+        self.insert_mode
+    }
+
     /// Populate modal state from existing connection for editing
     pub fn populate_from_connection(&mut self, connection: &ConnectionConfig) {
         self.name = connection.name.clone();
@@ -848,6 +885,7 @@ impl ConnectionModalState {
         self.error_message = None;
         self.using_connection_string = false;
         self.connection_string.clear();
+        self.insert_mode = false;
     }
 }
 
@@ -862,12 +900,17 @@ fn render_modal_overlay(frame: &mut Frame, area: Rect) {
 }
 
 /// Render the connection creation modal
-pub fn render_connection_modal(f: &mut Frame, modal_state: &ConnectionModalState, area: Rect, is_edit_mode: bool) {
+pub fn render_connection_modal(
+    f: &mut Frame,
+    modal_state: &ConnectionModalState,
+    area: Rect,
+    is_edit_mode: bool,
+) {
     // First render the overlay background for the entire screen
     render_modal_overlay(f, area);
 
-    // Create centered modal area with better proportions
-    let modal_area = centered_rect(55, 75, area);
+    // Create centered modal area with wider proportions to accommodate all fields
+    let modal_area = centered_rect(85, 80, area);
 
     // Clear the modal area specifically
     f.render_widget(Clear, modal_area);
@@ -899,18 +942,18 @@ pub fn render_connection_modal(f: &mut Frame, modal_state: &ConnectionModalState
     // Inner area for content with better margins
     let inner_area = modal_area.inner(Margin::new(3, 2));
 
-    // Split into header, main content, and buttons
+    // Split into header with keystroke hints, main content, and error area
     let main_chunks = Layout::default()
         .direction(Direction::Vertical)
         .constraints([
-            Constraint::Length(2), // Header/instructions
+            Constraint::Length(2), // Header with keystroke hints (more compact)
             Constraint::Min(0),    // Form fields
-            Constraint::Length(4), // Buttons area
+            Constraint::Length(1), // Error/status message area only
         ])
         .split(inner_area);
 
-    // Render header/instructions
-    render_modal_header(f, main_chunks[0]);
+    // Render header with keystroke hints
+    render_modal_header_with_hints(f, modal_state, main_chunks[0]);
 
     // Render different content based on current step
     match modal_state.current_step {
@@ -922,14 +965,41 @@ pub fn render_connection_modal(f: &mut Frame, modal_state: &ConnectionModalState
         }
     }
 
-    // Render buttons and error area
-    render_modal_footer(f, modal_state, main_chunks[2]);
+    // Render error/status area only
+    render_modal_status(f, modal_state, main_chunks[2]);
 }
 
-/// Render the modal header with step-specific instructions
-fn render_modal_header(f: &mut Frame, area: Rect) {
-    let instructions = vec![
-        Line::from(vec![
+/// Render the modal header with navigation and keystroke hints
+fn render_modal_header_with_hints(f: &mut Frame, modal_state: &ConnectionModalState, area: Rect) {
+    // Split header into three lines to accommodate insert mode indicator
+    let header_chunks = Layout::default()
+        .direction(Direction::Vertical)
+        .constraints([
+            Constraint::Length(1), // Mode indicator and basic navigation
+            Constraint::Length(1), // Step-specific context
+        ])
+        .split(area);
+
+    // Mode indicator and basic navigation
+    let mode_indicator = if modal_state.insert_mode {
+        " [INSERT MODE] "
+    } else {
+        " [NORMAL MODE] "
+    };
+
+    let mode_color = if modal_state.insert_mode {
+        Color::Green
+    } else {
+        Color::Blue
+    };
+
+    // Combined navigation and keystroke hints in one line
+    let combined_hints = match modal_state.current_step {
+        ModalStep::DatabaseTypeSelection => vec![Line::from(vec![
+            Span::styled(
+                mode_indicator,
+                Style::default().fg(mode_color).add_modifier(Modifier::BOLD),
+            ),
             Span::styled("Navigate: ", Style::default().fg(Color::Gray)),
             Span::styled(
                 "j/k",
@@ -937,7 +1007,7 @@ fn render_modal_header(f: &mut Frame, area: Rect) {
                     .fg(Color::Yellow)
                     .add_modifier(Modifier::BOLD),
             ),
-            Span::styled(" or ", Style::default().fg(Color::Gray)),
+            Span::styled("/", Style::default().fg(Color::Gray)),
             Span::styled(
                 "Tab",
                 Style::default()
@@ -951,20 +1021,93 @@ fn render_modal_header(f: &mut Frame, area: Rect) {
                     .fg(Color::Green)
                     .add_modifier(Modifier::BOLD),
             ),
-            Span::styled("  •  Back: ", Style::default().fg(Color::Gray)),
+            Span::styled("  •  Esc: Back", Style::default().fg(Color::Gray)),
+        ])],
+        ModalStep::ConnectionDetails => vec![Line::from(vec![
+            Span::styled(
+                mode_indicator,
+                Style::default().fg(mode_color).add_modifier(Modifier::BOLD),
+            ),
+            Span::styled("Navigate: ", Style::default().fg(Color::Gray)),
+            Span::styled(
+                "j/k/Tab",
+                Style::default()
+                    .fg(Color::Yellow)
+                    .add_modifier(Modifier::BOLD),
+            ),
+            Span::styled("  •  ", Style::default().fg(Color::Gray)),
+            Span::styled(
+                "i",
+                Style::default()
+                    .fg(Color::Green)
+                    .add_modifier(Modifier::BOLD),
+            ),
+            Span::styled(": Insert  •  ", Style::default().fg(Color::Gray)),
             Span::styled(
                 "Esc",
                 Style::default().fg(Color::Red).add_modifier(Modifier::BOLD),
             ),
-        ]),
-        Line::from(""),
-    ];
+            Span::styled(": Exit Insert/Back", Style::default().fg(Color::Gray)),
+        ])],
+    };
 
-    let header = Paragraph::new(instructions)
+    let nav_paragraph = Paragraph::new(combined_hints)
         .style(Style::default().fg(Color::Rgb(205, 214, 244)))
         .alignment(Alignment::Center);
 
-    f.render_widget(header, area);
+    f.render_widget(nav_paragraph, header_chunks[0]);
+
+    // Step-specific action hints
+    let action_hints = match modal_state.current_step {
+        ModalStep::DatabaseTypeSelection => vec![Line::from(vec![
+            Span::styled(
+                "S",
+                Style::default()
+                    .fg(Color::Green)
+                    .add_modifier(Modifier::BOLD),
+            ),
+            Span::styled(" - Save  •  ", Style::default().fg(Color::Gray)),
+            Span::styled(
+                "C",
+                Style::default().fg(Color::Red).add_modifier(Modifier::BOLD),
+            ),
+            Span::styled(" - Cancel", Style::default().fg(Color::Gray)),
+        ])],
+        ModalStep::ConnectionDetails => vec![Line::from(vec![
+            Span::styled(
+                "T",
+                Style::default()
+                    .fg(Color::Blue)
+                    .add_modifier(Modifier::BOLD),
+            ),
+            Span::styled(" - Test  •  ", Style::default().fg(Color::Gray)),
+            Span::styled(
+                "S",
+                Style::default()
+                    .fg(Color::Green)
+                    .add_modifier(Modifier::BOLD),
+            ),
+            Span::styled(" - Save  •  ", Style::default().fg(Color::Gray)),
+            Span::styled(
+                "C",
+                Style::default().fg(Color::Red).add_modifier(Modifier::BOLD),
+            ),
+            Span::styled(" - Cancel  •  ", Style::default().fg(Color::Gray)),
+            Span::styled(
+                "B",
+                Style::default()
+                    .fg(Color::Gray)
+                    .add_modifier(Modifier::BOLD),
+            ),
+            Span::styled(" - Back", Style::default().fg(Color::Gray)),
+        ])],
+    };
+
+    let hints_paragraph = Paragraph::new(action_hints)
+        .style(Style::default().fg(Color::Rgb(205, 214, 244)))
+        .alignment(Alignment::Center);
+
+    f.render_widget(hints_paragraph, header_chunks[1]);
 }
 
 /// Render database type selection step
@@ -973,24 +1116,21 @@ fn render_database_type_selection(f: &mut Frame, modal_state: &ConnectionModalSt
     let chunks = Layout::default()
         .direction(Direction::Vertical)
         .constraints([
-            Constraint::Length(3), // Instructions
+            Constraint::Length(1), // Instructions (compact)
             Constraint::Min(0),    // Database type selector
         ])
         .split(area);
 
     // Instructions
-    let instructions = vec![
-        Line::from(""),
-        Line::from(vec![
-            Span::styled("Step 1 of 2: ", Style::default().fg(Color::Gray)),
-            Span::styled(
-                "Choose your database type",
-                Style::default()
-                    .fg(Color::White)
-                    .add_modifier(Modifier::BOLD),
-            ),
-        ]),
-    ];
+    let instructions = vec![Line::from(vec![
+        Span::styled("Step 1 of 2: ", Style::default().fg(Color::Gray)),
+        Span::styled(
+            "Choose your database type",
+            Style::default()
+                .fg(Color::White)
+                .add_modifier(Modifier::BOLD),
+        ),
+    ])];
 
     let instruction_paragraph = Paragraph::new(instructions)
         .style(Style::default().fg(Color::Rgb(205, 214, 244)))
@@ -1015,7 +1155,7 @@ fn render_connection_details(f: &mut Frame, modal_state: &ConnectionModalState, 
     let chunks = Layout::default()
         .direction(Direction::Vertical)
         .constraints([
-            Constraint::Length(4), // Instructions
+            Constraint::Length(2), // Instructions (compact)
             Constraint::Min(0),    // Form fields
         ])
         .split(area);
@@ -1030,7 +1170,6 @@ fn render_connection_details(f: &mut Frame, modal_state: &ConnectionModalState, 
     };
 
     let instructions = vec![
-        Line::from(""),
         Line::from(vec![
             Span::styled("Step 2 of 2: ", Style::default().fg(Color::Gray)),
             Span::styled(
@@ -1075,7 +1214,7 @@ fn render_form_fields(f: &mut Frame, modal_state: &ConnectionModalState, area: R
         .direction(Direction::Vertical)
         .constraints([
             Constraint::Length(3), // Connection Name
-            Constraint::Length(4), // Connection String (taller for better visibility)
+            Constraint::Length(3), // Connection String
             Constraint::Min(0),    // Individual fields or spacer
         ])
         .split(area);
@@ -1086,6 +1225,7 @@ fn render_form_fields(f: &mut Frame, modal_state: &ConnectionModalState, area: R
         "Connection Name",
         &modal_state.name,
         modal_state.focused_field == ConnectionField::Name,
+        modal_state.insert_mode,
         main_chunks[0],
     );
 
@@ -1102,6 +1242,7 @@ fn render_form_fields(f: &mut Frame, modal_state: &ConnectionModalState, area: R
         &modal_state.connection_string,
         conn_string_focused,
         modal_state.using_connection_string,
+        modal_state.insert_mode,
         main_chunks[1],
     );
 
@@ -1134,86 +1275,250 @@ fn render_form_fields(f: &mut Frame, modal_state: &ConnectionModalState, area: R
 
 /// Render individual connection fields
 fn render_individual_fields(f: &mut Frame, modal_state: &ConnectionModalState, area: Rect) {
-    // Split into two columns for better layout
+    // Determine layout based on available width for responsiveness
+    let use_two_columns = area.width >= 100; // Use single column on narrow terminals
+
+    if use_two_columns {
+        render_two_column_fields(f, modal_state, area);
+    } else {
+        render_single_column_fields(f, modal_state, area);
+    }
+}
+
+/// Render fields in two columns with logical tab order (left to right, then down)
+fn render_two_column_fields(f: &mut Frame, modal_state: &ConnectionModalState, area: Rect) {
+    // Split into two columns with a bit more space
     let main_columns = Layout::default()
         .direction(Direction::Horizontal)
         .constraints([Constraint::Percentage(50), Constraint::Percentage(50)])
+        .margin(1)
         .split(area);
 
-    // Left column fields
+    // Simple, fixed constraints - ensure each field gets proper space
+    let base_constraints = vec![
+        Constraint::Length(3), // Row 1
+        Constraint::Length(1), // Spacer
+        Constraint::Length(3), // Row 2
+        Constraint::Length(1), // Spacer
+        Constraint::Length(3), // Row 3
+        Constraint::Length(1), // Spacer
+        Constraint::Length(3), // Row 4
+        Constraint::Length(1), // Spacer
+        Constraint::Length(3), // Row 5
+        Constraint::Length(1), // Spacer
+        Constraint::Length(3), // Row 6
+        Constraint::Length(1), // Spacer
+        Constraint::Length(3), // Row 7
+        Constraint::Min(1),    // Bottom margin
+    ];
+
     let left_chunks = Layout::default()
         .direction(Direction::Vertical)
-        .constraints([
-            Constraint::Length(3), // Host
-            Constraint::Length(3), // Port
-        ])
+        .constraints(base_constraints.clone())
         .split(main_columns[0]);
-
-    // Right column fields - dynamically adjust based on password storage type
-    let constraints = match modal_state.password_storage_type {
-        PasswordStorageType::PlainText => vec![
-            Constraint::Length(3), // Database
-            Constraint::Length(3), // Username
-            Constraint::Length(3), // Password
-            Constraint::Length(3), // Password Storage Type
-            Constraint::Length(3), // SSL Mode
-        ],
-        PasswordStorageType::Environment => vec![
-            Constraint::Length(3), // Database
-            Constraint::Length(3), // Username
-            Constraint::Length(3), // Password Storage Type
-            Constraint::Length(3), // Environment Variable
-            Constraint::Length(3), // SSL Mode
-        ],
-        PasswordStorageType::Encrypted => vec![
-            Constraint::Length(3), // Database
-            Constraint::Length(3), // Username
-            Constraint::Length(3), // Password
-            Constraint::Length(3), // Password Storage Type
-            Constraint::Length(3), // Encryption Key
-            Constraint::Length(3), // Key Hint
-            Constraint::Length(3), // SSL Mode
-        ],
-    };
 
     let right_chunks = Layout::default()
         .direction(Direction::Vertical)
-        .constraints(constraints)
+        .constraints(base_constraints)
         .split(main_columns[1]);
 
-    // Render left column fields
+    // Row 1: Host (left) | Username (right)
     render_text_field(
         f,
         "Host",
         &modal_state.host,
         modal_state.focused_field == ConnectionField::Host,
+        modal_state.insert_mode,
         left_chunks[0],
-    );
-    render_text_field(
-        f,
-        "Port",
-        &modal_state.port_input,
-        modal_state.focused_field == ConnectionField::Port,
-        left_chunks[1],
-    );
-
-    // Render right column fields
-    render_text_field(
-        f,
-        "Database (Optional)",
-        &modal_state.database,
-        modal_state.focused_field == ConnectionField::Database,
-        right_chunks[0],
     );
     render_text_field(
         f,
         "Username",
         &modal_state.username,
         modal_state.focused_field == ConnectionField::Username,
-        right_chunks[1],
+        modal_state.insert_mode,
+        right_chunks[0],
     );
 
-    // Render password fields based on storage type
+    // Row 2: Port (left) | Database (right)
+    render_text_field(
+        f,
+        "Port",
+        &modal_state.port_input,
+        modal_state.focused_field == ConnectionField::Port,
+        modal_state.insert_mode,
+        left_chunks[2],
+    );
+    render_text_field(
+        f,
+        "Database (Optional)",
+        &modal_state.database,
+        modal_state.focused_field == ConnectionField::Database,
+        modal_state.insert_mode,
+        right_chunks[2],
+    );
+
+    // Row 3: Password Storage Type (left) | SSL Mode (right) - ALWAYS render SSL Mode
+    render_password_storage_selector(f, modal_state, left_chunks[4]);
+    render_dropdown_field(
+        f,
+        "SSL Mode",
+        &get_ssl_modes(),
+        modal_state.focused_field == ConnectionField::SslMode,
+        &modal_state.ssl_list_state,
+        right_chunks[4],
+    );
+
+    // Row 4 and beyond: Password fields based on storage type
+    match modal_state.password_storage_type {
+        PasswordStorageType::PlainText => {
+            // Row 4: Password (left) | Empty (right)
+            render_password_field(
+                f,
+                "Password (Optional)",
+                &modal_state.password,
+                modal_state.focused_field == ConnectionField::Password,
+                left_chunks[6],
+            );
+        }
+        PasswordStorageType::Environment => {
+            // Row 4: Environment Variable (left) | Empty (right)
+            render_text_field(
+                f,
+                "Environment Variable (e.g., DB_PASSWORD)",
+                &modal_state.password_env_var,
+                modal_state.focused_field == ConnectionField::PasswordEnvVar,
+                modal_state.insert_mode,
+                left_chunks[6],
+            );
+        }
+        PasswordStorageType::Encrypted => {
+            // Row 4: Password (left) | Empty (right)
+            render_password_field(
+                f,
+                "Password",
+                &modal_state.password,
+                modal_state.focused_field == ConnectionField::Password,
+                left_chunks[6],
+            );
+            // Row 5: Encryption Key (left) | Empty (right)
+            render_password_field(
+                f,
+                "Encryption Key",
+                &modal_state.encryption_key,
+                modal_state.focused_field == ConnectionField::EncryptionKey,
+                left_chunks[8],
+            );
+            // Row 6: Key Hint (left) | Empty (right)
+            render_text_field(
+                f,
+                "Key Hint (Optional)",
+                &modal_state.encryption_hint,
+                modal_state.focused_field == ConnectionField::EncryptionHint,
+                modal_state.insert_mode,
+                left_chunks[10],
+            );
+        }
+    }
+}
+
+/// Render fields in a single column for narrow terminals
+fn render_single_column_fields(f: &mut Frame, modal_state: &ConnectionModalState, area: Rect) {
+    // Simple fixed constraints for single column - ensure proper spacing
+    let mut constraints = vec![
+        Constraint::Length(3), // Host
+        Constraint::Length(1), // Spacer
+        Constraint::Length(3), // Username
+        Constraint::Length(1), // Spacer
+        Constraint::Length(3), // Port
+        Constraint::Length(1), // Spacer
+        Constraint::Length(3), // Database
+        Constraint::Length(1), // Spacer
+        Constraint::Length(3), // Password Storage Type
+        Constraint::Length(1), // Spacer
+        Constraint::Length(3), // SSL Mode
+        Constraint::Length(1), // Spacer
+    ];
+
+    // Add password-related fields based on storage type
+    match modal_state.password_storage_type {
+        PasswordStorageType::PlainText => {
+            constraints.insert(8, Constraint::Length(3)); // Password before Password Storage Type
+            constraints.insert(9, Constraint::Length(1)); // Spacer
+        }
+        PasswordStorageType::Environment => {
+            constraints.extend_from_slice(&[
+                Constraint::Length(3), // Environment Variable
+                Constraint::Length(1), // Spacer
+            ]);
+        }
+        PasswordStorageType::Encrypted => {
+            constraints.insert(8, Constraint::Length(3)); // Password before Password Storage Type
+            constraints.insert(9, Constraint::Length(1)); // Spacer
+            constraints.extend_from_slice(&[
+                Constraint::Length(3), // Encryption Key
+                Constraint::Length(1), // Spacer
+                Constraint::Length(3), // Key Hint
+                Constraint::Length(1), // Spacer
+            ]);
+        }
+    }
+
+    // Add bottom margin
+    constraints.push(Constraint::Min(1));
+
+    let chunks = Layout::default()
+        .direction(Direction::Vertical)
+        .constraints(constraints)
+        .split(area);
+
+    let mut idx = 0;
+
+    // Row 1: Host
+    render_text_field(
+        f,
+        "Host",
+        &modal_state.host,
+        modal_state.focused_field == ConnectionField::Host,
+        modal_state.insert_mode,
+        chunks[idx],
+    );
+    idx += 2; // Skip spacer
+
+    // Row 2: Username
+    render_text_field(
+        f,
+        "Username",
+        &modal_state.username,
+        modal_state.focused_field == ConnectionField::Username,
+        modal_state.insert_mode,
+        chunks[idx],
+    );
+    idx += 2; // Skip spacer
+
+    // Row 3: Port
+    render_text_field(
+        f,
+        "Port",
+        &modal_state.port_input,
+        modal_state.focused_field == ConnectionField::Port,
+        modal_state.insert_mode,
+        chunks[idx],
+    );
+    idx += 2; // Skip spacer
+
+    // Row 4: Database
+    render_text_field(
+        f,
+        "Database (Optional)",
+        &modal_state.database,
+        modal_state.focused_field == ConnectionField::Database,
+        modal_state.insert_mode,
+        chunks[idx],
+    );
+    idx += 2; // Skip spacer
+
+    // Row 5: Password (if applicable)
     match modal_state.password_storage_type {
         PasswordStorageType::PlainText => {
             render_password_field(
@@ -1221,35 +1526,9 @@ fn render_individual_fields(f: &mut Frame, modal_state: &ConnectionModalState, a
                 "Password (Optional)",
                 &modal_state.password,
                 modal_state.focused_field == ConnectionField::Password,
-                right_chunks[2],
+                chunks[idx],
             );
-            render_password_storage_selector(f, modal_state, right_chunks[3]);
-            render_dropdown_field(
-                f,
-                "SSL Mode",
-                &get_ssl_modes(),
-                modal_state.focused_field == ConnectionField::SslMode,
-                &modal_state.ssl_list_state,
-                right_chunks[4],
-            );
-        }
-        PasswordStorageType::Environment => {
-            render_password_storage_selector(f, modal_state, right_chunks[2]);
-            render_text_field(
-                f,
-                "Environment Variable (e.g., DB_PASSWORD)",
-                &modal_state.password_env_var,
-                modal_state.focused_field == ConnectionField::PasswordEnvVar,
-                right_chunks[3],
-            );
-            render_dropdown_field(
-                f,
-                "SSL Mode",
-                &get_ssl_modes(),
-                modal_state.focused_field == ConnectionField::SslMode,
-                &modal_state.ssl_list_state,
-                right_chunks[4],
-            );
+            idx += 2; // Skip spacer
         }
         PasswordStorageType::Encrypted => {
             render_password_field(
@@ -1257,32 +1536,59 @@ fn render_individual_fields(f: &mut Frame, modal_state: &ConnectionModalState, a
                 "Password",
                 &modal_state.password,
                 modal_state.focused_field == ConnectionField::Password,
-                right_chunks[2],
+                chunks[idx],
             );
-            render_password_storage_selector(f, modal_state, right_chunks[3]);
+            idx += 2; // Skip spacer
+        }
+        _ => {}
+    }
+
+    // Row 6: Password Storage Type
+    render_password_storage_selector(f, modal_state, chunks[idx]);
+    idx += 2; // Skip spacer
+
+    // Row 7: SSL Mode - ALWAYS render
+    render_dropdown_field(
+        f,
+        "SSL Mode",
+        &get_ssl_modes(),
+        modal_state.focused_field == ConnectionField::SslMode,
+        &modal_state.ssl_list_state,
+        chunks[idx],
+    );
+    idx += 2; // Skip spacer
+
+    // Additional rows based on storage type
+    match modal_state.password_storage_type {
+        PasswordStorageType::Environment => {
+            render_text_field(
+                f,
+                "Environment Variable (e.g., DB_PASSWORD)",
+                &modal_state.password_env_var,
+                modal_state.focused_field == ConnectionField::PasswordEnvVar,
+                modal_state.insert_mode,
+                chunks[idx],
+            );
+        }
+        PasswordStorageType::Encrypted => {
             render_password_field(
                 f,
                 "Encryption Key",
                 &modal_state.encryption_key,
                 modal_state.focused_field == ConnectionField::EncryptionKey,
-                right_chunks[4],
+                chunks[idx],
             );
+            idx += 2; // Skip spacer
             render_text_field(
                 f,
                 "Key Hint (Optional)",
                 &modal_state.encryption_hint,
                 modal_state.focused_field == ConnectionField::EncryptionHint,
-                right_chunks[5],
-            );
-            render_dropdown_field(
-                f,
-                "SSL Mode",
-                &get_ssl_modes(),
-                modal_state.focused_field == ConnectionField::SslMode,
-                &modal_state.ssl_list_state,
-                right_chunks[6],
+                modal_state.insert_mode,
+                chunks[idx],
             );
         }
+        _ => {}
     }
 }
 
@@ -1293,16 +1599,18 @@ fn render_connection_string_field(
     value: &str,
     focused: bool,
     using_connection_string: bool,
+    insert_mode: bool,
     area: Rect,
 ) {
     let (border_style, title_style) = if focused {
+        let color = if insert_mode {
+            Color::Green // Green border in insert mode
+        } else {
+            Color::Cyan // Default cyan
+        };
         (
-            Style::default()
-                .fg(Color::Cyan)
-                .add_modifier(Modifier::BOLD),
-            Style::default()
-                .fg(Color::Cyan)
-                .add_modifier(Modifier::BOLD),
+            Style::default().fg(color).add_modifier(Modifier::BOLD),
+            Style::default().fg(color).add_modifier(Modifier::BOLD),
         )
     } else if using_connection_string {
         (
@@ -1326,10 +1634,12 @@ fn render_connection_string_field(
         .borders(Borders::ALL)
         .border_style(border_style);
 
-    let display_value = if focused && !value.is_empty() {
-        format!("{value}│") // Add cursor indicator
-    } else if focused {
-        "│".to_string() // Just cursor when empty
+    let display_value = if focused && insert_mode {
+        if value.is_empty() {
+            "│".to_string() // Just cursor when empty in insert mode
+        } else {
+            format!("{value}│") // Add cursor indicator in insert mode
+        }
     } else if using_connection_string {
         format!("✓ {value}") // Show checkmark when using connection string
     } else {
@@ -1354,15 +1664,23 @@ fn get_connection_string_example(db_type: &DatabaseType) -> &'static str {
 }
 
 /// Render a text input field
-fn render_text_field(f: &mut Frame, label: &str, value: &str, focused: bool, area: Rect) {
+fn render_text_field(
+    f: &mut Frame,
+    label: &str,
+    value: &str,
+    focused: bool,
+    insert_mode: bool,
+    area: Rect,
+) {
     let (border_style, title_style) = if focused {
+        let color = if insert_mode {
+            Color::Green // Green border in insert mode
+        } else {
+            Color::Rgb(116, 199, 236) // Default blue
+        };
         (
-            Style::default()
-                .fg(Color::Rgb(116, 199, 236))
-                .add_modifier(Modifier::BOLD),
-            Style::default()
-                .fg(Color::Rgb(116, 199, 236))
-                .add_modifier(Modifier::BOLD),
+            Style::default().fg(color).add_modifier(Modifier::BOLD),
+            Style::default().fg(color).add_modifier(Modifier::BOLD),
         )
     } else {
         (
@@ -1377,17 +1695,21 @@ fn render_text_field(f: &mut Frame, label: &str, value: &str, focused: bool, are
         .borders(Borders::ALL)
         .border_style(border_style);
 
-    let display_value = if focused && !value.is_empty() {
-        format!("{value}│") // Add cursor indicator
-    } else if focused {
-        "│".to_string() // Just cursor when empty
+    let display_value = if focused && insert_mode {
+        if value.is_empty() {
+            "│".to_string() // Just cursor when empty in insert mode
+        } else {
+            format!("{value}│") // Add cursor indicator in insert mode
+        }
     } else {
         value.to_string()
     };
 
+    // Use proper Ratatui block rendering with inner area
     let paragraph = Paragraph::new(display_value)
         .block(block)
-        .style(Style::default().fg(Color::White));
+        .style(Style::default().fg(Color::White))
+        .wrap(ratatui::widgets::Wrap { trim: false });
 
     f.render_widget(paragraph, area);
 }
@@ -1472,6 +1794,7 @@ fn render_password_field(f: &mut Frame, label: &str, value: &str, focused: bool,
         .borders(Borders::ALL)
         .border_style(border_style);
 
+    // Use proper Ratatui block rendering
     let paragraph = Paragraph::new(masked_value)
         .block(block)
         .style(Style::default().fg(Color::White));
@@ -1529,27 +1852,8 @@ fn render_dropdown_field(
     f.render_stateful_widget(list, area, &mut list_state);
 }
 
-/// Render the modal footer with buttons and error messages
-fn render_modal_footer(f: &mut Frame, modal_state: &ConnectionModalState, area: Rect) {
-    // Split footer into buttons and error area
-    let footer_chunks = Layout::default()
-        .direction(Direction::Vertical)
-        .constraints([
-            Constraint::Length(3), // Buttons
-            Constraint::Length(1), // Error/Test status message
-        ])
-        .split(area);
-
-    // Render buttons based on current step
-    match modal_state.current_step {
-        ModalStep::DatabaseTypeSelection => {
-            render_database_selection_buttons(f, modal_state, footer_chunks[0]);
-        }
-        ModalStep::ConnectionDetails => {
-            render_connection_details_buttons(f, modal_state, footer_chunks[0]);
-        }
-    }
-
+/// Render only status/error messages (no buttons)
+fn render_modal_status(f: &mut Frame, modal_state: &ConnectionModalState, area: Rect) {
     // Render test status or error message
     if let Some(test_status) = &modal_state.test_status {
         let (message, style) = match test_status {
@@ -1573,176 +1877,13 @@ fn render_modal_footer(f: &mut Frame, modal_state: &ConnectionModalState, area: 
         let status_paragraph = Paragraph::new(message)
             .style(style)
             .alignment(Alignment::Center);
-        f.render_widget(status_paragraph, footer_chunks[1]);
+        f.render_widget(status_paragraph, area);
     } else if let Some(error) = &modal_state.error_message {
         let error_paragraph = Paragraph::new(format!("❗ {error}"))
             .style(Style::default().fg(Color::Red).add_modifier(Modifier::BOLD))
             .alignment(Alignment::Center);
-        f.render_widget(error_paragraph, footer_chunks[1]);
+        f.render_widget(error_paragraph, area);
     }
-}
-
-/// Render buttons for database type selection step
-fn render_database_selection_buttons(
-    f: &mut Frame,
-    modal_state: &ConnectionModalState,
-    area: Rect,
-) {
-    let button_chunks = Layout::default()
-        .direction(Direction::Horizontal)
-        .constraints([
-            Constraint::Percentage(40),
-            Constraint::Percentage(20),
-            Constraint::Percentage(40),
-        ])
-        .split(area);
-
-    let next_style = if modal_state.focused_field == ConnectionField::Save {
-        Style::default()
-            .fg(Color::Black)
-            .bg(Color::Blue)
-            .add_modifier(Modifier::BOLD)
-    } else {
-        Style::default()
-            .fg(Color::Blue)
-            .add_modifier(Modifier::BOLD)
-    };
-
-    let cancel_style = if modal_state.focused_field == ConnectionField::Cancel {
-        Style::default()
-            .fg(Color::Black)
-            .bg(Color::Red)
-            .add_modifier(Modifier::BOLD)
-    } else {
-        Style::default().fg(Color::Red).add_modifier(Modifier::BOLD)
-    };
-
-    let next_button = Paragraph::new("▶️ Next Step (s)")
-        .style(next_style)
-        .alignment(Alignment::Center)
-        .block(Block::default().borders(Borders::ALL).border_style(
-            if modal_state.focused_field == ConnectionField::Save {
-                Style::default().fg(Color::Blue)
-            } else {
-                Style::default().fg(Color::Rgb(69, 71, 90))
-            },
-        ));
-
-    let cancel_button = Paragraph::new("❌ Cancel (c)")
-        .style(cancel_style)
-        .alignment(Alignment::Center)
-        .block(Block::default().borders(Borders::ALL).border_style(
-            if modal_state.focused_field == ConnectionField::Cancel {
-                Style::default().fg(Color::Red)
-            } else {
-                Style::default().fg(Color::Rgb(69, 71, 90))
-            },
-        ));
-
-    f.render_widget(next_button, button_chunks[0]);
-    f.render_widget(cancel_button, button_chunks[2]);
-}
-
-/// Render buttons for connection details step
-fn render_connection_details_buttons(
-    f: &mut Frame,
-    modal_state: &ConnectionModalState,
-    area: Rect,
-) {
-    let button_chunks = Layout::default()
-        .direction(Direction::Horizontal)
-        .constraints([
-            Constraint::Percentage(22),
-            Constraint::Percentage(5),
-            Constraint::Percentage(22),
-            Constraint::Percentage(5),
-            Constraint::Percentage(22),
-            Constraint::Percentage(5),
-            Constraint::Percentage(19),
-        ])
-        .split(area);
-
-    let test_style = if modal_state.focused_field == ConnectionField::Test {
-        Style::default()
-            .fg(Color::Black)
-            .bg(Color::Blue)
-            .add_modifier(Modifier::BOLD)
-    } else {
-        Style::default()
-            .fg(Color::Blue)
-            .add_modifier(Modifier::BOLD)
-    };
-
-    let save_style = if modal_state.focused_field == ConnectionField::Save {
-        Style::default()
-            .fg(Color::Black)
-            .bg(Color::Green)
-            .add_modifier(Modifier::BOLD)
-    } else {
-        Style::default()
-            .fg(Color::Green)
-            .add_modifier(Modifier::BOLD)
-    };
-
-    let cancel_style = if modal_state.focused_field == ConnectionField::Cancel {
-        Style::default()
-            .fg(Color::Black)
-            .bg(Color::Red)
-            .add_modifier(Modifier::BOLD)
-    } else {
-        Style::default().fg(Color::Red).add_modifier(Modifier::BOLD)
-    };
-
-    let test_button = Paragraph::new("🔌 Test (t)")
-        .style(test_style)
-        .alignment(Alignment::Center)
-        .block(Block::default().borders(Borders::ALL).border_style(
-            if modal_state.focused_field == ConnectionField::Test {
-                Style::default().fg(Color::Blue)
-            } else {
-                Style::default().fg(Color::Rgb(69, 71, 90))
-            },
-        ));
-
-    let save_button = Paragraph::new("💾 Save (s)")
-        .style(save_style)
-        .alignment(Alignment::Center)
-        .block(Block::default().borders(Borders::ALL).border_style(
-            if modal_state.focused_field == ConnectionField::Save {
-                Style::default().fg(Color::Green)
-            } else {
-                Style::default().fg(Color::Rgb(69, 71, 90))
-            },
-        ));
-
-    let cancel_button = Paragraph::new("❌ Cancel (c)")
-        .style(cancel_style)
-        .alignment(Alignment::Center)
-        .block(Block::default().borders(Borders::ALL).border_style(
-            if modal_state.focused_field == ConnectionField::Cancel {
-                Style::default().fg(Color::Red)
-            } else {
-                Style::default().fg(Color::Rgb(69, 71, 90))
-            },
-        ));
-
-    let back_button = Paragraph::new("◀️ Back (b)")
-        .style(
-            Style::default()
-                .fg(Color::Gray)
-                .add_modifier(Modifier::BOLD),
-        )
-        .alignment(Alignment::Center)
-        .block(
-            Block::default()
-                .borders(Borders::ALL)
-                .border_style(Style::default().fg(Color::Rgb(69, 71, 90))),
-        );
-
-    f.render_widget(test_button, button_chunks[0]);
-    f.render_widget(save_button, button_chunks[2]);
-    f.render_widget(cancel_button, button_chunks[4]);
-    f.render_widget(back_button, button_chunks[6]);
 }
 
 /// Helper function to create a centered rectangle
@@ -2004,7 +2145,10 @@ mod tests {
         };
 
         modal_state.populate_from_connection(&connection_with_plain_text);
-        assert_eq!(modal_state.password_storage_type, PasswordStorageType::PlainText);
+        assert_eq!(
+            modal_state.password_storage_type,
+            PasswordStorageType::PlainText
+        );
         assert_eq!(modal_state.password, "secret123");
         assert_eq!(modal_state.password_env_var, "");
         assert_eq!(modal_state.encryption_key, "");
@@ -2028,7 +2172,10 @@ mod tests {
         };
 
         modal_state.populate_from_connection(&connection_with_env_var);
-        assert_eq!(modal_state.password_storage_type, PasswordStorageType::Environment);
+        assert_eq!(
+            modal_state.password_storage_type,
+            PasswordStorageType::Environment
+        );
         assert_eq!(modal_state.password_env_var, "DB_PASSWORD");
         assert_eq!(modal_state.password, "");
         assert_eq!(modal_state.encryption_key, "");
@@ -2058,7 +2205,10 @@ mod tests {
         };
 
         modal_state.populate_from_connection(&connection_with_encrypted);
-        assert_eq!(modal_state.password_storage_type, PasswordStorageType::Encrypted);
+        assert_eq!(
+            modal_state.password_storage_type,
+            PasswordStorageType::Encrypted
+        );
         assert_eq!(modal_state.password, ""); // Should be empty for security
         assert_eq!(modal_state.password_env_var, "");
         assert_eq!(modal_state.encryption_key, ""); // Should be empty for security
@@ -2081,7 +2231,10 @@ mod tests {
         };
 
         modal_state.populate_from_connection(&connection_with_legacy);
-        assert_eq!(modal_state.password_storage_type, PasswordStorageType::PlainText);
+        assert_eq!(
+            modal_state.password_storage_type,
+            PasswordStorageType::PlainText
+        );
         assert_eq!(modal_state.password, "legacy_pass");
         assert_eq!(modal_state.password_env_var, "");
         assert_eq!(modal_state.encryption_key, "");
