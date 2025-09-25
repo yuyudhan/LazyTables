@@ -218,22 +218,34 @@ impl TableTab {
     /// Navigate to next page
     pub fn next_page(&mut self) -> bool {
         let max_page = (self.total_rows.saturating_sub(1)) / self.rows_per_page;
+        crate::log_debug!(
+            "next_page: total_rows={}, rows_per_page={}, current_page={}, max_page={}",
+            self.total_rows, self.rows_per_page, self.current_page, max_page
+        );
         if self.current_page < max_page {
             self.current_page += 1;
             self.selected_row = 0;
+            crate::log_debug!("next_page: Moving to page {}", self.current_page);
             true // Need to reload data
         } else {
+            crate::log_debug!("next_page: Already at last page, no navigation");
             false
         }
     }
 
     /// Navigate to previous page
     pub fn prev_page(&mut self) -> bool {
+        crate::log_debug!(
+            "prev_page: total_rows={}, rows_per_page={}, current_page={}",
+            self.total_rows, self.rows_per_page, self.current_page
+        );
         if self.current_page > 0 {
             self.current_page -= 1;
             self.selected_row = 0;
+            crate::log_debug!("prev_page: Moving to page {}", self.current_page);
             true // Need to reload data
         } else {
+            crate::log_debug!("prev_page: Already at first page, no navigation");
             false
         }
     }
