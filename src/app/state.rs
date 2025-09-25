@@ -425,20 +425,34 @@ impl AppState {
 
     /// Move table selection down
     pub fn table_down(&mut self) {
+        crate::log_debug!("Moving table selection down");
         self.ui.table_selection_down();
         // Clear metadata when selection changes (will load when Enter is pressed)
         self.db.current_table_metadata = None;
         // Reset details pane scroll position for new table
         self.ui.details_viewport_offset = 0;
+
+        if let Some(table_name) = self.ui.get_selected_table_name() {
+            crate::log_debug!("Selected table: {}", table_name);
+        } else {
+            crate::log_debug!("No table selected after navigation");
+        }
     }
 
     /// Move table selection up
     pub fn table_up(&mut self) {
+        crate::log_debug!("Moving table selection up");
         self.ui.table_selection_up();
         // Clear metadata when selection changes (will load when Enter is pressed)
         self.db.current_table_metadata = None;
         // Reset details pane scroll position for new table
         self.ui.details_viewport_offset = 0;
+
+        if let Some(table_name) = self.ui.get_selected_table_name() {
+            crate::log_debug!("Selected table: {}", table_name);
+        } else {
+            crate::log_debug!("No table selected after navigation");
+        }
     }
 
     /// Update table list state when tables change
@@ -1524,34 +1538,46 @@ impl AppState {
 
     /// Open table creator view
     pub fn open_table_creator(&mut self) {
+        crate::log_info!("Opening table creator view");
         self.ui.show_table_creator = true;
         self.table_creator_state = TableCreatorState::new();
+        crate::log_debug!("Table creator state initialized");
     }
 
     /// Close table creator view
     pub fn close_table_creator(&mut self) {
+        crate::log_info!("Closing table creator view");
         self.ui.show_table_creator = false;
         self.table_creator_state.clear();
+        crate::log_debug!("Table creator state cleared");
     }
 
     /// Open table editor view
     pub async fn open_table_editor(&mut self) {
         if let Some(table_name) = self.ui.get_selected_table_name() {
+            crate::log_info!("Opening table editor for table '{}'", table_name);
             self.ui.show_table_editor = true;
             self.table_editor_state = TableEditorState::new(table_name.clone());
 
             // Load table schema from database
             if let Err(e) = self.load_table_schema_for_editor(&table_name).await {
+                crate::log_error!("Failed to load table schema for editor (table '{}'): {}", table_name, e);
                 self.table_editor_state.error_message =
                     Some(format!("Failed to load table schema: {e}"));
+            } else {
+                crate::log_debug!("Successfully loaded table schema for editor (table '{}')", table_name);
             }
+        } else {
+            crate::log_warn!("Attempted to open table editor but no table is selected");
         }
     }
 
     /// Close table editor view
     pub fn close_table_editor(&mut self) {
+        crate::log_info!("Closing table editor view");
         self.ui.show_table_editor = false;
         self.table_editor_state.clear();
+        crate::log_debug!("Table editor state cleared");
     }
 
     /// Load table schema for the editor
@@ -1727,19 +1753,25 @@ impl AppState {
 
     /// Open a table for viewing
     pub async fn open_table_for_viewing(&mut self) {
+        crate::log_info!("Attempting to open table for viewing");
+
         // Check connection health before attempting to open table
         if !self.check_connection_health().await {
+            crate::log_warn!("Cannot open table: database connection is not available");
             self.toast_manager
                 .error("Cannot open table: database connection is not available");
             return;
         }
 
         if let Some(table_name) = self.ui.get_selected_table_name() {
+            crate::log_info!("Opening table '{}' for viewing", table_name);
             // Add tab to viewer
             let tab_idx = self.table_viewer_state.add_tab(table_name.clone());
+            crate::log_debug!("Created new tab with index {} for table '{}'", tab_idx, table_name);
 
             // Load table data
             if let Err(e) = self.load_table_data(tab_idx).await {
+                crate::log_error!("Failed to load table data for '{}': {}", table_name, e);
                 if let Some(tab) = self.table_viewer_state.tabs.get_mut(tab_idx) {
                     tab.error = Some(format!("Failed to load table: {e}"));
                     tab.loading = false;
@@ -1748,18 +1780,27 @@ impl AppState {
                 // Check if this was a connection issue and update status accordingly
                 if e.contains("connection") || e.contains("Connection") || e.contains("disconnect")
                 {
+                    crate::log_warn!("Connection issue detected while loading table data, checking connection health");
                     let _ = self.check_connection_health().await;
                 }
+            } else {
+                crate::log_info!("Successfully loaded table data for '{}'", table_name);
             }
 
             // Load table metadata for the details pane
             if let Err(e) = self.load_table_metadata(&table_name).await {
+                crate::log_error!("Failed to load table metadata for '{}': {}", table_name, e);
                 self.toast_manager
                     .error(format!("Failed to load table metadata: {e}"));
+            } else {
+                crate::log_debug!("Successfully loaded table metadata for '{}'", table_name);
             }
 
             // Switch focus to tabular output
             self.ui.focused_pane = FocusedPane::TabularOutput;
+            crate::log_debug!("Switched focus to tabular output for table '{}'", table_name);
+        } else {
+            crate::log_warn!("Attempted to open table but no table is selected");
         }
     }
 
