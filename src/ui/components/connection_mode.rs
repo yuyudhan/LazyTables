@@ -9,9 +9,7 @@ use ratatui::{
     layout::{Alignment, Constraint, Direction, Layout, Rect},
     style::{Color, Style},
     text::{Line, Span},
-    widgets::{
-        Block, Borders, Clear, List, ListItem, Paragraph,
-    },
+    widgets::{Block, Borders, Clear, List, ListItem, Paragraph},
     Frame,
 };
 
@@ -159,10 +157,10 @@ impl ConnectionMode {
         let chunks = Layout::default()
             .direction(Direction::Vertical)
             .constraints([
-                Constraint::Length(5),  // Database type selection
-                Constraint::Min(10),    // Connection details (more space)
-                Constraint::Length(2),  // Status (smaller)
-                Constraint::Length(3),  // Help text
+                Constraint::Length(5), // Database type selection
+                Constraint::Min(10),   // Connection details (more space)
+                Constraint::Length(2), // Status (smaller)
+                Constraint::Length(3), // Help text
             ])
             .split(inner_area);
 
@@ -224,8 +222,7 @@ impl ConnectionMode {
             })
             .collect();
 
-        let list = List::new(items)
-            .style(Style::default().bg(theme.get_color("background")));
+        let list = List::new(items).style(Style::default().bg(theme.get_color("background")));
 
         frame.render_widget(list, inner_area);
     }
@@ -298,7 +295,12 @@ impl ConnectionMode {
     }
 
     /// Render individual fields form with two columns
-    fn render_individual_fields_form_two_columns(&self, frame: &mut Frame, area: Rect, theme: &Theme) {
+    fn render_individual_fields_form_two_columns(
+        &self,
+        frame: &mut Frame,
+        area: Rect,
+        theme: &Theme,
+    ) {
         // Split into two columns
         let columns = Layout::default()
             .direction(Direction::Horizontal)
@@ -328,14 +330,56 @@ impl ConnectionMode {
             .split(columns[1]);
 
         // Render left column fields
-        self.render_input_field(frame, left_chunks[0], theme, "Connection Name", &self.form_state.name, 0);
-        self.render_input_field(frame, left_chunks[1], theme, "Host", &self.form_state.host, 1);
-        self.render_input_field(frame, left_chunks[2], theme, "Database", &self.form_state.database, 3);
+        self.render_input_field(
+            frame,
+            left_chunks[0],
+            theme,
+            "Connection Name",
+            &self.form_state.name,
+            0,
+        );
+        self.render_input_field(
+            frame,
+            left_chunks[1],
+            theme,
+            "Host",
+            &self.form_state.host,
+            1,
+        );
+        self.render_input_field(
+            frame,
+            left_chunks[2],
+            theme,
+            "Database",
+            &self.form_state.database,
+            3,
+        );
 
         // Render right column fields
-        self.render_input_field(frame, right_chunks[0], theme, "Port", &self.form_state.port, 2);
-        self.render_input_field(frame, right_chunks[1], theme, "Username", &self.form_state.username, 4);
-        self.render_input_field(frame, right_chunks[2], theme, "Password", &self.form_state.password, 5);
+        self.render_input_field(
+            frame,
+            right_chunks[0],
+            theme,
+            "Port",
+            &self.form_state.port,
+            2,
+        );
+        self.render_input_field(
+            frame,
+            right_chunks[1],
+            theme,
+            "Username",
+            &self.form_state.username,
+            4,
+        );
+        self.render_input_field(
+            frame,
+            right_chunks[2],
+            theme,
+            "Password",
+            &self.form_state.password,
+            5,
+        );
     }
 
     /// Render a single input field
@@ -383,8 +427,8 @@ impl ConnectionMode {
             value.to_string()
         };
 
-        let paragraph = Paragraph::new(display_value)
-            .style(Style::default().fg(theme.get_color("foreground")));
+        let paragraph =
+            Paragraph::new(display_value).style(Style::default().fg(theme.get_color("foreground")));
 
         frame.render_widget(paragraph, inner_area);
     }
@@ -434,7 +478,6 @@ impl ConnectionMode {
 
         frame.render_widget(paragraph, inner_area);
     }
-
 
     /// Render status/error section (compact, bottom line)
     fn render_status_section(&self, frame: &mut Frame, area: Rect, theme: &Theme) {
@@ -685,18 +728,34 @@ impl ConnectionMode {
 
         if self.form_state.use_connection_string {
             match self.focused_field {
-                0 => { self.form_state.name.pop(); },
-                1 => { self.form_state.connection_string.pop(); },
+                0 => {
+                    self.form_state.name.pop();
+                }
+                1 => {
+                    self.form_state.connection_string.pop();
+                }
                 _ => {}
             }
         } else {
             match self.focused_field {
-                0 => { self.form_state.name.pop(); },
-                1 => { self.form_state.host.pop(); },
-                2 => { self.form_state.port.pop(); },
-                3 => { self.form_state.database.pop(); },
-                4 => { self.form_state.username.pop(); },
-                5 => { self.form_state.password.pop(); },
+                0 => {
+                    self.form_state.name.pop();
+                }
+                1 => {
+                    self.form_state.host.pop();
+                }
+                2 => {
+                    self.form_state.port.pop();
+                }
+                3 => {
+                    self.form_state.database.pop();
+                }
+                4 => {
+                    self.form_state.username.pop();
+                }
+                5 => {
+                    self.form_state.password.pop();
+                }
                 _ => {}
             }
         }
@@ -718,7 +777,10 @@ impl ConnectionMode {
             return Err("Connection name is required".to_string());
         }
 
-        let port = self.form_state.port.parse::<u16>()
+        let port = self
+            .form_state
+            .port
+            .parse::<u16>()
             .map_err(|_| "Invalid port number".to_string())?;
 
         Ok(ConnectionConfig {
