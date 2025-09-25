@@ -106,17 +106,20 @@ impl AppState {
 
     /// Cycle focus to the next pane
     pub fn cycle_focus_forward(&mut self) {
-        self.ui.cycle_focus_forward();
+        let sql_panes_enabled = self.are_sql_panes_enabled();
+        self.ui.cycle_focus_forward(sql_panes_enabled);
     }
 
     /// Cycle focus to the previous pane
     pub fn cycle_focus_backward(&mut self) {
-        self.ui.cycle_focus_backward();
+        let sql_panes_enabled = self.are_sql_panes_enabled();
+        self.ui.cycle_focus_backward(sql_panes_enabled);
     }
 
     /// Move focus left (Ctrl+h)
     pub fn move_focus_left(&mut self) {
-        self.ui.move_focus_left();
+        let sql_panes_enabled = self.are_sql_panes_enabled();
+        self.ui.move_focus_left(sql_panes_enabled);
     }
 
     /// Move focus down (Ctrl+j)
@@ -131,7 +134,8 @@ impl AppState {
 
     /// Move focus right (Ctrl+l)
     pub fn move_focus_right(&mut self) {
-        self.ui.move_focus_right();
+        let sql_panes_enabled = self.are_sql_panes_enabled();
+        self.ui.move_focus_right(sql_panes_enabled);
     }
 
     /// Move selection up based on current focus
@@ -1788,6 +1792,17 @@ impl AppState {
     /// Get query content from the editor
     pub fn get_query_content(&self) -> &str {
         self.query_editor.get_content()
+    }
+
+    /// Check if SQL panes (query editor and SQL files) should be enabled
+    /// Returns true only if there is an active connected connection
+    pub fn are_sql_panes_enabled(&self) -> bool {
+        self.db
+            .connections
+            .connections
+            .get(self.ui.selected_connection)
+            .map(|conn| conn.is_connected())
+            .unwrap_or(false)
     }
 
     /// Update query editor database context when connection changes

@@ -432,20 +432,44 @@ impl UIState {
         Ok(config_dir.join("ui_state.json"))
     }
 
-    /// Cycle focus to the next pane
-    pub fn cycle_focus_forward(&mut self) {
-        let new_pane = self.focused_pane.next();
+    /// Cycle focus to the next pane (connection-aware)
+    pub fn cycle_focus_forward(&mut self, sql_panes_enabled: bool) {
+        let mut new_pane = self.focused_pane.next();
+
+        // Skip disabled SQL panes
+        if !sql_panes_enabled {
+            while matches!(new_pane, FocusedPane::QueryWindow | FocusedPane::SqlFiles) {
+                new_pane = new_pane.next();
+                // Prevent infinite loop if we end up back where we started
+                if new_pane == self.focused_pane {
+                    break;
+                }
+            }
+        }
+
         self.update_focus(new_pane);
     }
 
-    /// Cycle focus to the previous pane
-    pub fn cycle_focus_backward(&mut self) {
-        let new_pane = self.focused_pane.previous();
+    /// Cycle focus to the previous pane (connection-aware)
+    pub fn cycle_focus_backward(&mut self, sql_panes_enabled: bool) {
+        let mut new_pane = self.focused_pane.previous();
+
+        // Skip disabled SQL panes
+        if !sql_panes_enabled {
+            while matches!(new_pane, FocusedPane::QueryWindow | FocusedPane::SqlFiles) {
+                new_pane = new_pane.previous();
+                // Prevent infinite loop if we end up back where we started
+                if new_pane == self.focused_pane {
+                    break;
+                }
+            }
+        }
+
         self.update_focus(new_pane);
     }
 
-    /// Move focus left (Ctrl+h)
-    pub fn move_focus_left(&mut self) {
+    /// Move focus left (Ctrl+h) (connection-aware)
+    pub fn move_focus_left(&mut self, sql_panes_enabled: bool) {
         let new_pane = match self.focused_pane {
             FocusedPane::TabularOutput => {
                 // Smart selection: go to the last focused left pane
@@ -456,8 +480,22 @@ impl UIState {
                     _ => FocusedPane::Tables, // Default to middle pane
                 }
             }
-            FocusedPane::QueryWindow => FocusedPane::Details,
-            FocusedPane::SqlFiles => FocusedPane::QueryWindow,
+            FocusedPane::QueryWindow => {
+                if sql_panes_enabled {
+                    FocusedPane::Details
+                } else {
+                    // SQL panes disabled, go to tabular output instead
+                    FocusedPane::TabularOutput
+                }
+            }
+            FocusedPane::SqlFiles => {
+                if sql_panes_enabled {
+                    FocusedPane::QueryWindow
+                } else {
+                    // SQL panes disabled, go to tabular output instead
+                    FocusedPane::TabularOutput
+                }
+            }
             // Left column panes don't have anything to the left
             _ => self.focused_pane,
         };
@@ -492,13 +530,27 @@ impl UIState {
         self.update_focus(new_pane);
     }
 
-    /// Move focus right (Ctrl+l)
-    pub fn move_focus_right(&mut self) {
+    /// Move focus right (Ctrl+l) (connection-aware)
+    pub fn move_focus_right(&mut self, sql_panes_enabled: bool) {
         let new_pane = match self.focused_pane {
             FocusedPane::Connections => FocusedPane::TabularOutput,
             FocusedPane::Tables => FocusedPane::TabularOutput,
-            FocusedPane::Details => FocusedPane::QueryWindow,
-            FocusedPane::QueryWindow => FocusedPane::SqlFiles,
+            FocusedPane::Details => {
+                if sql_panes_enabled {
+                    FocusedPane::QueryWindow
+                } else {
+                    // SQL panes disabled, stay in place or go to tabular output
+                    self.focused_pane
+                }
+            }
+            FocusedPane::QueryWindow => {
+                if sql_panes_enabled {
+                    FocusedPane::SqlFiles
+                } else {
+                    // This shouldn't happen if SQL panes are disabled, but handle gracefully
+                    FocusedPane::TabularOutput
+                }
+            }
             // Right column panes don't have anything to the right
             _ => self.focused_pane,
         };

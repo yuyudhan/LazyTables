@@ -215,7 +215,8 @@ impl Command for NextPaneCommand {
     fn execute(&self, context: &mut CommandContext) -> Result<CommandResult> {
         use FocusedPane::*;
 
-        context.state.ui.focused_pane = match context.state.ui.focused_pane {
+        let sql_panes_enabled = context.state.are_sql_panes_enabled();
+        let mut new_pane = match context.state.ui.focused_pane {
             Connections => Tables,
             Tables => Details,
             Details => TabularOutput,
@@ -224,6 +225,25 @@ impl Command for NextPaneCommand {
             QueryWindow => Connections,
         };
 
+        // Skip disabled SQL panes
+        if !sql_panes_enabled {
+            while matches!(new_pane, SqlFiles | QueryWindow) {
+                new_pane = match new_pane {
+                    Connections => Tables,
+                    Tables => Details,
+                    Details => TabularOutput,
+                    TabularOutput => Connections, // Skip SQL panes, go to connections
+                    SqlFiles => Connections,      // Skip to connections
+                    QueryWindow => Connections,   // Skip to connections
+                };
+                // Prevent infinite loop
+                if new_pane == context.state.ui.focused_pane {
+                    break;
+                }
+            }
+        }
+
+        context.state.ui.focused_pane = new_pane;
         Ok(CommandResult::Success)
     }
 
@@ -251,7 +271,8 @@ impl Command for PreviousPaneCommand {
     fn execute(&self, context: &mut CommandContext) -> Result<CommandResult> {
         use FocusedPane::*;
 
-        context.state.ui.focused_pane = match context.state.ui.focused_pane {
+        let sql_panes_enabled = context.state.are_sql_panes_enabled();
+        let mut new_pane = match context.state.ui.focused_pane {
             Connections => QueryWindow,
             Tables => Connections,
             Details => Tables,
@@ -260,6 +281,25 @@ impl Command for PreviousPaneCommand {
             QueryWindow => SqlFiles,
         };
 
+        // Skip disabled SQL panes
+        if !sql_panes_enabled {
+            while matches!(new_pane, SqlFiles | QueryWindow) {
+                new_pane = match new_pane {
+                    Connections => TabularOutput, // Skip SQL panes, go to tabular output
+                    Tables => Connections,
+                    Details => Tables,
+                    TabularOutput => Details,
+                    SqlFiles => TabularOutput,    // Skip to tabular output
+                    QueryWindow => TabularOutput, // Skip to tabular output
+                };
+                // Prevent infinite loop
+                if new_pane == context.state.ui.focused_pane {
+                    break;
+                }
+            }
+        }
+
+        context.state.ui.focused_pane = new_pane;
         Ok(CommandResult::Success)
     }
 
