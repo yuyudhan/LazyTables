@@ -711,10 +711,26 @@ impl AppState {
         fs::create_dir_all(&sql_dir)?;
 
         let file_path = sql_dir.join(format!("{filename}.sql"));
-        fs::write(&file_path, &self.query_content)?;
+
+        // Get the latest content from QueryEditor (in case it's more up-to-date)
+        let content_to_save = if self.query_editor.get_content() != self.query_content {
+            // QueryEditor has newer content, sync it back
+            self.query_content = self.query_editor.get_content().to_string();
+            &self.query_content
+        } else {
+            &self.query_content
+        };
+
+        fs::write(&file_path, content_to_save)?;
 
         self.ui.current_sql_file = Some(filename.to_string());
         self.ui.query_modified = false;
+
+        // Update QueryEditor state
+        self.query_editor
+            .set_current_file(Some(filename.to_string()));
+        self.query_editor.mark_saved();
+
         self.refresh_sql_files();
 
         Ok(())
@@ -754,13 +770,20 @@ impl AppState {
             .join(format!("{filename}.sql"));
 
         let content = fs::read_to_string(&file_path)?;
-        self.query_content = content;
+        self.query_content = content.clone();
         self.ui.current_sql_file = Some(filename.to_string());
         self.ui.query_modified = false;
         self.ui.query_cursor_line = 0;
         self.ui.query_cursor_column = 0;
         self.ui.query_viewport_offset = 0; // Reset viewport to top
         self.ui.query_edit_mode = QueryEditMode::Normal;
+
+        // Sync content to QueryEditor component
+        self.query_editor.set_content(content);
+        self.query_editor
+            .set_current_file(Some(filename.to_string()));
+        self.query_editor.set_insert_mode(false); // Start in normal mode
+        self.update_query_editor_context();
 
         Ok(())
     }
@@ -786,6 +809,13 @@ impl AppState {
         self.ui.query_modified = false;
         self.ui.query_cursor_line = 0;
         self.ui.query_cursor_column = 0;
+
+        // Sync to QueryEditor component
+        self.query_editor.set_content(String::new());
+        self.query_editor
+            .set_current_file(Some(filename.to_string()));
+        self.query_editor.set_insert_mode(false);
+        self.update_query_editor_context();
 
         // Save the empty file
         self.save_query_as(filename)
