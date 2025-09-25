@@ -107,6 +107,19 @@ impl QueryEditor {
         self.hide_suggestions();
     }
 
+    /// Reset the query editor to its initial state (clear content, reset cursor, etc.)
+    pub fn reset(&mut self) {
+        self.content = String::new();
+        self.cursor_line = 0;
+        self.cursor_col = 0;
+        self.scroll_offset = 0;
+        self.is_modified = false;
+        self.is_insert_mode = false;
+        self.current_file = None;
+        self.pending_command = None;
+        self.hide_suggestions();
+    }
+
     pub fn get_content(&self) -> &str {
         &self.content
     }
@@ -327,6 +340,69 @@ impl QueryEditor {
                 self.cursor_col += 1;
             }
         }
+    }
+
+    /// Insert new line below cursor and enter insert mode (o key)
+    pub fn insert_line_below(&mut self) {
+        let lines: Vec<String> = self.content.lines().map(|s| s.to_string()).collect();
+        let mut new_lines = lines;
+
+        // Ensure we have at least an empty line if content is empty
+        if new_lines.is_empty() {
+            new_lines.push(String::new());
+        }
+
+        // Insert new line after current line
+        new_lines.insert(self.cursor_line + 1, String::new());
+
+        // Move cursor to the new line at the beginning
+        self.cursor_line += 1;
+        self.cursor_col = 0;
+
+        // Enter insert mode
+        self.is_insert_mode = true;
+        self.is_modified = true;
+
+        // Update content
+        self.content = new_lines.join("\n");
+        self.adjust_scroll();
+    }
+
+    /// Insert new line above cursor and enter insert mode (O key)
+    pub fn insert_line_above(&mut self) {
+        let lines: Vec<String> = self.content.lines().map(|s| s.to_string()).collect();
+        let mut new_lines = lines;
+
+        // Ensure we have at least an empty line if content is empty
+        if new_lines.is_empty() {
+            new_lines.push(String::new());
+        }
+
+        // Insert new line above current line
+        new_lines.insert(self.cursor_line, String::new());
+
+        // Cursor stays at same position (which is now the new line)
+        self.cursor_col = 0;
+
+        // Enter insert mode
+        self.is_insert_mode = true;
+        self.is_modified = true;
+
+        // Update content
+        self.content = new_lines.join("\n");
+        self.adjust_scroll();
+    }
+
+    /// Move to end of line and enter insert mode (A key)
+    pub fn append_to_line_end(&mut self) {
+        self.move_to_line_end();
+        self.is_insert_mode = true;
+    }
+
+    /// Move to beginning of line and enter insert mode (I key)
+    pub fn insert_at_line_start(&mut self) {
+        self.move_to_line_start();
+        self.is_insert_mode = true;
     }
 
     /// Delete current line (dd)
@@ -1123,5 +1199,73 @@ mod tests {
         assert_eq!(editor.cursor_line, 1);
         editor.move_cursor_up();
         assert_eq!(editor.cursor_line, 0);
+    }
+
+    #[test]
+    fn test_insert_line_below() {
+        let mut editor = QueryEditor::new();
+        editor.set_content("line 1\nline 2".to_string());
+
+        // Position cursor on first line
+        editor.cursor_line = 0;
+        editor.cursor_col = 0;
+
+        // Test 'o' command
+        editor.insert_line_below();
+
+        assert!(editor.is_insert_mode());
+        assert_eq!(editor.cursor_line, 1);
+        assert_eq!(editor.cursor_col, 0);
+        assert_eq!(editor.get_content(), "line 1\n\nline 2");
+    }
+
+    #[test]
+    fn test_insert_line_above() {
+        let mut editor = QueryEditor::new();
+        editor.set_content("line 1\nline 2".to_string());
+
+        // Position cursor on second line
+        editor.cursor_line = 1;
+        editor.cursor_col = 0;
+
+        // Test 'O' command
+        editor.insert_line_above();
+
+        assert!(editor.is_insert_mode());
+        assert_eq!(editor.cursor_line, 1);
+        assert_eq!(editor.cursor_col, 0);
+        assert_eq!(editor.get_content(), "line 1\n\nline 2");
+    }
+
+    #[test]
+    fn test_append_to_line_end() {
+        let mut editor = QueryEditor::new();
+        editor.set_content("hello world".to_string());
+
+        // Position cursor at beginning
+        editor.cursor_line = 0;
+        editor.cursor_col = 0;
+
+        // Test 'A' command
+        editor.append_to_line_end();
+
+        assert!(editor.is_insert_mode());
+        assert_eq!(editor.cursor_col, 11); // End of "hello world"
+    }
+
+    #[test]
+    fn test_insert_at_line_start() {
+        let mut editor = QueryEditor::new();
+        editor.set_content("hello world".to_string());
+
+        // Position cursor at end
+        editor.cursor_line = 0;
+        editor.cursor_col = 11;
+
+        // Test 'I' command
+        editor.insert_at_line_start();
+
+        assert!(editor.is_insert_mode());
+        assert_eq!(editor.cursor_col, 0);
     }
 }
