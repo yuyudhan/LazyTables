@@ -348,28 +348,28 @@ pub fn log_shutdown() {
 #[macro_export]
 macro_rules! log_debug {
     ($($arg:tt)*) => {
-        tracing::debug!($($arg)*);
+        tracing::debug!($($arg)*)
     };
 }
 
 #[macro_export]
 macro_rules! log_info {
     ($($arg:tt)*) => {
-        tracing::info!($($arg)*);
+        tracing::info!($($arg)*)
     };
 }
 
 #[macro_export]
 macro_rules! log_warn {
     ($($arg:tt)*) => {
-        tracing::warn!($($arg)*);
+        tracing::warn!($($arg)*)
     };
 }
 
 #[macro_export]
 macro_rules! log_error {
     ($($arg:tt)*) => {
-        tracing::error!($($arg)*);
+        tracing::error!($($arg)*)
     };
 }
 
