@@ -1611,14 +1611,21 @@ impl App {
                         }
                         KeyCode::Enter => {
                             let command = self.state.ui.vim_command_buffer.trim();
+                            crate::log_info!("=== VIM COMMAND EXECUTED: '{}' ===", command);
                             if command == "w" {
+                                crate::log_info!("Processing :w save command");
                                 // Save file
-                                if let Err(e) = self.state.save_sql_file_with_connection() {
-                                    self.state
-                                        .toast_manager
-                                        .error(format!("Failed to save: {e}"));
-                                } else {
-                                    self.state.toast_manager.success("File saved");
+                                match self.state.save_sql_file_with_connection() {
+                                    Err(e) => {
+                                        crate::log_info!("Save failed with error: {}", e);
+                                        self.state
+                                            .toast_manager
+                                            .error(format!("Failed to save: {e}"));
+                                    }
+                                    Ok(_) => {
+                                        crate::log_info!("Save completed successfully");
+                                        self.state.toast_manager.success("File saved");
+                                    }
                                 }
                             } else if command == "q" {
                                 // Quit query mode with confirmation

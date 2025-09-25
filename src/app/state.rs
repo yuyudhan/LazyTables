@@ -636,9 +636,18 @@ impl AppState {
 
     /// Load the currently selected SQL file
     pub fn load_selected_sql_file(&mut self) -> Result<(), Box<dyn std::error::Error>> {
+        crate::log_info!("=== LOAD SELECTED SQL FILE DEBUG START ===");
+
         if let Some(filename) = self.get_selected_sql_file() {
-            self.load_query_file(&filename)
+            crate::log_info!("Selected file: {}", filename);
+            let result = self.load_query_file(&filename);
+            match &result {
+                Ok(_) => crate::log_info!("=== LOAD SELECTED SQL FILE DEBUG END - SUCCESS ==="),
+                Err(e) => crate::log_info!("=== LOAD SELECTED SQL FILE DEBUG END - ERROR: {} ===", e),
+            }
+            result
         } else {
+            crate::log_info!("=== LOAD SELECTED SQL FILE DEBUG END - NO FILE SELECTED ===");
             Err("No SQL file selected".into())
         }
     }
@@ -668,10 +677,8 @@ impl AppState {
             .connections
             .get(self.ui.selected_connection)
         {
-            // Only show files if connection is actually connected
-            if !connection.is_connected() {
-                return files; // Return empty if not connected
-            }
+            // Show files even if connection is not active (allow offline editing)
+            // Previously this would return empty list if not connected
 
             let connection_name = &connection.name;
 
@@ -770,6 +777,11 @@ impl AppState {
     pub fn load_query_file(&mut self, filename: &str) -> Result<(), Box<dyn std::error::Error>> {
         use std::fs;
 
+        crate::log_info!("=== LOAD QUERY FILE DEBUG START ===");
+        crate::log_info!("Attempting to load file: {}", filename);
+        crate::log_info!("Selected connection index: {}", self.ui.selected_connection);
+        crate::log_info!("Total connections: {}", self.db.connections.connections.len());
+
         // Get connection-specific directory - require active connection
         let connection = self
             .db
@@ -778,9 +790,13 @@ impl AppState {
             .get(self.ui.selected_connection)
             .ok_or("No connection selected")?;
 
-        // Only allow loading if connection is active
+        crate::log_info!("Found connection: {} (status: {:?})", connection.name, connection.status);
+
+        // Allow loading files even if connection is not active (user might want to work offline)
         if !connection.is_connected() {
-            return Err("Cannot load SQL file: No active connection".into());
+            crate::log_info!("Connection not active, but allowing file load for offline editing");
+        } else {
+            crate::log_info!("Connection is active, proceeding with file load");
         }
 
         let connection_name = &connection.name;
@@ -791,6 +807,11 @@ impl AppState {
             .join(format!("{filename}.sql"));
 
         let content = fs::read_to_string(&file_path)?;
+
+        // Debug: Log the content being loaded
+        crate::log_info!("Loading SQL file '{}' with content length: {}", filename, content.len());
+        crate::log_info!("Loading from file path: {:?}", &file_path);
+
         self.query_content = content.clone();
         self.ui.current_sql_file = Some(filename.to_string());
         self.ui.query_modified = false;
@@ -799,12 +820,16 @@ impl AppState {
         self.ui.query_viewport_offset = 0; // Reset viewport to top
         self.ui.query_edit_mode = QueryEditMode::Normal;
 
+        crate::log_info!("Set current_sql_file to: {:?}", self.ui.current_sql_file);
+
         // Sync content to QueryEditor component
         self.query_editor.set_content(content);
         self.query_editor
             .set_current_file(Some(filename.to_string()));
         self.query_editor.set_insert_mode(false); // Start in normal mode
         self.update_query_editor_context();
+
+        crate::log_info!("=== LOAD QUERY FILE DEBUG END - SUCCESS ===");
 
         Ok(())
     }
@@ -1168,38 +1193,81 @@ impl AppState {
 
     /// Save current SQL file with connection-specific directory
     pub fn save_sql_file_with_connection(&mut self) -> Result<(), String> {
-        // Get the current connection name
+        crate::log_info!("=== SAVE SQL FILE DEBUG START ===");
+
+        // Sync content from query editor before saving
+        self.query_content = self.query_editor.get_content().to_string();
+
+        // Debug: Log the content being saved
+        crate::log_info!("Query editor content length: {}", self.query_editor.get_content().len());
+        crate::log_info!("Synced query_content length: {}", self.query_content.len());
+        crate::log_info!("Current SQL file: {:?}", self.ui.current_sql_file);
+        crate::log_info!("Selected connection index: {}", self.ui.selected_connection);
+        crate::log_info!("Total connections: {}", self.db.connections.connections.len());
+
+        // Get the current connection name - allow saving even without active connection
         let connection_name = if let Some(connection) = self
             .db
             .connections
             .connections
             .get(self.ui.selected_connection)
         {
+            crate::log_info!("Found connection: {} (type: {:?}, status: {:?})", connection.name, connection.database_type, connection.status);
+            // Use connection name regardless of connection status
             connection.name.clone()
         } else {
+            crate::log_info!("No connection found at index {}, using 'default'", self.ui.selected_connection);
             "default".to_string()
         };
 
+        crate::log_info!("Will save to directory for connection: {}", connection_name);
+
+        crate::log_info!("Using connection name for directory: {}", connection_name);
+
         // Create connection-specific directory
         let sql_dir = Config::sql_files_dir().join(&connection_name);
-        std::fs::create_dir_all(&sql_dir)
-            .map_err(|e| format!("Failed to create directory: {e}"))?;
+        crate::log_info!("SQL directory path: {:?}", sql_dir);
+
+        match std::fs::create_dir_all(&sql_dir) {
+            Ok(_) => crate::log_info!("Directory created/exists successfully"),
+            Err(e) => {
+                crate::log_info!("Failed to create directory: {}", e);
+                return Err(format!("Failed to create directory: {e}"));
+            }
+        }
 
         // Determine filename
         let filename = if let Some(ref current_file) = self.ui.current_sql_file {
+            crate::log_info!("Using existing current file: {}", current_file);
             current_file.clone()
         } else {
-            format!("query_{}.sql", chrono::Local::now().format("%Y%m%d_%H%M%S"))
+            let new_filename = format!("query_{}", chrono::Local::now().format("%Y%m%d_%H%M%S"));
+            crate::log_info!("No current file, generating new filename: {}", new_filename);
+            new_filename
         };
 
-        let file_path = sql_dir.join(&filename);
+        let file_path = sql_dir.join(format!("{}.sql", filename));
+        crate::log_info!("Final file path: {:?}", file_path);
 
-        std::fs::write(&file_path, &self.query_content)
-            .map_err(|e| format!("Failed to save file: {e}"))?;
+        // Write the file
+        crate::log_info!("Writing {} bytes to file", self.query_content.len());
+        match std::fs::write(&file_path, &self.query_content) {
+            Ok(_) => crate::log_info!("File write successful"),
+            Err(e) => {
+                crate::log_info!("File write failed: {}", e);
+                return Err(format!("Failed to save file: {e}"));
+            }
+        }
 
-        self.ui.current_sql_file = Some(filename);
+        // Update state
+        crate::log_info!("Updating state - setting current_sql_file to: {}", filename);
+        self.ui.current_sql_file = Some(filename.clone());
         self.ui.query_modified = false;
+
+        crate::log_info!("Calling refresh_sql_files()");
         self.refresh_sql_files();
+
+        crate::log_info!("=== SAVE SQL FILE DEBUG END - SUCCESS ===");
 
         Ok(())
     }
