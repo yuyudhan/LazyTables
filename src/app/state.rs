@@ -549,7 +549,9 @@ impl AppState {
         &mut self,
         connection: &ConnectionConfig,
     ) -> Result<crate::database::DatabaseObjectList, String> {
-        self.db.try_connect_to_database(connection).await
+        self.db
+            .try_connect_to_database(connection, &self.connection_manager)
+            .await
     }
 
     /// Disconnect from current database
@@ -1603,6 +1605,13 @@ impl AppState {
 
     /// Open a table for viewing
     pub async fn open_table_for_viewing(&mut self) {
+        // Check connection health before attempting to open table
+        if !self.check_connection_health().await {
+            self.toast_manager
+                .error("Cannot open table: database connection is not available");
+            return;
+        }
+
         if let Some(table_name) = self.ui.get_selected_table_name() {
             // Add tab to viewer
             let tab_idx = self.table_viewer_state.add_tab(table_name.clone());
@@ -1612,6 +1621,12 @@ impl AppState {
                 if let Some(tab) = self.table_viewer_state.tabs.get_mut(tab_idx) {
                     tab.error = Some(format!("Failed to load table: {e}"));
                     tab.loading = false;
+                }
+
+                // Check if this was a connection issue and update status accordingly
+                if e.contains("connection") || e.contains("Connection") || e.contains("disconnect")
+                {
+                    let _ = self.check_connection_health().await;
                 }
             }
 
@@ -1641,8 +1656,46 @@ impl AppState {
     /// Load table metadata for the details pane
     pub async fn load_table_metadata(&mut self, table_name: &str) -> Result<(), String> {
         self.db
-            .load_table_metadata(table_name, self.ui.selected_connection)
+            .load_table_metadata(
+                table_name,
+                self.ui.selected_connection,
+                &self.connection_manager,
+            )
             .await
+    }
+
+    /// Check the health of the currently selected connection and update status
+    pub async fn check_connection_health(&mut self) -> bool {
+        if let Some(connection) = self.get_selected_connection() {
+            // Use ConnectionManager to check if connection is healthy
+            let is_healthy = self.connection_manager.is_connected(&connection.id).await;
+
+            // Update connection status based on health check
+            if let Some(conn) = self.get_selected_connection_mut() {
+                if !is_healthy && matches!(conn.status, ConnectionStatus::Connected) {
+                    // Connection was supposed to be connected but is not healthy
+                    conn.status = ConnectionStatus::Failed("Connection lost".to_string());
+
+                    // Clear database objects and tables
+                    self.db.database_objects = None;
+                    self.db.tables.clear();
+                    self.db.table_load_error = Some("Connection lost".to_string());
+                    self.ui.build_selectable_table_items(&None);
+
+                    // Show user feedback
+                    self.toast_manager.error("Database connection lost");
+
+                    // Save updated connection status
+                    let _ = self.db.connections.save();
+
+                    return false;
+                }
+            }
+
+            is_healthy
+        } else {
+            false
+        }
     }
 
     /// Update a cell in the database
@@ -1651,7 +1704,11 @@ impl AppState {
         update: crate::ui::components::table_viewer::CellUpdate,
     ) -> Result<(), String> {
         self.db
-            .update_table_cell(update, self.ui.selected_connection)
+            .update_table_cell(
+                update,
+                self.ui.selected_connection,
+                &self.connection_manager,
+            )
             .await
     }
 
@@ -1661,7 +1718,11 @@ impl AppState {
         confirmation: crate::ui::components::table_viewer::DeleteConfirmation,
     ) -> Result<(), String> {
         self.db
-            .delete_table_row(confirmation, self.ui.selected_connection)
+            .delete_table_row(
+                confirmation,
+                self.ui.selected_connection,
+                &self.connection_manager,
+            )
             .await
     }
 

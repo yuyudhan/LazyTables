@@ -428,7 +428,10 @@ impl Command for TestConnectionCommand {
                     context
                         .state
                         .db
-                        .try_connect_to_database(&connection_config)
+                        .try_connect_to_database(
+                            &connection_config,
+                            &context.state.connection_manager,
+                        )
                         .await
                 });
 

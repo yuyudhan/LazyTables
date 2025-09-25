@@ -2,8 +2,8 @@
 
 use crate::{
     database::{
-        connection::ConnectionStorage, ConnectionConfig, ConnectionStatus, DatabaseObjectList,
-        DatabaseType, TableMetadata,
+        connection::{Connection, ConnectionStorage},
+        ConnectionConfig, ConnectionStatus, DatabaseObjectList, DatabaseType, TableMetadata,
     },
     ui::components::{
         table_viewer::{CellUpdate, ColumnInfo, DeleteConfirmation},
@@ -103,7 +103,7 @@ impl DatabaseState {
         }
     }
 
-    /// Load PostgreSQL table data using individual connection (reverting to working approach)
+    /// Load PostgreSQL table data using persistent ConnectionManager
     #[allow(clippy::too_many_arguments)]
     async fn load_postgres_table_data(
         &mut self,
@@ -113,34 +113,30 @@ impl DatabaseState {
         offset: usize,
         table_viewer_state: &mut TableViewerState,
         tab_idx: usize,
-        _connection_manager: &crate::database::ConnectionManager,
+        connection_manager: &crate::database::ConnectionManager,
     ) -> Result<(), String> {
-        use crate::database::postgres::PostgresConnection;
-        use crate::database::Connection;
-
-        // Create individual connection (reverting to working approach)
-        let mut pg_connection = PostgresConnection::new(connection.clone());
-        pg_connection
-            .connect()
+        // Ensure we have a persistent connection in the ConnectionManager
+        connection_manager
+            .connect(connection)
             .await
-            .map_err(|e| format!("Connection failed: {e}"))?;
+            .map_err(|e| format!("Failed to ensure connection: {e}"))?;
 
-        // Get table columns
-        let columns = pg_connection
-            .get_table_columns(table_name)
+        // Get table columns using persistent connection
+        let columns = connection_manager
+            .get_table_columns(&connection.id, table_name)
             .await
             .map_err(|e| format!("Failed to retrieve columns: {e}"))?;
 
         crate::log_debug!(
-            "Retrieved {} columns for table {}",
+            "Retrieved {} columns for table {} using persistent connection",
             columns.len(),
             table_name
         );
 
         // Get total row count using raw query
         let count_query = format!("SELECT COUNT(*) FROM {table_name}");
-        let (_, count_rows) = pg_connection
-            .execute_raw_query(&count_query)
+        let (_, count_rows) = connection_manager
+            .execute_raw_query(&connection.id, &count_query)
             .await
             .map_err(|e| format!("Failed to get row count: {e}"))?;
 
@@ -150,9 +146,9 @@ impl DatabaseState {
             .and_then(|count_str| count_str.parse::<usize>().ok())
             .unwrap_or(0);
 
-        // Get table data
-        let rows = pg_connection
-            .get_table_data(table_name, limit, offset)
+        // Get table data using persistent connection
+        let rows = connection_manager
+            .get_table_data(&connection.id, table_name, limit, offset)
             .await
             .map_err(|e| format!("Failed to retrieve data: {e}"))?;
 
@@ -186,16 +182,16 @@ impl DatabaseState {
             tab.error = None;
         }
 
-        // Clean up individual connection
-        let _ = pg_connection.disconnect().await;
+        // Connection is kept alive by ConnectionManager
         Ok(())
     }
 
-    /// Load table metadata for the details pane
+    /// Load table metadata for the details pane using persistent ConnectionManager
     pub async fn load_table_metadata(
         &mut self,
         table_name: &str,
         selected_connection: usize,
+        connection_manager: &crate::database::ConnectionManager,
     ) -> Result<(), String> {
         // Get the current connection
         if let Some(connection) = self
@@ -209,24 +205,19 @@ impl DatabaseState {
                     // Load metadata based on database type
                     match connection.database_type {
                         DatabaseType::PostgreSQL => {
-                            use crate::database::postgres::PostgresConnection;
-                            use crate::database::Connection;
-
-                            let mut pg_connection = PostgresConnection::new(connection.clone());
-                            pg_connection
-                                .connect()
+                            // Ensure we have a persistent connection
+                            connection_manager
+                                .connect(&connection)
                                 .await
-                                .map_err(|e| format!("Connection failed: {e}"))?;
+                                .map_err(|e| format!("Failed to ensure connection: {e}"))?;
 
-                            // Get table metadata
-                            let metadata = pg_connection
-                                .get_table_metadata(table_name)
+                            // Get table metadata using persistent connection
+                            let metadata = connection_manager
+                                .get_table_metadata(&connection.id, table_name)
                                 .await
                                 .map_err(|e| format!("Failed to retrieve metadata: {e}"))?;
 
                             self.current_table_metadata = Some(metadata);
-
-                            let _ = pg_connection.disconnect().await;
                             Ok(())
                         }
                         _ => Err(format!(
@@ -242,11 +233,12 @@ impl DatabaseState {
         }
     }
 
-    /// Update a cell in the database
+    /// Update a cell in the database using persistent ConnectionManager
     pub async fn update_table_cell(
         &mut self,
         update: CellUpdate,
         selected_connection: usize,
+        connection_manager: &crate::database::ConnectionManager,
     ) -> Result<(), String> {
         // Get the current connection
         if let Some(connection) = self
@@ -260,7 +252,8 @@ impl DatabaseState {
                     // Update cell based on database type
                     match connection.database_type {
                         DatabaseType::PostgreSQL => {
-                            self.update_postgres_cell(&connection, update).await
+                            self.update_postgres_cell(&connection, update, connection_manager)
+                                .await
                         }
                         _ => Err(format!(
                             "Database type {} not yet supported for cell updates",
@@ -275,20 +268,18 @@ impl DatabaseState {
         }
     }
 
-    /// Update a cell in PostgreSQL
+    /// Update a cell in PostgreSQL using persistent ConnectionManager
     async fn update_postgres_cell(
         &self,
         connection: &ConnectionConfig,
         update: CellUpdate,
+        connection_manager: &crate::database::ConnectionManager,
     ) -> Result<(), String> {
-        use crate::database::postgres::PostgresConnection;
-        use crate::database::Connection;
-
-        let mut pg_connection = PostgresConnection::new(connection.clone());
-        pg_connection
-            .connect()
+        // Ensure we have a persistent connection
+        connection_manager
+            .connect(connection)
             .await
-            .map_err(|e| format!("Connection failed: {e}"))?;
+            .map_err(|e| format!("Failed to ensure connection: {e}"))?;
 
         // Build UPDATE SQL
         let mut where_clauses = Vec::new();
@@ -308,26 +299,21 @@ impl DatabaseState {
             where_clauses.join(" AND ")
         );
 
-        // Execute the SQL update
-        if let Some(pool) = &pg_connection.pool {
-            sqlx::query(&sql)
-                .execute(pool)
-                .await
-                .map_err(|e| format!("Failed to update cell: {e}"))?;
-        } else {
-            return Err("Database connection not established".to_string());
-        }
-
-        let _ = pg_connection.disconnect().await;
+        // Execute the SQL update using persistent connection
+        connection_manager
+            .execute_raw_query(&connection.id, &sql)
+            .await
+            .map_err(|e| format!("Failed to update cell: {e}"))?;
 
         Ok(())
     }
 
-    /// Delete a row from the database
+    /// Delete a row from the database using persistent ConnectionManager
     pub async fn delete_table_row(
         &mut self,
         confirmation: DeleteConfirmation,
         selected_connection: usize,
+        connection_manager: &crate::database::ConnectionManager,
     ) -> Result<(), String> {
         // Get the current connection
         if let Some(connection) = self
@@ -341,7 +327,8 @@ impl DatabaseState {
                     // Delete row based on database type
                     match connection.database_type {
                         DatabaseType::PostgreSQL => {
-                            self.delete_postgres_row(&connection, confirmation).await
+                            self.delete_postgres_row(&connection, confirmation, connection_manager)
+                                .await
                         }
                         _ => Err(format!(
                             "Database type {} not yet supported for row deletion",
@@ -356,20 +343,18 @@ impl DatabaseState {
         }
     }
 
-    /// Delete a row in PostgreSQL
+    /// Delete a row in PostgreSQL using persistent ConnectionManager
     async fn delete_postgres_row(
         &self,
         connection: &ConnectionConfig,
         confirmation: DeleteConfirmation,
+        connection_manager: &crate::database::ConnectionManager,
     ) -> Result<(), String> {
-        use crate::database::postgres::PostgresConnection;
-        use crate::database::Connection;
-
-        let mut pg_connection = PostgresConnection::new(connection.clone());
-        pg_connection
-            .connect()
+        // Ensure we have a persistent connection
+        connection_manager
+            .connect(connection)
             .await
-            .map_err(|e| format!("Connection failed: {e}"))?;
+            .map_err(|e| format!("Failed to ensure connection: {e}"))?;
 
         // Build DELETE SQL
         let mut where_clauses = Vec::new();
@@ -387,26 +372,21 @@ impl DatabaseState {
             where_clauses.join(" AND ")
         );
 
-        // Execute the delete query using the pool directly
-        if let Some(pool) = &pg_connection.pool {
-            sqlx::query(&sql)
-                .execute(pool)
-                .await
-                .map_err(|e| format!("Failed to delete row: {e}"))?;
-        } else {
-            return Err("No database connection available".to_string());
-        }
-
-        let _ = pg_connection.disconnect().await;
+        // Execute the delete query using persistent connection
+        connection_manager
+            .execute_raw_query(&connection.id, &sql)
+            .await
+            .map_err(|e| format!("Failed to delete row: {e}"))?;
 
         Ok(())
     }
 
-    /// Execute a query and return results
+    /// Execute a query and return results using persistent ConnectionManager
     pub async fn execute_query(
         &mut self,
         query: &str,
         selected_connection: usize,
+        connection_manager: &crate::database::ConnectionManager,
     ) -> Result<(Vec<String>, Vec<Vec<String>>), String> {
         // Get the current connection
         if let Some(connection) = self
@@ -420,7 +400,8 @@ impl DatabaseState {
                     // Execute query based on database type
                     match connection.database_type {
                         DatabaseType::PostgreSQL => {
-                            self.execute_postgres_query(&connection, query).await
+                            self.execute_postgres_query(&connection, query, connection_manager)
+                                .await
                         }
                         _ => Err(format!(
                             "Database type {} not yet supported for queries",
@@ -435,67 +416,49 @@ impl DatabaseState {
         }
     }
 
-    /// Execute a PostgreSQL query
+    /// Execute a PostgreSQL query using persistent ConnectionManager
     async fn execute_postgres_query(
         &self,
         connection: &ConnectionConfig,
         query: &str,
+        connection_manager: &crate::database::ConnectionManager,
     ) -> Result<(Vec<String>, Vec<Vec<String>>), String> {
-        use crate::database::postgres::PostgresConnection;
-        use crate::database::Connection;
-
-        let mut pg_connection = PostgresConnection::new(connection.clone());
-        pg_connection
-            .connect()
+        // Ensure we have a persistent connection
+        connection_manager
+            .connect(connection)
             .await
-            .map_err(|e| format!("Connection failed: {e}"))?;
+            .map_err(|e| format!("Failed to ensure connection: {e}"))?;
 
-        // Execute query and get results
-        let (columns, rows) = pg_connection
-            .execute_raw_query(query)
+        // Execute query and get results using persistent connection
+        let (columns, rows) = connection_manager
+            .execute_raw_query(&connection.id, query)
             .await
             .map_err(|e| format!("Query execution failed: {e}"))?;
-
-        let _ = pg_connection.disconnect().await;
 
         Ok((columns, rows))
     }
 
-    /// Try to connect to a specific database and return database objects
+    /// Try to connect to a specific database using ConnectionManager and return database objects
     pub async fn try_connect_to_database(
         &mut self,
         connection: &ConnectionConfig,
+        connection_manager: &crate::database::ConnectionManager,
     ) -> Result<DatabaseObjectList, String> {
-        use crate::database::Connection;
-
         // Query database objects based on database type
         match connection.database_type {
             DatabaseType::PostgreSQL => {
-                use crate::database::postgres::PostgresConnection;
-                let mut conn = PostgresConnection::new(connection.clone());
-                conn.connect()
+                // Ensure we have a persistent connection in the ConnectionManager
+                connection_manager
+                    .connect(connection)
                     .await
                     .map_err(|e| format!("Connection failed: {e}"))?;
 
-                // Get schemas
-                let schemas = conn
-                    .list_schemas()
+                // Get database objects using persistent connection
+                let objects = connection_manager
+                    .list_database_objects(&connection.id)
                     .await
-                    .unwrap_or_else(|_| vec!["public".to_string()]);
-                self.schemas = schemas;
+                    .map_err(|e| format!("Failed to retrieve database objects: {e}"))?;
 
-                // Get database objects based on selected schema
-                let objects = if let Some(ref schema) = self.selected_schema {
-                    conn.list_database_objects_in_schema(Some(schema))
-                        .await
-                        .map_err(|e| format!("Failed to retrieve database objects: {e}"))?
-                } else {
-                    conn.list_database_objects()
-                        .await
-                        .map_err(|e| format!("Failed to retrieve database objects: {e}"))?
-                };
-
-                let _ = conn.disconnect().await;
                 self.database_objects = Some(objects.clone());
 
                 // Update legacy tables list with qualified names for non-public schemas

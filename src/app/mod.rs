@@ -45,6 +45,8 @@ pub struct App {
     command_buffer: String,
     /// Leader key state for compound commands
     leader_pressed: bool,
+    /// Tick counter for periodic connection health checks
+    tick_counter: u32,
 }
 
 impl App {
@@ -65,6 +67,7 @@ impl App {
             mode: Mode::Normal,
             command_buffer: String::new(),
             leader_pressed: false,
+            tick_counter: 0,
         })
     }
 
@@ -1175,7 +1178,11 @@ impl App {
                                 match self
                                     .state
                                     .db
-                                    .execute_query(&statement, self.state.ui.selected_connection)
+                                    .execute_query(
+                                        &statement,
+                                        self.state.ui.selected_connection,
+                                        &self.state.connection_manager,
+                                    )
                                     .await
                                 {
                                     Ok((columns, rows)) => {
@@ -2281,7 +2288,23 @@ impl App {
 
     /// Handle periodic updates
     async fn tick(&mut self) -> Result<()> {
-        // Update any time-based state here
+        // Increment tick counter
+        self.tick_counter = self.tick_counter.wrapping_add(1);
+
+        // Perform connection health check every 100 ticks (approximately every 25 seconds with 250ms intervals)
+        if self.tick_counter % 100 == 0 {
+            // Only check health if we have an active connection
+            if let Some(connection) = self.state.get_selected_connection() {
+                if matches!(
+                    connection.status,
+                    crate::database::ConnectionStatus::Connected
+                ) {
+                    // Perform health check in background - don't await to avoid blocking UI
+                    let _ = self.state.check_connection_health().await;
+                }
+            }
+        }
+
         Ok(())
     }
 
