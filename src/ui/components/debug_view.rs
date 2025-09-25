@@ -18,6 +18,16 @@ use std::collections::HashMap;
 pub struct DebugView {
     /// Current application performance metrics
     pub performance_metrics: PerformanceMetrics,
+    /// Cached statistics to prevent flickering
+    cached_stats: Option<CachedStatistics>,
+}
+
+/// Cached statistics to reduce flickering
+#[derive(Debug, Clone)]
+struct CachedStatistics {
+    stats_text: String,
+    last_update: std::time::Instant,
+    last_message_count: usize,
 }
 
 /// Performance metrics for the debug view
@@ -36,12 +46,13 @@ impl DebugView {
     pub fn new() -> Self {
         Self {
             performance_metrics: PerformanceMetrics::default(),
+            cached_stats: None,
         }
     }
 
     /// Render the debug view as a full-screen overlay
     pub fn render(
-        &self,
+        &mut self,
         frame: &mut Frame,
         area: Rect,
         theme: &Theme,
@@ -171,9 +182,9 @@ impl DebugView {
         frame.render_widget(right_paragraph, columns[1]);
     }
 
-    /// Render statistics section
+    /// Render statistics section with caching to prevent flickering
     fn render_statistics(
-        &self,
+        &mut self,
         frame: &mut Frame,
         area: Rect,
         theme: &Theme,
@@ -191,20 +202,55 @@ impl DebugView {
         let inner_area = stats_block.inner(area);
         frame.render_widget(stats_block, area);
 
-        // Count messages by level
-        let mut level_counts = HashMap::new();
-        for message in debug_messages {
-            *level_counts.entry(&message.level).or_insert(0) += 1;
-        }
+        let current_message_count = debug_messages.len();
+        let now = std::time::Instant::now();
 
-        let stats_text = if debug_messages.is_empty() {
-            "No log messages captured yet".to_string()
-        } else {
-            let mut parts = vec![format!("Total: {}", debug_messages.len())];
-            for (level, count) in &level_counts {
-                parts.push(format!("{}: {}", level, count));
+        // Check if we need to update cached statistics
+        let should_update = match &self.cached_stats {
+            None => true,
+            Some(cached) => {
+                // Update if:
+                // 1. Message count changed significantly (>= 10 new messages)
+                // 2. It's been more than 500ms since last update
+                // 3. No messages and we had messages before
+                (current_message_count >= cached.last_message_count + 10)
+                    || (now.duration_since(cached.last_update).as_millis() > 500)
+                    || (current_message_count == 0 && cached.last_message_count > 0)
             }
-            parts.join(" | ")
+        };
+
+        let stats_text = if should_update {
+            // Recalculate statistics
+            let new_stats_text = if debug_messages.is_empty() {
+                "No log messages captured yet".to_string()
+            } else {
+                // Count messages by level
+                let mut level_counts = HashMap::new();
+                for message in debug_messages {
+                    *level_counts.entry(&message.level).or_insert(0) += 1;
+                }
+
+                let mut parts = vec![format!("Total: {}", debug_messages.len())];
+                for (level, count) in &level_counts {
+                    parts.push(format!("{}: {}", level, count));
+                }
+                parts.join(" | ")
+            };
+
+            // Update cache
+            self.cached_stats = Some(CachedStatistics {
+                stats_text: new_stats_text.clone(),
+                last_update: now,
+                last_message_count: current_message_count,
+            });
+
+            new_stats_text
+        } else {
+            // Use cached statistics
+            self.cached_stats
+                .as_ref()
+                .map(|cached| cached.stats_text.clone())
+                .unwrap_or_else(|| "No log messages captured yet".to_string())
         };
 
         let paragraph = Paragraph::new(stats_text)

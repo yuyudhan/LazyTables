@@ -80,9 +80,9 @@ impl ConnectionManager {
         };
 
         // Store the connected instance
-        tracing::error!("Storing connection with ID: '{}'", config.id);
+        tracing::debug!("Storing connection with ID: '{}'", config.id);
         connections.insert(config.id.clone(), Arc::new(Mutex::new(connection)));
-        tracing::error!(
+        tracing::debug!(
             "Connection manager now has {} connections",
             connections.len()
         );
@@ -97,9 +97,9 @@ impl ConnectionManager {
     ) -> Result<Arc<Mutex<Box<dyn ManagedConnection>>>> {
         let connections = self.connections.lock().await;
 
-        // Error-level logging to help diagnose connection issues (visible in production)
-        tracing::error!("Looking for connection ID: '{}'", connection_id);
-        tracing::error!(
+        // Debug-level logging to help diagnose connection issues
+        tracing::debug!("Looking for connection ID: '{}'", connection_id);
+        tracing::debug!(
             "Available connections: {:?}",
             connections.keys().collect::<Vec<_>>()
         );
