@@ -12,6 +12,8 @@ Stop wrestling with clunky GUI database tools. LazyTables brings the power and e
 - **Vim-Style Navigation**: Navigate databases like you navigate code
 - **Keyboard-First**: Never reach for your mouse again
 - **Cross-Platform**: Works on macOS and Linux
+- **Six-Pane Layout**: Efficient workspace for database management
+- **Smart Query Editor**: Full vim-style editing with syntax highlighting and auto-completion
 
 ## Installation
 
@@ -56,33 +58,290 @@ cargo binstall lazytables
    - `Ctrl+h/j/k/l` - Switch between panes
    - `Tab/Shift+Tab` - Cycle through panes
 
-4. **Execute queries** with `Space z q` to enter query mode
+4. **Execute queries** with `Ctrl+Enter` or enter query mode with `i`
 
-5. **Quit** with `q`
+5. **Get help** by pressing `?` for context-aware assistance
+
+6. **Quit** with `q`
+
+## Database Support
+
+### Currently Supported
+- **PostgreSQL** - Full support with all features
+- **MySQL** - Full support (stable)
+- **SQLite** - Full support (stable)
+
+### Planned Support
+- **MariaDB** - Coming soon
+- **Oracle** - Planned
+- **Redis** - Key-value store support planned
+- **MongoDB** - Document database support planned
 
 ## Key Features
 
 ### Six-Pane Layout
-- **Connections** - Manage database connections
-- **Tables/Views** - Browse database objects  
-- **Table Details** - View metadata and schema
-- **Query Results** - Display query output
-- **SQL Editor** - Write and execute queries
-- **SQL Files** - Browse saved queries
+LazyTables uses a fixed six-pane layout optimized for database workflow:
 
-### Vim-Style Navigation
-- `h/j/k/l` - Move cursor
-- `gg/G` - Jump to top/bottom
-- `Ctrl+h/j/k/l` - Switch panes
-- `i` - Enter insert mode for editing
-- `v` - Visual selection mode
-- `:` - Command mode
-- `q` - Quit application
+1. **Connections Pane** (Top Left) - Manage database connections with status indicators
+2. **Tables/Views Pane** (Middle Left) - Browse database objects with search and filtering
+3. **Table Details Pane** (Bottom Left) - View detailed metadata, schema, and relationships
+4. **Query Results Area** (Top Right) - Display tabular query results with navigation
+5. **SQL Query Editor** (Bottom Left) - Full-featured vim-style SQL editor
+6. **SQL Files Browser** (Bottom Right) - Browse and manage saved SQL files
 
-### Database Support
-- **PostgreSQL** (full support)
-- **MySQL, MariaDB, SQLite** (coming soon)
-- More databases planned
+### Advanced Query Editor
+- **Vim-style editing** with multiple modes (Normal, Insert, Visual, Command)
+- **Syntax highlighting** for SQL queries
+- **Smart auto-completion** with database context awareness
+- **Execute at cursor** - Run specific SQL statements with `Ctrl+Enter`
+- **File management** - Save, load, and organize SQL queries
+- **Query history** - Track and reuse previous queries
+
+### Table Management & Navigation
+- **Data view mode** - Browse table data with cell editing
+- **Schema view mode** - Inspect table structure and metadata
+- **Search and filter** - Find data quickly across tables
+- **Row operations** - Edit, delete, and copy rows
+- **Tab management** - Work with multiple tables simultaneously
+
+## Complete Key Bindings Reference
+
+### Global Commands
+| Key | Action |
+|-----|--------|
+| `q` | Quit LazyTables |
+| `?` | Toggle help guide |
+| `:` | Enter command mode |
+| `Ctrl+B` | Toggle debug view |
+
+### Navigation
+| Key | Action |
+|-----|--------|
+| `Tab` | Next pane |
+| `Shift+Tab` | Previous pane |
+| `Ctrl+h` | Focus left pane |
+| `Ctrl+j` | Focus down pane |
+| `Ctrl+k` | Focus up pane |
+| `Ctrl+l` | Focus right pane |
+
+### Data Operations
+| Key | Action |
+|-----|--------|
+| `Ctrl+Enter` | Execute SQL at cursor |
+| `Ctrl+S` | Save current query |
+| `Ctrl+O` | Refresh current view |
+| `Ctrl+N` | New timestamped query |
+
+### Connections Pane
+| Key | Action |
+|-----|--------|
+| `j/k` | Navigate up/down connections |
+| `Enter/Space` | Connect to selected database |
+| `x` | Disconnect current connection |
+| `a` | Add new connection |
+| `e` | Edit selected connection |
+| `d` | Delete connection (with confirmation) |
+| `/` | Start search mode |
+
+#### Connection Modal
+| Key | Action |
+|-----|--------|
+| `Enter` | Save/Test connection |
+| `←/→` | Navigate form steps |
+| `Tab/Shift+Tab` | Navigate form fields |
+| `i` | Enter insert mode (text fields) |
+| `ESC` | Cancel modal/exit insert |
+| `Ctrl+T` | Toggle connection method |
+
+### Tables Pane
+| Key | Action |
+|-----|--------|
+| `j/k` | Navigate up/down tables |
+| `gg/G` | Jump to first/last table |
+| `Enter/Space` | Open table for viewing |
+| `n` | Create new table (when connected) |
+| `e` | Edit table structure |
+| `/` | Start search mode |
+
+### Table Details Pane
+| Key | Action |
+|-----|--------|
+| `j/k` | Scroll up/down |
+| `Enter/Space` | Load detailed metadata |
+| `r` | Refresh metadata |
+
+### Table Viewer (Query Results)
+| Key | Action |
+|-----|--------|
+| `h/j/k/l` | Navigate table cells |
+| `gg/G` | Jump to first/last row |
+| `0/$` | Jump to first/last column |
+| `Ctrl+D/U` | Page down/up through data |
+| `i` | Enter edit mode for current cell |
+| `Enter` | Save cell changes |
+| `ESC` | Cancel cell edit |
+| `/` | Start search mode |
+| `n/N` | Navigate to next/previous match |
+| `dd` | Delete current row |
+| `yy` | Copy row data (CSV format) |
+| `t` | Toggle between Data and Schema view |
+| `r` | Refresh/reload table data |
+| `x` | Close current tab |
+| `S/D` | Switch to previous/next tab |
+
+### SQL Files Pane
+| Key | Action |
+|-----|--------|
+| `j/k` | Navigate up/down files |
+| `Enter/Space` | Load selected SQL file |
+| `c` | Copy/duplicate file |
+| `d` | Delete file (with confirmation) |
+| `r` | Rename file |
+| `i` | Enter Query mode for editing |
+| `Ctrl+N` | Create new timestamped query |
+| `/` | Start search mode |
+
+### Query Editor
+| Key | Action |
+|-----|--------|
+| `i` | Enter full-screen Query mode |
+| `h/j/k/l` | Navigate cursor (normal mode) |
+| `Ctrl+Enter` | Execute query at cursor |
+
+#### Query Mode (Full-screen)
+| Key | Action |
+|-----|--------|
+| `ESC` | Exit Query mode / Exit insert mode |
+| `i` | Enter insert mode for text editing |
+| `q` | Quit with confirmation |
+| `h/j/k/l` | Cursor navigation (vim keys) |
+| `w/b/e` | Word navigation |
+| `0/$` | Line start/end |
+| `gg/G` | File start/end |
+
+##### Insert Mode
+| Key | Action |
+|-----|--------|
+| `Tab` | Accept auto-completion suggestion |
+| `↑/↓` | Navigate suggestions |
+| `Enter` | Insert new line |
+| `Backspace` | Delete character |
+| `ESC` | Exit insert mode |
+
+##### Command Mode
+| Key | Action |
+|-----|--------|
+| `:` | Enter vim command mode |
+| `:w` | Save current query |
+| `:q` | Quit with confirmation |
+| `:q!` | Force quit without saving |
+| `:wq` | Save and quit |
+
+### Search Modes
+Most panes support search functionality:
+- Type to filter results in real-time
+- `↑/↓` or `j/k` to navigate results
+- `Enter` to select highlighted result
+- `ESC` to exit search mode
+
+### Insert Mode Requirements
+LazyTables follows vim-style input patterns:
+- **All text input fields require pressing 'i' to enter insert mode**
+- **Press ESC to exit insert mode and return to normal navigation**
+- **Arrow keys are used for dropdown/list navigation**
+- **Visual feedback shows when in insert mode (e.g., "[INSERT]" indicator)**
+
+This applies to:
+- Connection creation/editing forms
+- Table creation forms
+- Query editing windows
+- File renaming operations
+- All text input fields
+
+## Status Indicators
+
+### Connection Status
+- `✓` Connected to database
+- `—` Not connected
+- `✗` Connection failed
+- `⟳` Connecting in progress
+
+### Display Format
+Connections show as: `[Icon] [Status] Name (type) [DB: name] Status`
+
+Database type icons:
+- `🐘` PostgreSQL
+- `🐬` MySQL
+- `📁` SQLite
+
+## Configuration
+
+LazyTables stores its configuration and data in the following locations:
+
+### Configuration Directory
+```
+~/.config/lazytables/
+└── config.toml       # Main configuration file
+```
+
+### Data Directory
+```
+~/.lazytables/
+├── README.md         # Data directory documentation
+├── connections.json  # Database connection definitions (encrypted)
+├── connections/      # Individual connection files
+├── sql_files/        # Saved SQL query files
+│   └── sample_queries.sql  # Sample SQL queries
+├── logs/             # Application log files
+│   └── lazytables.log
+└── backups/          # Backup files
+```
+
+### Connection Storage
+- **Secure encryption** for database credentials
+- **Connection files** stored individually for better organization
+- **Auto-backup** of connection configurations
+- **Legacy support** for existing connection formats
+
+## Tips for New Users
+
+### Getting Started
+1. **Start with the help system** - Press `?` in any pane for context-specific help
+2. **Practice navigation** - Use `Tab` and `Ctrl+h/j/k/l` to move between panes
+3. **Learn the modes** - Normal mode for navigation, Insert mode for editing
+4. **Use the built-in help** - Every pane has detailed guidance
+
+### Productivity Tips
+- **Query at cursor**: Place cursor on any SQL statement and press `Ctrl+Enter`
+- **Save frequently used queries**: Use `Ctrl+S` to save queries to files
+- **Search everything**: Most panes support `/` for searching
+- **Use vim motions**: `gg`, `G`, `0`, `$`, `w`, `b` work throughout the app
+- **Tab management**: Work with multiple tables using `S`/`D` to switch tabs
+
+### Common Workflows
+1. **Database exploration**: Connect → Browse tables → View details → Query data
+2. **Query development**: Write in editor → Execute with `Ctrl+Enter` → Save with `Ctrl+S`
+3. **Data editing**: Open table → Navigate with `h/j/k/l` → Edit with `i` → Save with `Enter`
+4. **File management**: Browse SQL files → Load with `Enter` → Edit → Save
+
+## Troubleshooting
+
+### Connection Issues
+- Check connection credentials and host/port
+- Verify database is running and accessible
+- Look at status indicators for specific error messages
+- Use debug mode (`Ctrl+B`) for detailed connection logs
+
+### Performance
+- LazyTables is optimized for large datasets with virtual scrolling
+- Query results are paginated automatically for >10K rows
+- Use filters and search to work with large tables efficiently
+
+### Keyboard Navigation
+- Remember that text input requires `i` to enter insert mode
+- Press `ESC` to return to normal mode from any input state
+- Use `?` in any pane for context-specific help
+- Arrow keys work for dropdown navigation, `h/j/k/l` for vim-style movement
 
 ## Development
 
@@ -118,6 +377,7 @@ We welcome contributions! Please see our [development guide](docs/dev/README.md)
 
 - **Issues**: [GitHub Issues](https://github.com/yuyudhan/LazyTables/issues)
 - **Discussions**: [GitHub Discussions](https://github.com/yuyudhan/LazyTables/discussions)
+- **Documentation**: Built-in help system (press `?` in any pane)
 
 ## License
 
@@ -126,3 +386,5 @@ WTFPL - Do What The Fuck You Want To Public License
 ---
 
 **Ready to ditch the GUI?** Install LazyTables and experience database management the terminal way. 🚀
+
+*Pro tip: Press `?` after installation to explore the comprehensive help system built right into the application.*
