@@ -27,22 +27,18 @@ jobs:
           # macOS Apple Silicon
           - os: macos-latest
             target: aarch64-apple-darwin
-            name: lazytables-v${{ github.ref_name }}-aarch64-apple-darwin
-          
+
           # macOS Intel
           - os: macos-13
             target: x86_64-apple-darwin
-            name: lazytables-v${{ github.ref_name }}-x86_64-apple-darwin
-          
+
           # Linux x86_64
           - os: ubuntu-latest
             target: x86_64-unknown-linux-gnu
-            name: lazytables-v${{ github.ref_name }}-x86_64-unknown-linux-gnu
-          
+
           # Linux ARM64
           - os: ubuntu-latest
             target: aarch64-unknown-linux-gnu
-            name: lazytables-v${{ github.ref_name }}-aarch64-unknown-linux-gnu
             use-cross: true
     
     steps:
@@ -78,17 +74,17 @@ jobs:
       - name: Package binary
         run: |
           cd target/${{ matrix.target }}/release
-          tar czf ../../../${{ matrix.name }}.tar.gz lazytables
+          tar czf ../../../lazytables-${{ github.ref_name }}-${{ matrix.target }}.tar.gz lazytables
           cd ../../../
-          shasum -a 256 ${{ matrix.name }}.tar.gz > ${{ matrix.name }}.tar.gz.sha256
+          shasum -a 256 lazytables-${{ github.ref_name }}-${{ matrix.target }}.tar.gz > lazytables-${{ github.ref_name }}-${{ matrix.target }}.tar.gz.sha256
       
       - name: Upload artifacts
         uses: actions/upload-artifact@v4
         with:
           name: ${{ matrix.target }}
           path: |
-            ${{ matrix.name }}.tar.gz
-            ${{ matrix.name }}.tar.gz.sha256
+            lazytables-${{ github.ref_name }}-${{ matrix.target }}.tar.gz
+            lazytables-${{ github.ref_name }}-${{ matrix.target }}.tar.gz.sha256
   
   release:
     name: Create Release

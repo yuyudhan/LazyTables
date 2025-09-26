@@ -1,0 +1,13 @@
+=======================================
+THIS WILL REQUIRE DOING AGAIN AND AGAIN:
+DONE:
+Can you check the help modal that opens when pressing question mark? It should align with all the panes, current options that are there. So it should not show anything different from what options are available in each of the panes. I want you to refer to each and every pane, connections pane, tables pane, table details pane, table data pane, query results pane, SQL query editor pane, SQL files pane. For each of the panes, find out what all keyboard bindings it gives and move those keyboard bindings to the help model, ensure that the help model takes care of all the pane's help bindings as needed.
+
+=======================================
+THIS WILL REQUIRE DOING AGAIN AND AGAIN:
+~/.config/lazytables/conf.yaml
+~/.config/lazytables/conf.yml
+So basically we want to support the configuration of lazy tables using the .config files as given in this directory structure. We should have the com.yml file which should be used in order to allow the users to make the configurations. This should have pane specific configuration. This should have global configurations. And it should be in a proper structure. Configuration capability available for me and also move the configurations of each of the panes like for example connections panes into that config file in the configuration file I also want to allow setting of the key bindings so the user can customize the key bindings however the default which is present right now should be present by default so the user can set the config in the config file for the key bindings and the UI look and feel but if they don't set the sensible default which is present right now gets enabled.
+Ensure that the configurations for all the panes specifically the key bindings are present into the config file.
+
+

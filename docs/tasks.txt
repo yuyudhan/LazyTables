@@ -1,8 +1,14 @@
-
+=======================================
+So there is something called cargo binstall. This installs the prebuilt binaries. Somehow my application is not supporting that. How to make it support that?
+=======================================
+=======================================
+=======================================
+=======================================
 =======================================
 In the SQL Editor we have VIM modes active. In that VIM mode I want you to implement pressing X in normal mode to delete the character under cursor.
 
 =======================================
+DONE:
 This is for the SQL query editor pane. Can you implement pressing O to insert new line and going into edit mode pressing shift O to create a line above and going to insert mode pressing capital A to go at the end of the line pressing capital I to start editing from the below beginning of the line. These are the standard vim motions.
 
 =======================================
@@ -12,7 +18,9 @@ This is for the SQL query editor pane. Can you implement pressing O to insert ne
 I am seeing a strange behavior when I am in the SQL query editor. When I press Q and then press Y, it does not quit. But when I press Q and press Y, the application gets quit correctly. I don't know why this is happening. Can you find out the issue and resolve it? This is happening when I am in insert mode and then I go into normal mode. This happens only when I come back to normal mode after going into insert mode. What might be the issue?
 
 =======================================
+We need the theming to be moved to this directory. ~/.config/lazytables/theme.yaml or theme.yml file. This helps Users build custom themes. The theming structure of the platform, sorry not the platform, the TUI application list tables should be minimal and not too overwhelming for our users. Find out what is needed, how it is needed and how we can structure it within the TUI app lazy tables as well as how we can make it usable and more user friendly as well.
 =======================================
+
 =======================================
 =======================================
 =======================================
@@ -51,19 +59,9 @@ In the connection creation and connection edit modal. This is the feature I want
 =======================================
 =======================================
 =======================================
-=======================================
-Instead of showing the buttons in the connection creation and connection edit pane, sorry not pane, I mean modal. Can we just show what keystrokes to press instead, like C for cancel, S for save, T for test.
-=======================================
-THIS WILL REQUIRE DOING AGAIN AND AGAIN:
-DONE:
-Can you check the help modal that opens when pressing question mark? It should align with all the panes, current options that are there. So it should not show anything different from what options are available in each of the panes. I want you to refer to each and every pane, connections pane, tables pane, table details pane, table data pane, query results pane, SQL query editor pane, SQL files pane. For each of the panes, find out what all keyboard bindings it gives and move those keyboard bindings to the help model, ensure that the help model takes care of all the pane's help bindings as needed.
 
 =======================================
-THIS WILL REQUIRE DOING AGAIN AND AGAIN:
-~/.config/lazytables/conf.yaml
-~/.config/lazytables/conf.yml
-So basically we want to support the configuration of lazy tables using the .config files as given in this directory structure. We should have the com.yml file which should be used in order to allow the users to make the configurations. This should have pane specific configuration. This should have global configurations. And it should be in a proper structure. Configuration capability available for me and also move the configurations of each of the panes like for example connections panes into that config file in the configuration file I also want to allow setting of the key bindings so the user can customize the key bindings however the default which is present right now should be present by default so the user can set the config in the config file for the key bindings and the UI look and feel but if they don't set the sensible default which is present right now gets enabled.
-Ensure that the configurations for all the panes specifically the key bindings are present into the config file.
+Instead of showing the buttons in the connection creation and connection edit pane, sorry not pane, I mean modal. Can we just show what keystrokes to press instead, like C for cancel, S for save, T for test.
 
 =======================================
 I GUESS THIS IS DONE:
