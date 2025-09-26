@@ -12,6 +12,7 @@ DONE:
 This is for the SQL query editor pane. Can you implement pressing O to insert new line and going into edit mode pressing shift O to create a line above and going to insert mode pressing capital A to go at the end of the line pressing capital I to start editing from the below beginning of the line. These are the standard vim motions.
 
 =======================================
+When the user presses y they should copy the cell value which is under the cursor and when the user presses double yy they should copy the entire row into the clipboard.
 =======================================
 =======================================
 =======================================
