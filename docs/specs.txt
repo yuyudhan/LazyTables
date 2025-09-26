@@ -1,0 +1,153 @@
+LAZYTABLES DEVELOPMENT SPECIFICATIONS
+=====================================
+
+PHASE 1: CORE INFRASTRUCTURE & CONFIGURATION
+============================================
+
+SPEC-001: Configuration System Foundation
+- Create ~/.config/lazytables/conf.yaml structure
+- Support both conf.yaml and conf.yml extensions
+- Implement pane-specific configuration loading
+- Add global configuration support
+- Provide sensible defaults when config is missing
+
+SPEC-002: Theming System
+- Move theming to ~/.config/lazytables/theme.yaml
+- Create minimal, user-friendly theming structure
+- Support theme customization without overwhelming options
+- Maintain backwards compatibility with current themes
+
+SPEC-003: Key Binding Configuration
+- Allow custom key binding configuration in config file
+- Maintain current defaults as fallback
+- Support per-pane key binding customization
+- Implement key binding validation and conflict detection
+
+SPEC-004: Cargo Binstall Support
+- Fix prebuilt binary installation compatibility
+- Ensure cargo-binstall can properly install LazyTables
+- Test installation process and verify binary functionality
+
+
+PHASE 2: VIM EDITOR ENHANCEMENTS
+===============================
+
+SPEC-005: VIM Normal Mode - Character Operations
+- Implement X key in normal mode to delete character under cursor
+- Ensure proper cursor positioning after deletion
+- Maintain consistency with standard VIM behavior
+
+SPEC-006: Copy Operations
+- Implement 'y' to copy cell value under cursor to clipboard
+- Implement 'yy' (double y) to copy entire row to clipboard
+- Add visual feedback for copy operations
+- Handle different data types appropriately
+
+SPEC-007: SQL Editor Quit Bug Fix
+- Investigate Q+Y quit behavior inconsistency
+- Fix issue where Q+Y doesn't quit from insert->normal mode transition
+- Ensure consistent quit behavior across all modes
+- Add proper mode state management
+
+
+PHASE 3: CONNECTION MANAGEMENT IMPROVEMENTS
+==========================================
+
+SPEC-008: Connection String Mode Preservation
+- Detect if connection was created via connection string
+- Restore connection string mode when editing existing connections
+- Add was_created_from_connection_string flag to connection data
+- Implement connection.to_connection_string() method
+
+SPEC-009: Connection Validation & Live Feedback
+- Implement real-time validation as user modifies connection details
+- Add changed field indicators to highlight modified fields
+- Provide revert option for individual fields to original values
+- Show validation status with visual indicators
+
+SPEC-010: Connection Modal UI Improvements
+- Implement responsive modal sizing for different terminal sizes
+- Improve tab navigation and field focus indicators
+- Add field validation styling (red borders for invalid, green for valid)
+- Replace buttons with keystroke indicators (C=Cancel, S=Save, T=Test)
+
+
+PHASE 4: UI/UX ENHANCEMENTS
+==========================
+
+SPEC-011: Help System Unification
+- Ensure help modal aligns with all pane capabilities
+- Move all pane-specific help from individual panes to centralized help modal
+- Verify help content matches actual available options in each pane
+- Remove inline help text from all panes (connections, tables, etc.)
+
+SPEC-012: Modal Background Improvements
+- Fix help modal transparency issues
+- Implement solid black background for all modals
+- Prevent background text bleeding through
+- Ensure proper modal rendering across different terminals
+
+SPEC-013: Pane Focus Visual Indicators
+- Fix table details pane highlighting issue
+- Ensure only focused pane shows blue highlight
+- Implement consistent focus indicators across all panes
+- Add visual feedback for pane transitions
+
+
+PHASE 5: DATA MANAGEMENT FEATURES
+================================
+
+SPEC-014: Table Structure Editing
+- Design and implement table structure modification interface
+- Support column addition, deletion, and modification
+- Add data type selection and constraint management
+- Implement proper SQL generation for schema changes
+
+SPEC-015: Enhanced SQL Pane Features
+- Improve SQL query editor functionality
+- Add advanced syntax highlighting
+- Implement query history and favorites
+- Add query performance analysis tools
+
+SPEC-016: Advanced Data Operations
+- Implement bulk data operations
+- Add import/export functionality for various formats
+- Support data filtering and sorting enhancements
+- Add data validation and constraint checking
+
+
+PHASE 6: ADVANCED FEATURES & POLISH
+==================================
+
+SPEC-017: Debug Mode Enhancement
+- Move debug mode to full-screen toggle similar to connection mode
+- Improve debug information display and organization
+- Add better logging and error tracking
+- Implement debug mode keyboard shortcuts
+
+SPEC-018: Search & Navigation Improvements
+- Enhance search functionality across all panes
+- Implement fuzzy search where appropriate
+- Add search result navigation and highlighting
+- Support regex and advanced search patterns
+
+SPEC-019: Performance Optimizations
+- Implement lazy loading for large datasets
+- Add virtual scrolling for performance
+- Optimize database query execution
+- Implement caching strategies for frequently accessed data
+
+SPEC-020: Accessibility & Usability
+- Add keyboard shortcut discovery mechanism
+- Implement command palette for feature discovery
+- Add context-sensitive tooltips and guidance
+- Ensure consistent behavior across all terminal environments
+
+
+IMPLEMENTATION NOTES:
+====================
+- Each spec should be implemented and tested independently
+- Maintain backwards compatibility unless explicitly breaking changes are noted
+- All new features should follow existing VIM-style navigation patterns
+- Configuration changes should not break existing user setups
+- Focus on user experience consistency across all features
