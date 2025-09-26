@@ -74,6 +74,7 @@ jobs:
       - name: Package binary
         run: |
           cd target/${{ matrix.target }}/release
+          # Create cargo-binstall compatible archive name format
           tar czf ../../../lazytables-${{ github.ref_name }}-${{ matrix.target }}.tar.gz lazytables
           cd ../../../
           shasum -a 256 lazytables-${{ github.ref_name }}-${{ matrix.target }}.tar.gz > lazytables-${{ github.ref_name }}-${{ matrix.target }}.tar.gz.sha256
