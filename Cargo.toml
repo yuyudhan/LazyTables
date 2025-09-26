@@ -2,7 +2,7 @@
 
 [package]
 name = "lazytables"
-version = "0.1.4"
+version = "0.1.5"
 edition = "2021"
 authors = ["LazyTables Team"]
 license = "WTFPL"
