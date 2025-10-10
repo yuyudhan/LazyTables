@@ -1189,8 +1189,14 @@ impl App {
 
         // Normal mode - vim keybindings
         match key.code {
-            // Ctrl+Enter - Execute query at cursor (works in both modes)
-            KeyCode::Enter if key.modifiers == KeyModifiers::CONTROL => {
+            // Shift+E - Execute query at cursor (PRIMARY binding, vim-style)
+            KeyCode::Char('E') => {
+                if let Err(e) = self.state.execute_query_at_cursor().await {
+                    self.state.toast_manager.error(format!("Query execution failed: {e}"));
+                }
+            }
+            // Ctrl+Enter - Execute query at cursor (SECONDARY binding, familiar to SQL tool users)
+            KeyCode::Enter if key.modifiers.contains(KeyModifiers::CONTROL) => {
                 if let Err(e) = self.state.execute_query_at_cursor().await {
                     self.state.toast_manager.error(format!("Query execution failed: {e}"));
                 }
@@ -1282,17 +1288,23 @@ impl App {
                     self.state.query_editor.set_insert_mode(false);
                 }
             }
-            // Ctrl+Enter - Execute query
-            KeyCode::Enter if key.modifiers == KeyModifiers::CONTROL => {
-                if let Err(e) = self.state.execute_query_at_cursor().await {
-                    self.state.toast_manager.error(format!("Query execution failed: {e}"));
-                }
-            }
-            // Enter - Insert newline
+            // Enter - Insert newline (Ctrl+Enter does NOT work in insert mode - use normal mode)
             KeyCode::Enter => {
                 self.state.query_editor.insert_newline();
                 self.state.query_content = self.state.query_editor.get_content().to_string();
                 self.state.ui.query_modified = true;
+            }
+            // Ctrl+p - Navigate suggestions up (vim-style) - MUST come before Char(c) pattern
+            KeyCode::Char('p') if key.modifiers == KeyModifiers::CONTROL => {
+                if self.state.query_editor.are_suggestions_active() {
+                    self.state.query_editor.move_suggestion_up();
+                }
+            }
+            // Ctrl+n - Navigate suggestions down (vim-style) - MUST come before Char(c) pattern
+            KeyCode::Char('n') if key.modifiers == KeyModifiers::CONTROL => {
+                if self.state.query_editor.are_suggestions_active() {
+                    self.state.query_editor.move_suggestion_down();
+                }
             }
             // Regular typing
             KeyCode::Char(c) => {
@@ -1306,11 +1318,33 @@ impl App {
                 self.state.query_content = self.state.query_editor.get_content().to_string();
                 self.state.ui.query_modified = true;
             }
-            // Tab
+            // Tab - Accept suggestion if active, otherwise insert tab character
             KeyCode::Tab => {
-                self.state.query_editor.insert_char('\t');
-                self.state.query_content = self.state.query_editor.get_content().to_string();
-                self.state.ui.query_modified = true;
+                if self.state.query_editor.are_suggestions_active() {
+                    self.state.query_editor.accept_suggestion();
+                    self.state.query_content = self.state.query_editor.get_content().to_string();
+                    self.state.ui.query_modified = true;
+                } else {
+                    self.state.query_editor.insert_char('\t');
+                    self.state.query_content = self.state.query_editor.get_content().to_string();
+                    self.state.ui.query_modified = true;
+                }
+            }
+            // Up arrow - Navigate suggestions or move cursor
+            KeyCode::Up => {
+                if self.state.query_editor.are_suggestions_active() {
+                    self.state.query_editor.move_suggestion_up();
+                } else {
+                    self.state.query_editor.move_cursor_up();
+                }
+            }
+            // Down arrow - Navigate suggestions or move cursor
+            KeyCode::Down => {
+                if self.state.query_editor.are_suggestions_active() {
+                    self.state.query_editor.move_suggestion_down();
+                } else {
+                    self.state.query_editor.move_cursor_down();
+                }
             }
             _ => {}
         }
