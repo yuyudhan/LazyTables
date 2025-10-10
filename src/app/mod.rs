@@ -13,7 +13,7 @@ use std::time::Duration;
 
 pub mod state;
 
-pub use state::{AppState, FocusedPane, QueryEditMode};
+pub use state::{AppState, AppView, ConnectionFormMode, FocusedPane, OverlayView, TextInputMode};
 
 // Simplified internal mode for compatibility - not shown to user
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -157,16 +157,16 @@ impl App {
                         self.execute_command(CommandId::Help)?;
                     }
                     ModalType::Connection => {
-                        self.state.ui.show_add_connection_modal = true;
+                        // Handled by overlay system;
                     }
                     _ => {}
                 }
             }
             CommandAction::CloseModal => {
-                self.state.ui.show_add_connection_modal = false;
-                self.state.ui.show_edit_connection_modal = false;
-                self.state.ui.show_table_creator = false;
-                self.state.ui.show_table_editor = false;
+                // Handled by overlay system;
+                // Handled by overlay system;
+                // Handled by overlay system;
+                // Handled by overlay system;
             }
             CommandAction::ExecuteQuery(query) => {
                 // TODO: Execute query through database connection
@@ -392,7 +392,7 @@ impl App {
         }
 
         // Handle debug view navigation when debug view is open
-        if self.state.ui.show_debug_view {
+        if self.state.ui.current_view.is_debug_view() {
             let debug_messages = crate::logging::get_debug_messages();
             let max_lines = debug_messages.len();
 
@@ -469,14 +469,10 @@ impl App {
             }
         }
 
-        // Handle 'q' key globally to quit (except when in modals, editing, or Query mode)
+        // Handle 'q' key globally to quit (except when in overlays, editing, or Query mode)
         if key.code == KeyCode::Char('q') && key.modifiers == KeyModifiers::NONE {
-            // Don't quit if we're in a modal, editing, or in Query mode
-            if !self.state.ui.show_add_connection_modal
-                && !self.state.ui.show_edit_connection_modal
-                && !self.state.ui.show_table_creator
-                && !self.state.ui.show_table_editor
-                && !self.state.ui.show_connection_mode
+            // Don't quit if we're in an overlay or special input mode
+            if self.state.ui.is_in_main()
                 && self.state.ui.confirmation_modal.is_none()
                 && !self.state.ui.connections_search_active
                 && !self.state.ui.sql_files_search_active
@@ -611,22 +607,21 @@ impl App {
         }
 
         // Handle connection mode if active
-        if self.state.ui.show_connection_mode {
-            return self.handle_connection_mode_key_event(key).await;
-        }
-        // Handle connection modal if active
-        if self.state.ui.show_add_connection_modal || self.state.ui.show_edit_connection_modal {
-            return self.handle_connection_modal_key_event(key).await;
-        }
-
-        // Handle table creator if active
-        if self.state.ui.show_table_creator {
-            return self.handle_table_creator_key_event(key).await;
-        }
-
-        // Handle table editor if active
-        if self.state.ui.show_table_editor {
-            return self.handle_table_editor_key_event(key).await;
+        // Handle overlay views
+        if let Some(overlay) = self.state.ui.current_view.overlay() {
+            return match overlay {
+                OverlayView::ConnectionForm(_) => self.handle_connection_mode_key_event(key).await,
+                OverlayView::TableCreator => self.handle_table_creator_key_event(key).await,
+                OverlayView::TableEditor => self.handle_table_editor_key_event(key).await,
+                OverlayView::DebugView => {
+                    // Debug view is handled earlier in the function
+                    Ok(())
+                }
+                OverlayView::Help => {
+                    // Help is handled earlier in the function
+                    Ok(())
+                }
+            };
         }
 
         // Handle connections search input
@@ -915,7 +910,7 @@ impl App {
                             self.mode = Mode::Query;
                             // Set QueryEditor to insert mode when entering Query mode with 'i'
                             self.state.query_editor.set_insert_mode(true);
-                            self.state.ui.query_edit_mode = QueryEditMode::Insert;
+                            self.state.ui.text_input_mode = TextInputMode::Insert;
                         } else {
                             self.mode = Mode::Insert;
                         }
@@ -960,7 +955,16 @@ impl App {
                             == crate::app::state::FocusedPane::Connections
                             && !self.state.db.connections.connections.is_empty()
                         {
-                            self.state.ui.enter_edit_connection_mode();
+                            if let Some(connection) = self
+                                .state
+                                .db
+                                .connections
+                                .connections
+                                .get(self.state.ui.selected_connection)
+                                .cloned()
+                            {
+                                self.state.ui.enter_edit_connection_mode(connection);
+                            }
                         }
                     }
                     // Create new table (only in tables pane when connected) or next search result
@@ -1618,7 +1622,7 @@ impl App {
                 }
             }
             Mode::Query => {
-                use crate::app::state::QueryEditMode;
+                use crate::app::state::TextInputMode;
 
                 // Handle global pane navigation even in Query mode
                 match (key.modifiers, key.code) {
@@ -1731,7 +1735,7 @@ impl App {
                         }
                         _ => {}
                     }
-                } else if self.state.ui.query_edit_mode == QueryEditMode::Insert {
+                } else if self.state.ui.text_input_mode == TextInputMode::Insert {
                     // Insert mode - handle text input using QueryEditor
                     match key.code {
                         KeyCode::Esc => {
@@ -1740,7 +1744,7 @@ impl App {
                                 self.state.query_editor.hide_suggestions();
                             } else {
                                 // No suggestions active, exit insert mode
-                                self.state.ui.query_edit_mode = QueryEditMode::Normal;
+                                self.state.ui.text_input_mode = TextInputMode::Normal;
                                 self.state.query_editor.set_insert_mode(false);
                             }
                         }
@@ -1837,7 +1841,7 @@ impl App {
                             }
                         }
                         KeyCode::Char('i') => {
-                            self.state.ui.query_edit_mode = QueryEditMode::Insert;
+                            self.state.ui.text_input_mode = TextInputMode::Insert;
                             self.state.query_editor.set_insert_mode(true);
                         }
                         KeyCode::Char(':') => {
@@ -2043,7 +2047,7 @@ impl App {
                     self.state.connection_modal_state.go_back();
                 } else {
                     // Close the appropriate modal
-                    if self.state.ui.show_add_connection_modal {
+                    if self.state.ui.current_view.is_connection_form() {
                         self.state.close_add_connection_modal();
                     } else {
                         self.state.close_edit_connection_modal();
@@ -2204,7 +2208,7 @@ impl App {
                     }
                     ConnectionField::Cancel => {
                         // Close the appropriate modal
-                        if self.state.ui.show_add_connection_modal {
+                        if self.state.ui.current_view.is_connection_form() {
                             self.state.close_add_connection_modal();
                         } else {
                             self.state.close_edit_connection_modal();
@@ -2245,7 +2249,7 @@ impl App {
             }
             KeyCode::Char('c') => {
                 // Cancel shortcut - works from any field
-                if self.state.ui.show_add_connection_modal {
+                if self.state.ui.current_view.is_connection_form() {
                     self.state.close_add_connection_modal();
                 } else {
                     self.state.close_edit_connection_modal();
@@ -2797,12 +2801,12 @@ impl App {
 
         // Get or create the connection mode state
         let connection_mode = if self.state.connection_mode.is_none() {
-            match self.state.ui.connection_mode_type {
-                crate::state::ui::ConnectionModeType::Add => {
+            match self.state.ui.current_view.overlay() {
+                Some(OverlayView::ConnectionForm(ConnectionFormMode::Add)) => {
                     self.state.connection_mode =
                         Some(crate::ui::components::ConnectionMode::new_add());
                 }
-                crate::state::ui::ConnectionModeType::Edit => {
+                Some(OverlayView::ConnectionForm(ConnectionFormMode::Edit(_))) => {
                     if let Some(connection) = self
                         .state
                         .db
@@ -2818,6 +2822,11 @@ impl App {
                         self.state.ui.exit_connection_mode();
                         return Ok(());
                     }
+                }
+                _ => {
+                    // Invalid state, exit connection mode
+                    self.state.ui.exit_connection_mode();
+                    return Ok(());
                 }
             }
             self.state.connection_mode.as_mut().unwrap()
@@ -2909,8 +2918,8 @@ impl App {
                     crate::ui::components::ConnectionModeAction::Save => {
                         match connection_mode.to_connection_config() {
                             Ok(mut config) => {
-                                match self.state.ui.connection_mode_type {
-                                    crate::state::ui::ConnectionModeType::Add => {
+                                match self.state.ui.current_view.overlay() {
+                                    Some(OverlayView::ConnectionForm(ConnectionFormMode::Add)) => {
                                         // Add new connection
                                         if let Err(e) =
                                             self.state.db.connections.add_connection(config)
@@ -2926,7 +2935,7 @@ impl App {
                                             self.state.ui.exit_connection_mode();
                                         }
                                     }
-                                    crate::state::ui::ConnectionModeType::Edit => {
+                                    Some(OverlayView::ConnectionForm(ConnectionFormMode::Edit(_))) => {
                                         // Update existing connection
                                         if let Some(existing) = self
                                             .state
@@ -2951,6 +2960,7 @@ impl App {
                                             }
                                         }
                                     }
+                                    _ => {}
                                 }
                             }
                             Err(e) => {
@@ -2980,8 +2990,8 @@ impl App {
             } if !connection_mode.insert_mode => {
                 // Same logic as Enter on Save action
                 match connection_mode.to_connection_config() {
-                    Ok(mut config) => match self.state.ui.connection_mode_type {
-                        crate::state::ui::ConnectionModeType::Add => {
+                    Ok(mut config) => match self.state.ui.current_view.overlay() {
+                        Some(OverlayView::ConnectionForm(ConnectionFormMode::Add)) => {
                             if let Err(e) = self.state.db.connections.add_connection(config) {
                                 connection_mode
                                     .set_error(format!("Failed to save connection: {}", e));
@@ -2992,7 +3002,7 @@ impl App {
                                 self.state.ui.exit_connection_mode();
                             }
                         }
-                        crate::state::ui::ConnectionModeType::Edit => {
+                        Some(OverlayView::ConnectionForm(ConnectionFormMode::Edit(_))) => {
                             if let Some(existing) = self
                                 .state
                                 .db
@@ -3013,6 +3023,7 @@ impl App {
                                 }
                             }
                         }
+                        _ => {}
                     },
                     Err(e) => {
                         connection_mode.set_error(e);
