@@ -64,12 +64,9 @@ impl HelpSystem {
         Self::add_command(&mut lines, ":", "Enter command mode");
         Self::add_command(&mut lines, "C-B", "Toggle debug view");
         lines.push(Line::from(""));
+        Self::add_command(&mut lines, "1-6", "Jump to pane (by number)");
         Self::add_command(&mut lines, "Tab", "Next pane");
         Self::add_command(&mut lines, "S-Tab", "Previous pane");
-        Self::add_command(&mut lines, "C-h", "Focus left");
-        Self::add_command(&mut lines, "C-j", "Focus down");
-        Self::add_command(&mut lines, "C-k", "Focus up");
-        Self::add_command(&mut lines, "C-l", "Focus right");
 
         lines
     }
@@ -108,12 +105,15 @@ impl HelpSystem {
                 .add_modifier(Modifier::BOLD | Modifier::UNDERLINED),
         )]));
         lines.push(Line::from(""));
+        Self::add_command(&mut lines, "1", "[1] Connections pane");
+        Self::add_command(&mut lines, "2", "[2] Tables pane");
+        Self::add_command(&mut lines, "3", "[3] Table Details pane");
+        Self::add_command(&mut lines, "4", "[4] Query Results pane");
+        Self::add_command(&mut lines, "5", "[5] SQL Query Editor pane");
+        Self::add_command(&mut lines, "6", "[6] SQL Files pane");
+        lines.push(Line::from(""));
         Self::add_command(&mut lines, "Tab", "Next pane");
         Self::add_command(&mut lines, "S-Tab", "Previous pane");
-        Self::add_command(&mut lines, "C-h", "Focus left");
-        Self::add_command(&mut lines, "C-j", "Focus down");
-        Self::add_command(&mut lines, "C-k", "Focus up");
-        Self::add_command(&mut lines, "C-l", "Focus right");
         lines.push(Line::from(""));
 
         // Data operations
