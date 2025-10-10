@@ -1,4 +1,11 @@
-=======================================
+=======================================****=======================================
+I want to switch from the syntax of Ctrl+H, Ctrl+J, Ctrl+K and Ctrl+L into a method where pressing the number of the pane takes us to that pane. So first of all, we should have each pane number defined and the heading of all the panes. When the user presses that pane number, the focus should go to that particular pane. The user can also traverse through the panes using Tab and Shift+Tab to cycle through the panes.
+
+=======================================****=======================================
+=======================================****=======================================
+=======================================****=======================================
+=======================================****=======================================
+=======================================****=======================================
 So there is something called cargo binstall. This installs the prebuilt binaries. Somehow my application is not supporting that. How to make it support that?
 =======================================
 =======================================

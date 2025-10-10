@@ -50,4 +50,3 @@ async fn main() -> color_eyre::Result<()> {
 
     result
 }
-

@@ -300,3 +300,4 @@ Test organization:
 - Configuration files use TOML format (see src/config/mod.rs)
 - SQL files are stored per-connection in `~/.lazytables/sql_files/<connection_name>/`
 - Always keep the help area up to date whenever we change the any of the keybindings.
+- Always use run cargo run, cargo check or cargo build commands to see if there are any errors and correct them, code should be clean always.
