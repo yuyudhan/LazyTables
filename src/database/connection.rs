@@ -4,7 +4,7 @@ use crate::config::Config;
 use crate::core::error::Result;
 use crate::security::{PasswordManager, PasswordSource};
 use serde::{Deserialize, Serialize};
-use std::fs;
+// Removed: use std::fs; (now using async file I/O)
 
 /// Database type
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
@@ -253,12 +253,12 @@ fn default_version() -> String {
 }
 
 impl ConnectionStorage {
-    /// Load connections from storage
-    pub fn load() -> Result<Self> {
+    /// Load connections from storage asynchronously (non-blocking)
+    pub async fn load() -> Result<Self> {
         let path = Config::connections_path();
 
         if path.exists() {
-            let contents = fs::read_to_string(&path)?;
+            let contents = crate::io::async_fs::read_to_string(&path).await?;
             let storage: ConnectionStorage = toml::from_str(&contents)?;
             Ok(storage)
         } else {
@@ -266,22 +266,22 @@ impl ConnectionStorage {
         }
     }
 
-    /// Save connections to storage
-    pub fn save(&self) -> Result<()> {
+    /// Save connections to storage asynchronously (non-blocking)
+    pub async fn save(&self) -> Result<()> {
         let path = Config::connections_path();
 
         // Create parent directory if it doesn't exist
         if let Some(parent) = path.parent() {
-            fs::create_dir_all(parent)?;
+            crate::io::async_fs::create_dir_all(parent).await?;
         }
 
         let contents = toml::to_string_pretty(self)?;
-        fs::write(path, contents)?;
+        crate::io::async_fs::write(path, contents).await?;
         Ok(())
     }
 
-    /// Add a new connection
-    pub fn add_connection(&mut self, connection: ConnectionConfig) -> Result<()> {
+    /// Add a new connection asynchronously
+    pub async fn add_connection(&mut self, connection: ConnectionConfig) -> Result<()> {
         // Check for duplicate names
         if self.connections.iter().any(|c| c.name == connection.name) {
             return Err(crate::core::error::LazyTablesError::ConnectionExists(
@@ -290,20 +290,20 @@ impl ConnectionStorage {
         }
 
         self.connections.push(connection);
-        self.save()
+        self.save().await
     }
 
-    /// Remove a connection by ID
-    pub fn remove_connection(&mut self, id: &str) -> Result<()> {
+    /// Remove a connection by ID asynchronously
+    pub async fn remove_connection(&mut self, id: &str) -> Result<()> {
         self.connections.retain(|c| c.id != id);
-        self.save()
+        self.save().await
     }
 
-    /// Update a connection
-    pub fn update_connection(&mut self, connection: ConnectionConfig) -> Result<()> {
+    /// Update a connection asynchronously
+    pub async fn update_connection(&mut self, connection: ConnectionConfig) -> Result<()> {
         if let Some(index) = self.connections.iter().position(|c| c.id == connection.id) {
             self.connections[index] = connection;
-            self.save()
+            self.save().await
         } else {
             Err(crate::core::error::LazyTablesError::ConnectionNotFound(
                 connection.id,
