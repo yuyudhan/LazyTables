@@ -1,7 +1,9 @@
 
 ====================****====================
+When Let's focus on the SQL query editor pane, which is the pane number five now when I am in the insert mode the tab binding which is a global binding which is expected to Switch the pane In general should not switch the pane But in fact, it should do internal work of the SQL query editor, which is the pane number five only this should happen only in the insert mode in the edit mode It should Not happen but in the normal mode tab is expected to behave normally like if it is on the Pane number five, which is the SQL editor tab, obviously it should switch to pane number six
 
 ====================****====================
+In the SQL query editor when it is focused and in the normal mode it should basically allow the colon w command to save the file.
 
 ====================****====================
 

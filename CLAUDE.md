@@ -376,3 +376,4 @@ Test organization:
   - ONLY the SQL Query Editor has vim-style insert mode (managed by QueryEditor component)
   - Forms/modals accept direct typing - NO insert mode required
   - Key events are routed per-pane via dedicated handler methods
+- When implementing on one functionality if you think you are writing code that might break another functoinality you should double check what will break, avoid or ensure the other functionlity or functionalities are working.

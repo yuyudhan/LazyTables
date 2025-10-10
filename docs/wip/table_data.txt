@@ -1,5 +1,6 @@
 
 ====================****====================
+In the table data pane, if we have opened multiple tables, we used to have capital S and capital D to move between different panes. So is that still there? Or we have removed it because we want it. Can you see that and confirm to me?
 
 ====================****====================
 
