@@ -127,6 +127,43 @@ impl FocusedPane {
             Self::QueryWindow => Self::SqlFiles,
         }
     }
+
+    /// Get the pane number (1-6) for display
+    pub fn to_number(&self) -> u8 {
+        match self {
+            Self::Connections => 1,
+            Self::Tables => 2,
+            Self::Details => 3,
+            Self::TabularOutput => 4,
+            Self::QueryWindow => 5,
+            Self::SqlFiles => 6,
+        }
+    }
+
+    /// Create a pane from a number (1-6)
+    pub fn from_number(num: u8) -> Option<Self> {
+        match num {
+            1 => Some(Self::Connections),
+            2 => Some(Self::Tables),
+            3 => Some(Self::Details),
+            4 => Some(Self::TabularOutput),
+            5 => Some(Self::QueryWindow),
+            6 => Some(Self::SqlFiles),
+            _ => None,
+        }
+    }
+
+    /// Get the display name of the pane
+    pub fn display_name(&self) -> &'static str {
+        match self {
+            Self::Connections => "Connections",
+            Self::Tables => "Tables",
+            Self::Details => "Table Details",
+            Self::TabularOutput => "Query Results",
+            Self::QueryWindow => "SQL Query Editor",
+            Self::SqlFiles => "SQL Files",
+        }
+    }
 }
 
 /// Help display mode for context-aware help
