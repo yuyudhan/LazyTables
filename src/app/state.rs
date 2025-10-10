@@ -72,11 +72,11 @@ pub struct AppState {
 
 impl AppState {
     /// Create a new application state
-    pub fn new() -> Self {
+    pub async fn new() -> Self {
         // Ensure all directories exist
         let _ = crate::config::Config::ensure_directories();
 
-        let db = DatabaseState::new();
+        let db = DatabaseState::new().await;
         let saved_sql_files = Vec::new(); // Will be loaded only when a connection is connected
 
         // Load or create UI state
@@ -85,7 +85,7 @@ impl AppState {
         // Update list states based on loaded connections
         ui.update_connection_selection(db.connections.connections.len());
 
-        let mut app_state = Self {
+        let app_state = Self {
             ui,
             db,
             connection_modal_state: ConnectionModalState::new(),
@@ -109,8 +109,8 @@ impl AppState {
             test_start_time: None,
         };
 
-        // Load SQL files during initialization
-        app_state.refresh_sql_files();
+        // Don't load SQL files during initialization to avoid block_on in async context
+        // They will be loaded lazily when first needed or when a connection is established
 
         app_state
     }
@@ -415,14 +415,14 @@ impl AppState {
                     .get(self.ui.selected_connection)
                 {
                     connection.id = existing.id.clone();
-                    if let Err(e) = self.db.connections.update_connection(connection) {
+                    if let Err(e) = tokio::runtime::Handle::current().block_on(self.db.connections.update_connection(connection)) {
                         return Err(format!("Failed to update connection: {e}"));
                     }
                 }
                 self.close_edit_connection_modal();
             } else {
                 // Add new connection
-                if let Err(e) = self.db.connections.add_connection(connection) {
+                if let Err(e) = tokio::runtime::Handle::current().block_on(self.db.connections.add_connection(connection)) {
                     return Err(format!("Failed to add connection: {e}"));
                 }
                 self.close_add_connection_modal();
@@ -622,8 +622,8 @@ impl AppState {
                         .await;
                 }
 
-                // Refresh SQL files to show connection-specific files
-                self.refresh_sql_files();
+                // Note: SQL files will be loaded lazily when first accessed
+                // Removed refresh_sql_files() call here to avoid block_on in async context
             }
 
             // Save updated connection status
@@ -648,8 +648,8 @@ impl AppState {
         // Clear active connection in app state database
         let _ = self.app_state_db.clear_active_connection().await;
 
-        // Refresh SQL files to clear the list (no connection = no files)
-        self.refresh_sql_files();
+        // Note: SQL files list will be cleared lazily when needed
+        // Removed refresh_sql_files() call here to avoid block_on in async context
     }
 
     /// Disconnect from current database (synchronous part only)
@@ -734,8 +734,6 @@ impl AppState {
 
     /// Load list of saved SQL files for current connection (only if connection is active)
     fn load_sql_files_for_connection(&self) -> Vec<String> {
-        use std::fs;
-
         let mut files = Vec::new();
 
         // Only load files if we have an active connected connection
@@ -752,8 +750,13 @@ impl AppState {
 
             // Try connection-specific directory first
             let connection_dir = Config::sql_files_dir().join(connection_name);
-            if let Ok(entries) = fs::read_dir(&connection_dir) {
-                for entry in entries.flatten() {
+
+            // Use async file I/O with block_on (sync function, called from many sync contexts)
+            // TODO: Move to background task with event notification for truly non-blocking operation
+            if let Ok(entries) = tokio::runtime::Handle::current().block_on(async {
+                crate::io::async_fs::read_dir(&connection_dir).await
+            }) {
+                for entry in entries {
                     let path = entry.path();
                     if path.is_file() && path.extension().is_some_and(|ext| ext == "sql") {
                         if let Some(name) = path.file_stem().and_then(|name| name.to_str()) {
@@ -785,7 +788,6 @@ impl AppState {
     /// Save current query content to a file (only if connection is active)
     pub fn save_query_as(&mut self, filename: &str) -> Result<(), Box<dyn std::error::Error>> {
         use crate::config::Config;
-        use std::fs;
 
         // Get connection-specific directory - require active connection
         let connection = self
@@ -804,20 +806,25 @@ impl AppState {
 
         // Save to connection-specific directory
         let sql_dir = Config::sql_files_dir().join(connection_name);
-        fs::create_dir_all(&sql_dir)?;
-
         let file_path = sql_dir.join(format!("{filename}.sql"));
 
         // Get the latest content from QueryEditor (in case it's more up-to-date)
         let content_to_save = if self.query_editor.get_content() != self.query_content {
             // QueryEditor has newer content, sync it back
             self.query_content = self.query_editor.get_content().to_string();
-            &self.query_content
+            self.query_content.clone()
         } else {
-            &self.query_content
+            self.query_content.clone()
         };
 
-        fs::write(&file_path, content_to_save)?;
+        // Use async file I/O with block_on (sync function, called from many sync contexts)
+        // TODO: Move to background task with event notification for truly non-blocking operation
+        tokio::runtime::Handle::current().block_on(async {
+            // Ensure directory exists
+            crate::io::async_fs::create_dir_all(&sql_dir).await?;
+            // Write file
+            crate::io::async_fs::write(&file_path, &content_to_save).await
+        })?;
 
         self.ui.current_sql_file = Some(filename.to_string());
         self.ui.query_modified = false;
@@ -1320,14 +1327,6 @@ impl AppState {
         let sql_dir = Config::sql_files_dir().join(&connection_name);
         crate::log_info!("SQL directory path: {:?}", sql_dir);
 
-        match std::fs::create_dir_all(&sql_dir) {
-            Ok(_) => crate::log_info!("Directory created/exists successfully"),
-            Err(e) => {
-                crate::log_info!("Failed to create directory: {}", e);
-                return Err(format!("Failed to create directory: {e}"));
-            }
-        }
-
         // Determine filename
         let filename = if let Some(ref current_file) = self.ui.current_sql_file {
             crate::log_info!("Using existing current file: {}", current_file);
@@ -1341,9 +1340,17 @@ impl AppState {
         let file_path = sql_dir.join(format!("{}.sql", filename));
         crate::log_info!("Final file path: {:?}", file_path);
 
-        // Write the file
+        // Use async file I/O with block_on (sync function, called from many sync contexts)
+        // TODO: Move to background task with event notification for truly non-blocking operation
         crate::log_info!("Writing {} bytes to file", self.query_content.len());
-        match std::fs::write(&file_path, &self.query_content) {
+        let content_to_save = self.query_content.clone();
+        match tokio::runtime::Handle::current().block_on(async {
+            // Ensure directory exists
+            crate::io::async_fs::create_dir_all(&sql_dir).await?;
+            crate::log_info!("Directory created/exists successfully");
+            // Write file
+            crate::io::async_fs::write(&file_path, &content_to_save).await
+        }) {
             Ok(_) => crate::log_info!("File write successful"),
             Err(e) => {
                 crate::log_info!("File write failed: {}", e);
@@ -1389,13 +1396,26 @@ impl AppState {
         let connection_path = connection_dir.join(format!("{filename}.sql"));
         let root_path = root_dir.join(format!("{filename}.sql"));
 
+        // Use async file I/O with block_on (sync function, called from many sync contexts)
+        // TODO: Move to background task with event notification for truly non-blocking operation
         let mut deleted = false;
-        if connection_path.exists() {
-            std::fs::remove_file(&connection_path)?;
+        let exists_connection = tokio::runtime::Handle::current().block_on(async {
+            crate::io::async_fs::exists(&connection_path).await.unwrap_or(false)
+        });
+        if exists_connection {
+            tokio::runtime::Handle::current().block_on(async {
+                crate::io::async_fs::remove_file(&connection_path).await
+            })?;
             deleted = true;
         }
-        if root_path.exists() {
-            std::fs::remove_file(&root_path)?;
+
+        let exists_root = tokio::runtime::Handle::current().block_on(async {
+            crate::io::async_fs::exists(&root_path).await.unwrap_or(false)
+        });
+        if exists_root {
+            tokio::runtime::Handle::current().block_on(async {
+                crate::io::async_fs::remove_file(&root_path).await
+            })?;
             deleted = true;
         }
 
@@ -1446,13 +1466,28 @@ impl AppState {
         let new_connection_path = connection_dir.join(format!("{new_name}.sql"));
         let new_root_path = root_dir.join(format!("{new_name}.sql"));
 
-        // Rename in the location where it exists
-        if old_connection_path.exists() {
-            std::fs::rename(&old_connection_path, &new_connection_path)?;
-        } else if old_root_path.exists() {
-            std::fs::rename(&old_root_path, &new_root_path)?;
+        // Use async file I/O with block_on (sync function, called from many sync contexts)
+        // TODO: Move to background task with event notification for truly non-blocking operation
+        let exists_connection = tokio::runtime::Handle::current().block_on(async {
+            crate::io::async_fs::exists(&old_connection_path).await.unwrap_or(false)
+        });
+
+        if exists_connection {
+            tokio::runtime::Handle::current().block_on(async {
+                crate::io::async_fs::rename(&old_connection_path, &new_connection_path).await
+            })?;
         } else {
-            return Err("File not found".into());
+            let exists_root = tokio::runtime::Handle::current().block_on(async {
+                crate::io::async_fs::exists(&old_root_path).await.unwrap_or(false)
+            });
+
+            if exists_root {
+                tokio::runtime::Handle::current().block_on(async {
+                    crate::io::async_fs::rename(&old_root_path, &new_root_path).await
+                })?;
+            } else {
+                return Err("File not found".into());
+            }
         }
 
         // Update current file reference if needed
@@ -1493,22 +1528,34 @@ impl AppState {
         let source_connection_path = connection_dir.join(format!("{source_name}.sql"));
         let source_root_path = root_dir.join(format!("{source_name}.sql"));
 
-        let content = if source_connection_path.exists() {
-            std::fs::read_to_string(&source_connection_path)?
-        } else if source_root_path.exists() {
-            std::fs::read_to_string(&source_root_path)?
-        } else {
-            return Err("Source file not found".into());
-        };
+        // Use async file I/O with block_on (sync function, called from many sync contexts)
+        // TODO: Move to background task with event notification for truly non-blocking operation
+        let (content, use_connection_dir) = tokio::runtime::Handle::current().block_on(async {
+            let exists_connection = crate::io::async_fs::exists(&source_connection_path).await.unwrap_or(false);
+            if exists_connection {
+                let content = crate::io::async_fs::read_to_string(&source_connection_path).await?;
+                Ok::<_, Box<dyn std::error::Error>>((content, true))
+            } else {
+                let exists_root = crate::io::async_fs::exists(&source_root_path).await.unwrap_or(false);
+                if exists_root {
+                    let content = crate::io::async_fs::read_to_string(&source_root_path).await?;
+                    Ok((content, false))
+                } else {
+                    Err("Source file not found".into())
+                }
+            }
+        })?;
 
         // Write to the same location (connection-specific if it existed there, otherwise root)
-        let target_path = if source_connection_path.exists() {
+        let target_path = if use_connection_dir {
             connection_dir.join(format!("{new_name}.sql"))
         } else {
             root_dir.join(format!("{new_name}.sql"))
         };
 
-        std::fs::write(&target_path, content)?;
+        tokio::runtime::Handle::current().block_on(async {
+            crate::io::async_fs::write(&target_path, &content).await
+        })?;
         self.refresh_sql_files();
         Ok(())
     }
@@ -1528,12 +1575,16 @@ impl AppState {
 
         // Create in connection-specific directory
         let connection_dir = Config::sql_files_dir().join(&connection_name);
-        std::fs::create_dir_all(&connection_dir)?;
-
         let file_path = connection_dir.join(format!("{filename}.sql"));
 
-        // Create empty file
-        std::fs::write(&file_path, "")?;
+        // Use async file I/O with block_on (sync function, called from many sync contexts)
+        // TODO: Move to background task with event notification for truly non-blocking operation
+        tokio::runtime::Handle::current().block_on(async {
+            // Ensure directory exists
+            crate::io::async_fs::create_dir_all(&connection_dir).await?;
+            // Create empty file
+            crate::io::async_fs::write(&file_path, "").await
+        })?;
 
         // Load the new file and refresh list
         self.query_content.clear();
@@ -2252,6 +2303,45 @@ impl AppState {
 
 impl Default for AppState {
     fn default() -> Self {
-        Self::new()
+        // Ensure all directories exist
+        let _ = crate::config::Config::ensure_directories();
+
+        let db = DatabaseState::default(); // Use default (empty) instead of loading from disk
+        let saved_sql_files = Vec::new();
+
+        // Load or create UI state
+        let mut ui = UIState::load().unwrap_or_default();
+
+        // Update list states based on loaded connections
+        ui.update_connection_selection(db.connections.connections.len());
+
+        let app_state = Self {
+            ui,
+            db,
+            connection_modal_state: ConnectionModalState::new(),
+            query_content: String::new(),
+            saved_sql_files,
+            table_creator_state: TableCreatorState::new(),
+            table_editor_state: TableEditorState::new("table".to_string()),
+            table_viewer_state: TableViewerState::new(),
+            toast_manager: ToastManager::new(),
+            query_editor: QueryEditor::new(),
+            debug_view: DebugView::new(),
+            connection_mode: None,
+            app_state_db: AppStateDb::new(),
+            connection_manager: ConnectionManager::new(),
+            connecting_in_progress: None,
+            connecting_animation_frame: 0,
+            connection_start_time: None,
+            connection_timeout_seconds: 30,
+            test_connection_in_progress: false,
+            test_animation_frame: 0,
+            test_start_time: None,
+        };
+
+        // Don't load SQL files during initialization to avoid potential blocking
+        // They will be loaded lazily when first needed or when a connection is established
+
+        app_state
     }
 }

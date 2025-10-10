@@ -34,8 +34,9 @@ async fn main() -> color_eyre::Result<()> {
     lazytables::terminal::install_panic_hook();
 
     // Create and run the application
-    let mut app =
-        App::new(config).map_err(|e| color_eyre::eyre::eyre!("Failed to create app: {}", e))?;
+    let mut app = App::new(config)
+        .await
+        .map_err(|e| color_eyre::eyre::eyre!("Failed to create app: {}", e))?;
     let result = app
         .run(terminal)
         .await

@@ -32,8 +32,9 @@ pub struct DatabaseState {
 
 impl DatabaseState {
     /// Create a new database state
-    pub fn new() -> Self {
-        let connections = ConnectionStorage::load().unwrap_or_default();
+    pub async fn new() -> Self {
+        // Load connections asynchronously
+        let connections = ConnectionStorage::load().await.unwrap_or_default();
 
         Self {
             connections,
@@ -621,6 +622,14 @@ impl DatabaseState {
 
 impl Default for DatabaseState {
     fn default() -> Self {
-        Self::new()
+        Self {
+            connections: ConnectionStorage::default(),
+            tables: Vec::new(),
+            database_objects: None,
+            schemas: Vec::new(),
+            selected_schema: None,
+            table_load_error: None,
+            current_table_metadata: None,
+        }
     }
 }

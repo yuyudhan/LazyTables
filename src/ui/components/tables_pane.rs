@@ -301,8 +301,8 @@ mod tests {
         assert_eq!(items.len(), 1);
     }
 
-    #[test]
-    fn test_get_adaptive_title_with_objects() {
+    #[tokio::test]
+    async fn test_get_adaptive_title_with_objects() {
         let objects = DatabaseObjectList {
             tables: vec![DatabaseObject {
                 name: "users".to_string(),
@@ -319,16 +319,16 @@ mod tests {
             error: None,
         };
 
-        let db_state = crate::state::DatabaseState::new();
+        let db_state = crate::state::DatabaseState::new().await;
         let ui_state = crate::state::ui::UIState::new();
         let title = get_adaptive_title(&Some(objects), &db_state, &ui_state);
 
         assert!(title.contains("1 tables"));
     }
 
-    #[test]
-    fn test_get_adaptive_title_empty() {
-        let db_state = crate::state::DatabaseState::new();
+    #[tokio::test]
+    async fn test_get_adaptive_title_empty() {
+        let db_state = crate::state::DatabaseState::new().await;
         let ui_state = crate::state::ui::UIState::new();
         let title = get_adaptive_title(&None, &db_state, &ui_state);
 

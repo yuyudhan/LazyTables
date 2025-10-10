@@ -63,8 +63,8 @@ pub struct App {
 
 impl App {
     /// Create a new application instance
-    pub fn new(config: Config) -> Result<Self> {
-        let state = AppState::new();
+    pub async fn new(config: Config) -> Result<Self> {
+        let state = AppState::new().await;
         let event_handler = EventHandler::new(Duration::from_millis(250));
         let ui = UI::new(&config)?;
         let command_registry = CommandRegistry::new();
@@ -466,7 +466,7 @@ impl App {
                             let index = *index;
                             if let Some(connection) = self.state.db.connections.connections.get(index) {
                                 let conn_id = connection.id.clone();
-                                if let Err(e) = self.state.db.connections.remove_connection(&conn_id) {
+                                if let Err(e) = self.state.db.connections.remove_connection(&conn_id).await {
                                     self.state.toast_manager.error(format!("Failed to delete connection: {e}"));
                                 } else {
                                     self.state.toast_manager.success("Connection deleted successfully");
@@ -770,8 +770,8 @@ impl App {
 
         // Normal mode
         match key.code {
-            // Enter - Open table for viewing
-            KeyCode::Enter => {
+            // Enter or Space - Open table for viewing
+            KeyCode::Enter | KeyCode::Char(' ') => {
                 self.state.open_table_for_viewing().await;
             }
             // 'r' - Refresh tables list
@@ -800,10 +800,17 @@ impl App {
             KeyCode::Char('G') => {
                 self.state.ui.table_go_to_last();
             }
-            // Space/Tab - Toggle group expansion
-            KeyCode::Char(' ') | KeyCode::Tab if key.modifiers == KeyModifiers::NONE => {
-                // Toggle expansion of current group - implementation depends on what's selected
-                // For now, we'll skip this and implement later if needed
+            // Ctrl+d - Page down (half page)
+            KeyCode::Char('d') if key.modifiers == KeyModifiers::CONTROL => {
+                for _ in 0..10 {
+                    self.state.ui.table_search_selection_down();
+                }
+            }
+            // Ctrl+u - Page up (half page)
+            KeyCode::Char('u') if key.modifiers == KeyModifiers::CONTROL => {
+                for _ in 0..10 {
+                    self.state.ui.table_search_selection_up();
+                }
             }
             _ => {}
         }
@@ -2255,7 +2262,7 @@ impl App {
                                     Some(OverlayView::ConnectionForm(ConnectionFormMode::Add)) => {
                                         // Add new connection
                                         if let Err(e) =
-                                            self.state.db.connections.add_connection(config)
+                                            self.state.db.connections.add_connection(config).await
                                         {
                                             connection_mode.set_error(format!(
                                                 "Failed to save connection: {}",
@@ -2279,7 +2286,7 @@ impl App {
                                         {
                                             config.id = existing.id.clone();
                                             if let Err(e) =
-                                                self.state.db.connections.update_connection(config)
+                                                self.state.db.connections.update_connection(config).await
                                             {
                                                 connection_mode.set_error(format!(
                                                     "Failed to update connection: {}",
@@ -2325,7 +2332,7 @@ impl App {
                 match connection_mode.to_connection_config() {
                     Ok(mut config) => match self.state.ui.current_view.overlay() {
                         Some(OverlayView::ConnectionForm(ConnectionFormMode::Add)) => {
-                            if let Err(e) = self.state.db.connections.add_connection(config) {
+                            if let Err(e) = self.state.db.connections.add_connection(config).await {
                                 connection_mode
                                     .set_error(format!("Failed to save connection: {}", e));
                             } else {
@@ -2344,7 +2351,7 @@ impl App {
                                 .get(self.state.ui.selected_connection)
                             {
                                 config.id = existing.id.clone();
-                                if let Err(e) = self.state.db.connections.update_connection(config)
+                                if let Err(e) = self.state.db.connections.update_connection(config).await
                                 {
                                     connection_mode
                                         .set_error(format!("Failed to update connection: {}", e));
