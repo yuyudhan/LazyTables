@@ -10,22 +10,30 @@ LazyTables is a terminal-based SQL database viewer and editor designed for devel
 
 ## Technical Stack
 
-- **Language**: Rust (for performance, memory safety, and strong CLI tooling)
-- **TUI Framework**: Ratatui (most mature and feature-rich TUI library)
-- **Database Drivers**: Native Rust crates (e.g., sqlx for async connections)
+- **Language**: Rust 1.70+ (for performance, memory safety, and strong CLI tooling)
+- **TUI Framework**: Ratatui 0.29 + Crossterm 0.28 (terminal rendering and event handling)
+- **Async Runtime**: Tokio 1.41 (async database operations and event handling)
+- **Database**: SQLx 0.8 (async database driver supporting Postgres, MySQL, SQLite)
+- **Security**: AES-GCM 0.10 + Argon2 0.5 (credential encryption and key derivation)
+- **Logging**: Tracing 0.1 + Tracing-subscriber 0.3 (structured logging)
+- **Error Handling**: color-eyre 0.6, thiserror 2.0, anyhow 1.0
+- **CLI Parsing**: Clap 4.5 (command-line argument parsing)
+- **Serialization**: Serde 1.0 + serde_json 1.0 + TOML 0.8 (config and data)
 - **License**: WTFPL (What The Fuck Public License)
 - **Supported Platforms**: macOS, Linux (No Windows support)
 
 ## Architecture Overview
 
-LazyTables uses a fixed six-pane layout optimized for database navigation and SQL querying:
+LazyTables uses a fixed six-pane layout optimized for database navigation and SQL querying. Each pane is numbered for direct keyboard access:
 
-1. **Connections Pane** (Top Left): Manage database connections
-2. **Tables/Views Pane** (Middle Left): Navigate database objects  
-3. **Table Details Pane** (Bottom Left): Display metadata about selected table
-4. **Query Results Area** (Top Right): Display tabular query results
-5. **SQL Query Editor** (Bottom Left): Write, edit, and execute SQL queries
-6. **SQL Files Browser** (Bottom Right Column): Thin column to browse and load saved SQL files
+1. **[1] Connections Pane** (Top Left): Manage database connections
+2. **[2] Tables/Views Pane** (Middle Left): Navigate database objects
+3. **[3] Table Details Pane** (Bottom Left): Display metadata about selected table
+4. **[4] Query Results Area** (Top Right): Display tabular query results
+5. **[5] SQL Query Editor** (Bottom Left): Write, edit, and execute SQL queries
+6. **[6] SQL Files Browser** (Bottom Right Column): Thin column to browse and load saved SQL files
+
+**Navigation**: Press 1-6 to jump directly to any pane, or use Tab/Shift+Tab to cycle through panes.
 
 The application follows vim-style navigation with multiple modes:
 - **Normal Mode**: Navigation and commands (default)
@@ -38,27 +46,35 @@ The application follows vim-style navigation with multiple modes:
 
 ```bash
 # Development
-make dev              # Run with cargo watch for auto-reload
+make dev              # Run with cargo watch for auto-reload (requires cargo-watch)
 make run              # Run debug build
+make run-debug        # Run with debug logging enabled
 make build            # Build release binary
 cargo run             # Run directly with cargo
 
 # Testing & Quality
 make test             # Run all tests
-make lint             # Run clippy linter
+cargo test            # Run all tests (same as make test)
+cargo test test_name  # Run specific test by name
+cargo test --package lazytables --lib database::postgres::tests  # Run tests in specific module
+make lint             # Run clippy linter with warnings as errors
 make format           # Auto-format code with rustfmt
-make check            # Run format check and clippy
+make format-check     # Check formatting without modifying files
+make check            # Run format check and clippy (CI-friendly)
 
 # Installation
 make install          # Install LazyTables via cargo
 make uninstall        # Remove LazyTables from system
-make install-deps     # Install development dependencies
+make install-deps     # Install development dependencies (cargo-watch, cargo-audit)
 
 # Cleanup
-make clean            # Clean build artifacts
+make clean            # Clean build artifacts and target/ directory
 ```
 
-**Note**: The application requires a terminal environment to run. It will not work when piped or run in non-interactive mode.
+**Important notes:**
+- The application requires a terminal environment to run. It will not work when piped or run in non-interactive mode.
+- Use `make dev` for development with auto-reload (requires `cargo install cargo-watch`)
+- Tests may require database connections; some can be run with environment variables for connection strings
 
 ## Database Support Roadmap
 
@@ -104,7 +120,8 @@ make clean            # Clean build artifacts
 - ✅ Secure credential storage (encrypted)
 
 ### Navigation & Key Bindings
-- ✅ Six-pane directional navigation with Ctrl+h/j/k/l (true spatial movement) and Tab/Shift+Tab
+- ✅ Six-pane numbered navigation with number keys 1-6 for direct pane access
+- ✅ Tab/Shift+Tab for cycling through panes
 - ✅ SQL file browser navigation (j/k to navigate, Enter to load)
 - ✅ Query editor key bindings (Ctrl+S/O/N for save/refresh/new)
 - ✅ Mode switching (Normal/Insert/Visual/Command/Query modes)
@@ -134,7 +151,8 @@ make clean            # Clean build artifacts
 - Vim motions throughout (`h/j/k/l`, `gg/G`, `0/$`, etc.)
 - Leader key commands with `Space` as leader
 - Context-sensitive help system
-- Pane navigation with `Ctrl+h/j/k/l`
+- Pane navigation with number keys `1-6` for direct access
+- Tab/Shift+Tab for cycling through panes
 
 ### Input Mode System
 - **Vim-like insert mode requirement**: All text input fields require pressing 'i' to enter insert mode
@@ -171,46 +189,114 @@ make clean            # Clean build artifacts
 └── backups/          # Backup files
 ```
 
-## Current Repository Structure
+## Architecture Patterns
 
-```
-lazytables/
-├── src/
-│   ├── app/          # Application state management
-│   ├── cli/          # Command line interface
-│   ├── commands/     # Command handlers
-│   ├── config/       # Configuration management
-│   ├── core/         # Core functionality and error handling
-│   ├── database/     # Database drivers and connection management
-│   ├── event/        # Event handling system
-│   ├── security/     # Credential storage and encryption
-│   ├── state/        # Application state structures
-│   ├── themes/       # Theme definitions
-│   └── ui/           # TUI components
-│       ├── components/   # Individual UI components
-│       ├── layout/      # Layout management
-│       ├── theme/       # Theme loading and application
-│       └── widgets/     # Custom widgets
-├── target/           # Build artifacts (ignored)
-└── Cargo.toml        # Project configuration
-```
+### Main Application Flow
+The application follows an event-driven architecture:
+1. **main.rs**: Entry point that initializes logging, config, terminal, and creates the App instance
+2. **App::run()** (src/app/mod.rs): Main event loop that draws UI and handles events
+3. Event flow: `EventHandler` → `App::handle_event()` → Command execution → State update → UI redraw
 
-## Development Notes
+### State Management
+State is split into two main structures (src/state/):
+- **DatabaseState** (database.rs): Connection info, tables, metadata, query results
+- **UIState** (ui.rs): Focused pane, selection indices, scroll offsets, modal states
 
-- Follow Rust best practices with proper error handling
-- Use async/await patterns for database operations
-- Implement comprehensive logging for debugging
-- Design for horizontal scaling and plugin extensibility
-- Maintain vim-style consistency throughout the interface
-- Prioritize performance and memory efficiency
-- Use proper security practices for credential management
+Both are aggregated in **AppState** (src/app/state.rs) along with UI component states like:
+- `query_editor: QueryEditor` - SQL editor component state
+- `table_viewer_state: TableViewerState` - Table viewer state with tabs
+- `connection_modal_state: ConnectionModalState` - Connection creation/editing
+- `toast_manager: ToastManager` - Notification system
+
+### Command Pattern
+Commands are implemented using the Command pattern (src/commands/):
+- **CommandId** enum defines all available commands
+- **CommandContext** provides access to state and config
+- **CommandResult** indicates success, error, or requires confirmation
+- Commands are organized in modules: basic, connection, editing, navigation, query
+
+### Database Abstraction
+Database drivers follow the adapter pattern (src/database/):
+- **Connection** trait defines the interface all database adapters must implement
+- **AdapterFactory** creates the appropriate adapter based on DatabaseType
+- Adapters: PostgreSQLAdapter, MySQLAdapter, SQLiteAdapter
+- **ConnectionManager** handles connection pooling and lifecycle
+
+Key types:
+- **TableMetadata**: Comprehensive table information (columns, indexes, FKs, sizes)
+- **DatabaseObject**: Represents tables, views, materialized views with schema info
+- **QueryHistoryManager**: Tracks query execution history per connection
+
+### UI Component Architecture
+The UI is rendered through **UI::draw()** (src/ui/mod.rs) which delegates to specialized components:
+
+Core panes:
+- **Connections Pane**: Shows connection list with status indicators (src/ui/mod.rs:295)
+- **Tables Pane**: Database-adaptive table/view browser (src/ui/components/tables_pane.rs)
+- **Details Pane**: Comprehensive table metadata display (src/ui/mod.rs:446)
+- **Query Results**: Table viewer with tabs (src/ui/components/table_viewer.rs)
+- **SQL Files**: File browser for saved queries (src/ui/mod.rs:939)
+- **Query Editor**: Syntax-highlighted SQL editor (src/ui/components/query_editor.rs)
+
+Modals and overlays:
+- **Connection Modal**: Two-step connection creation (src/ui/components/connection_modal.rs)
+- **Table Creator**: Interactive table creation form (src/ui/components/table_creator.rs)
+- **Help System**: Context-aware help overlay (src/ui/help.rs)
+- **Debug View**: Live log viewer (src/ui/components/debug_view.rs)
+
+### Key Architectural Decisions
+
+1. **Async Database Operations**: All database operations use `sqlx` with `tokio` runtime for non-blocking I/O
+2. **Theme System**: Colors and styles loaded from TOML files (src/themes/, src/ui/theme/)
+3. **Secure Credentials**: Passwords encrypted using AES-GCM with Argon2 key derivation (src/security/)
+4. **Modal System**: Modals are overlays rendered after main UI with dimmed background
+5. **Event-Driven Updates**: State changes trigger UI redraws, no polling required
+
+### Common Development Patterns
+
+**Adding a new database adapter:**
+1. Create new file in `src/database/` (e.g., `oracle.rs`)
+2. Implement the `Connection` trait with all required methods
+3. Add variant to `DatabaseType` enum in `src/database/connection.rs`
+4. Update `AdapterFactory::create_adapter()` in `src/database/factory.rs`
+
+**Adding a new UI component:**
+1. Create component module in `src/ui/components/`
+2. Define component state structure
+3. Implement `render()` function taking `Frame`, state, area, and theme
+4. Add component state to `AppState` if stateful
+5. Call render function from `UI::draw()` method
+
+**Adding a new command:**
+1. Add variant to `CommandId` enum in `src/commands/mod.rs`
+2. Implement command logic in appropriate module (basic, connection, etc.)
+3. Add key binding in `App::handle_key_event()` in `src/app/mod.rs`
+4. Update help system text in `src/ui/help.rs` if user-facing
 
 ## Testing Strategy
 
-- Unit tests for all core modules
-- Integration tests for database adapters
-- TUI testing for user interface components
-- Performance benchmarks for large datasets
-- Security testing for credential handling
-- never corrupt the view with debug outputs.
-- Don't create unnecessary extra test file clutter here and there.
+Run tests with: `make test` or `cargo test --all-features`
+
+Test organization:
+- Unit tests inline with module code using `#[cfg(test)]`
+- Integration tests for database adapters in module tests
+- No separate test directories to avoid clutter
+- Use `tempfile` crate for filesystem tests
+- Use `pretty_assertions` for better test failure output
+
+**Important testing guidelines:**
+- Never corrupt the terminal view with debug outputs during tests
+- Don't create unnecessary extra test file clutter
+- Mock database connections when possible to avoid requiring live databases
+- Use `#[tokio::test]` for async tests
+
+## Development Notes
+
+- All database operations are async - use `.await` and `#[tokio::main]` or `#[tokio::test]`
+- Logging uses `tracing` crate - use `tracing::info!()`, `tracing::error!()`, etc.
+- Error handling uses `thiserror` for custom errors, `anyhow` for application errors
+- Terminal state must be restored on panic - handled by `terminal::install_panic_hook()`
+- Never use `println!` or `dbg!` - they corrupt the TUI; use `tracing::debug!()` instead
+- Configuration files use TOML format (see src/config/mod.rs)
+- SQL files are stored per-connection in `~/.lazytables/sql_files/<connection_name>/`
+- Always keep the help area up to date whenever we change the any of the keybindings.
