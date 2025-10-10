@@ -122,9 +122,9 @@ make clean            # Clean build artifacts and target/ directory
 ### Navigation & Key Bindings
 - ✅ Six-pane numbered navigation with number keys 1-6 for direct pane access
 - ✅ Tab/Shift+Tab for cycling through panes
+- ✅ Direct key bindings per pane (a=add, e=edit, d=delete, etc.)
 - ✅ SQL file browser navigation (j/k to navigate, Enter to load)
-- ✅ Query editor key bindings (Ctrl+S/O/N for save/refresh/new)
-- ✅ Mode switching (Normal/Insert/Visual/Command/Query modes)
+- ✅ Query editor with vim-style insert mode (ONLY pane with insert mode)
 - ✅ Help system with '?' key
 - ✅ Context-aware help messages and state indicators in all panes
 
@@ -154,16 +154,85 @@ make clean            # Clean build artifacts and target/ directory
 - Pane navigation with number keys `1-6` for direct access
 - Tab/Shift+Tab for cycling through panes
 
-### Input Mode System
-- **Vim-like insert mode requirement**: All text input fields require pressing 'i' to enter insert mode
-- Press ESC to exit insert mode and return to normal navigation
-- Arrow keys are used for dropdown/list navigation (e.g., selecting database type, column type)
-- Visual feedback shows when in insert mode (e.g., "[INSERT]" indicator, cursor display)
-- This applies to all forms:
-  - Connection creation/editing forms
-  - Table creation forms
-  - Query editing windows
-  - Any future text input fields
+### Input Mode System (Simplified Architecture)
+- **Direct key bindings in all panes** - no insert mode needed except Query Editor
+- **SQL Query Editor** - ONLY pane with vim-style insert mode:
+  - Press 'i', 'a', 'o', or 'O' to enter insert mode
+  - Press ESC to exit insert mode and return to normal mode
+  - All vim motions available in normal mode (h/j/k/l, w/b/e, 0/$, gg/G, etc.)
+  - Visual feedback shows current mode ([INSERT] or [NORMAL])
+- **Forms and Modals** (Connection, Table Creator, etc.):
+  - Direct typing in all text fields - NO insert mode required
+  - Tab/Shift+Tab to navigate between fields
+  - ESC to cancel and close modal
+  - Arrow keys for dropdown navigation
+- **All Other Panes**: Direct action keys (a=add, e=edit, d=delete, /=search, etc.)
+
+### Per-Pane Key Bindings Reference
+
+#### [1] Connections Pane (Direct Bindings)
+- **a** → Add new connection
+- **e** → Edit selected connection
+- **d** → Delete connection (with confirmation)
+- **Enter** → Connect to selected database
+- **r** → Refresh connection list
+- **/** → Enter search mode
+- **j/k** or **↑/↓** → Navigate connections
+
+#### [2] Tables Pane (Direct Bindings)
+- **Enter** → Open table for viewing
+- **r** → Refresh tables list
+- **/** → Enter search mode
+- **j/k** or **↑/↓** → Navigate tables
+- **g** → First press of gg (jump to top)
+- **G** → Jump to last table
+
+#### [3] Details Pane (Read-Only, Navigation Only)
+- **j/k** or **↑/↓** → Scroll up/down
+- **Ctrl+d/u** → Page down/up
+- **gg** → Jump to top
+- **G** → Jump to bottom
+
+#### [4] Query Results / Table Viewer (Has Edit Mode)
+- **i** or **Enter** → Start editing current cell
+- **d** → Delete current row (with confirmation)
+- **/** → Enter search mode
+- **h/j/k/l** or **arrows** → Navigate cells
+- **Ctrl+r** → Refresh table data
+- **ESC** → Exit edit/search mode
+
+#### [5] SQL Query Editor (VIM-STYLE - Only Pane with Insert Mode)
+**Normal Mode** (default):
+- **i** → Insert mode at cursor
+- **a** → Insert mode after cursor
+- **o** → New line below + insert mode
+- **O** → New line above + insert mode
+- **h/j/k/l** → Navigate cursor
+- **w/b/e** → Word motions
+- **0/$** → Line start/end
+- **gg/G** → File start/end
+- **Ctrl+Enter** → Execute query at cursor
+
+**Insert Mode**:
+- **ESC** → Return to normal mode
+- **Type normally** → Edit text
+- **Ctrl+Enter** → Execute query
+
+#### [6] SQL Files Pane (Direct Bindings)
+- **Enter** → Load selected SQL file
+- **n** → Create new file
+- **r** → Rename file
+- **d** → Delete file (with confirmation)
+- **/** → Enter search mode
+- **j/k** or **↑/↓** → Navigate files
+
+### Global Key Bindings (Work Everywhere)
+- **1-6** → Jump directly to pane by number
+- **Tab** → Cycle to next pane
+- **Shift+Tab** → Cycle to previous pane
+- **?** → Toggle help overlay
+- **q** → Quit application (with confirmation)
+- **Ctrl+B** → Toggle debug view
 
 ### Performance Requirements
 - Startup time: < 100ms
@@ -301,3 +370,9 @@ Test organization:
 - SQL files are stored per-connection in `~/.lazytables/sql_files/<connection_name>/`
 - Always keep the help area up to date whenever we change the any of the keybindings.
 - Always use run cargo run, cargo check or cargo build commands to see if there are any errors and correct them, code should be clean always.
+- **IMPORTANT ARCHITECTURE NOTE**: The app uses a simplified mode system:
+  - NO global Mode enum - removed for simplicity
+  - Each pane has direct key bindings (a/e/d for actions, j/k for navigation, / for search)
+  - ONLY the SQL Query Editor has vim-style insert mode (managed by QueryEditor component)
+  - Forms/modals accept direct typing - NO insert mode required
+  - Key events are routed per-pane via dedicated handler methods
