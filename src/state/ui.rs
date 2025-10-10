@@ -735,9 +735,10 @@ impl UIState {
             // Add tables section
             if !objects.tables.is_empty() {
                 let is_expanded = self.is_object_group_expanded("Tables");
+                let arrow = if is_expanded { "▼" } else { "▶" };
                 self.selectable_table_items
                     .push(SelectableTableItem::new_header(
-                        "▼ Tables".to_string(),
+                        format!("{} Tables", arrow),
                         display_index,
                     ));
                 display_index += 1;
@@ -769,9 +770,10 @@ impl UIState {
                 }
 
                 let is_expanded = self.is_object_group_expanded("Views");
+                let arrow = if is_expanded { "▼" } else { "▶" };
                 self.selectable_table_items
                     .push(SelectableTableItem::new_header(
-                        "▼ Views".to_string(),
+                        format!("{} Views", arrow),
                         display_index,
                     ));
                 display_index += 1;
@@ -803,9 +805,10 @@ impl UIState {
                 }
 
                 let is_expanded = self.is_object_group_expanded("Materialized Views");
+                let arrow = if is_expanded { "▼" } else { "▶" };
                 self.selectable_table_items
                     .push(SelectableTableItem::new_header(
-                        "▼ Materialized Views".to_string(),
+                        format!("{} Materialized Views", arrow),
                         display_index,
                     ));
                 display_index += 1;
@@ -837,9 +840,10 @@ impl UIState {
                 }
 
                 let is_expanded = self.is_object_group_expanded("Foreign Tables");
+                let arrow = if is_expanded { "▼" } else { "▶" };
                 self.selectable_table_items
                     .push(SelectableTableItem::new_header(
-                        "▼ Foreign Tables".to_string(),
+                        format!("{} Foreign Tables", arrow),
                         display_index,
                     ));
                 display_index += 1;
@@ -969,7 +973,7 @@ impl UIState {
         }
     }
 
-    /// Get the currently selected table item
+    /// Get the currently selected table item (only if selectable)
     pub fn get_selected_table_item(&self) -> Option<&SelectableTableItem> {
         let items = self.get_display_table_items();
         if self.selected_table_item_index < items.len() {
@@ -979,6 +983,16 @@ impl UIState {
             }
         }
         None
+    }
+
+    /// Get the currently selected item (including headers)
+    pub fn get_selected_item_raw(&self) -> Option<&SelectableTableItem> {
+        let items = self.get_display_table_items();
+        if self.selected_table_item_index < items.len() {
+            Some(&items[self.selected_table_item_index])
+        } else {
+            None
+        }
     }
 
     /// Get the currently selected table name for database operations

@@ -269,7 +269,9 @@ impl HelpSystem {
         // Basic Navigation
         Self::add_command(lines, "j/k", "Navigate up/down tables");
         Self::add_command(lines, "gg/G", "Jump to first/last table");
+        Self::add_command(lines, "C-d/C-u", "Page down/up (half page)");
         Self::add_command(lines, "Enter/Space", "Open table for viewing");
+        Self::add_command(lines, "Tab", "Toggle group expansion (on headers)");
         lines.push(Line::from(""));
 
         // Table Management
@@ -279,8 +281,7 @@ impl HelpSystem {
                 .fg(Color::Rgb(120, 180, 255))
                 .add_modifier(Modifier::BOLD | Modifier::UNDERLINED),
         )]));
-        Self::add_command(lines, "n", "Create new table (when connected)");
-        Self::add_command(lines, "e", "Edit table structure");
+        Self::add_command(lines, "r", "Refresh tables list");
         lines.push(Line::from(""));
 
         // Search & Filter
