@@ -1058,7 +1058,7 @@ impl QueryEditor {
 
         // Create title with database type and mode info
         let title = format!(
-            "SQL Query Editor{}{}{}",
+            " [5] SQL Query Editor{}{}{}",
             if let Some(ref db_type) = self.database_type {
                 format!(
                     " ({})",

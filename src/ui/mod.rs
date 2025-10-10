@@ -408,11 +408,11 @@ impl UI {
         // Create title with search indicator
         let title = if state.ui.connections_search_active {
             format!(
-                " Connections [SEARCH: {}] ",
+                " [1] Connections [SEARCH: {}] ",
                 state.ui.connections_search_query
             )
         } else {
-            " Connections ".to_string()
+            " [1] Connections ".to_string()
         };
 
         let connections = List::new(items)
@@ -520,13 +520,13 @@ impl UI {
         // Create title with scroll indicator
         let title = if content_height > available_height {
             let scroll_info = format!(
-                "Table Details [{}/{}]",
+                " [3] Table Details [{}/{}] ",
                 state.ui.details_viewport_offset + 1,
                 content_height.saturating_sub(available_height) + 1
             );
             scroll_info
         } else {
-            "Table Details".to_string()
+            " [3] Table Details ".to_string()
         };
 
         let details = Paragraph::new(visible_lines)
@@ -859,7 +859,7 @@ impl UI {
             let placeholder = Paragraph::new(message)
                 .block(
                     Block::default()
-                        .title(" Query Results ")
+                        .title(" [4] Query Results ")
                         .borders(Borders::ALL)
                         .border_style(border_style),
                 )
@@ -892,7 +892,7 @@ impl UI {
             let placeholder = Paragraph::new(message)
                 .block(
                     Block::default()
-                        .title(" Query Results ")
+                        .title(" [4] Query Results ")
                         .borders(Borders::ALL)
                         .border_style(border_style),
                 )
@@ -925,7 +925,7 @@ impl UI {
                 .header(header)
                 .block(
                     Block::default()
-                        .title(" Query Results ")
+                        .title(" [4] Query Results ")
                         .borders(Borders::ALL)
                         .border_style(border_style),
                 )
@@ -1085,15 +1085,18 @@ impl UI {
 
         // Create title with search/mode/disabled indicator
         let title = if !sql_panes_enabled {
-            " SQL Files [DISABLED] ".to_string()
+            " [6] SQL Files [DISABLED] ".to_string()
         } else if state.ui.sql_files_search_active {
-            format!(" SQL Files [SEARCH: {}] ", state.ui.sql_files_search_query)
+            format!(
+                " [6] SQL Files [SEARCH: {}] ",
+                state.ui.sql_files_search_query
+            )
         } else if state.ui.sql_files_rename_mode {
-            " SQL Files [RENAME] ".to_string()
+            " [6] SQL Files [RENAME] ".to_string()
         } else if state.ui.sql_files_create_mode {
-            " SQL Files [CREATE] ".to_string()
+            " [6] SQL Files [CREATE] ".to_string()
         } else {
-            format!(" SQL Files ({}) ", display_files.len())
+            format!(" [6] SQL Files ({}) ", display_files.len())
         };
 
         let sql_files = List::new(items)
@@ -1161,7 +1164,7 @@ impl UI {
 
         if !query_editor_enabled {
             let disabled_block = Block::default()
-                .title(" SQL Query Editor [DISABLED] ")
+                .title(" [5] SQL Query Editor [DISABLED] ")
                 .borders(Borders::ALL)
                 .border_style(Style::default().fg(Color::DarkGray));
 

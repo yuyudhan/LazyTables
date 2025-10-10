@@ -196,17 +196,16 @@ fn get_adaptive_title(
         }
 
         let base_title = if !title_parts.is_empty() {
-            format!(" Tables/Views ({}) ", title_parts.join(" | "))
+            format!(" [2] Tables/Views ({}) ", title_parts.join(" | "))
         } else {
-            " Tables/Views ".to_string()
+            " [2] Tables/Views ".to_string()
         };
 
         // Add search indicator if search is active
         if ui_state.tables_search_active {
             let filter_count = ui_state.filtered_table_items.len();
             format!(
-                "{} [Search: {} result{}]",
-                base_title.trim(),
+                " [2] Tables/Views [Search: {} result{}]",
                 filter_count,
                 if filter_count == 1 { "" } else { "s" }
             )
@@ -214,7 +213,7 @@ fn get_adaptive_title(
             base_title
         }
     } else {
-        " Tables/Views ".to_string()
+        " [2] Tables/Views ".to_string()
     }
 }
 
