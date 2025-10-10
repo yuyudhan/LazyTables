@@ -939,6 +939,14 @@ impl App {
             KeyCode::Char('l') | KeyCode::Right => {
                 self.state.move_right();
             }
+            // 'H' - Switch to previous tab
+            KeyCode::Char('H') => {
+                self.state.table_viewer_state.prev_tab();
+            }
+            // 'L' - Switch to next tab
+            KeyCode::Char('L') => {
+                self.state.table_viewer_state.next_tab();
+            }
             _ => {}
         }
         Ok(())

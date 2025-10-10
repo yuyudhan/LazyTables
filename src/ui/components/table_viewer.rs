@@ -1284,7 +1284,7 @@ fn render_help(f: &mut Frame, area: Rect, theme: &Theme) {
                     .fg(theme.get_color("primary_highlight"))
                     .add_modifier(Modifier::BOLD),
             ),
-            Span::raw("S - Previous tab | D - Next tab | x - Close current tab"),
+            Span::raw("H - Previous tab | L - Next tab | x - Close current tab"),
         ]),
         Line::from(vec![
             Span::styled(
