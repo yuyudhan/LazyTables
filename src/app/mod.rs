@@ -1172,6 +1172,11 @@ impl App {
 
     /// Handle Query Editor pane keys - ONLY PANE WITH VIM INSERT MODE
     async fn handle_query_editor_keys(&mut self, key: KeyEvent) -> Result<()> {
+        // Check if in command mode
+        if self.state.query_editor.is_in_command_mode() {
+            return self.handle_query_editor_command_mode(key).await;
+        }
+
         // Check if query editor is in insert mode
         if self.state.query_editor.is_insert_mode() {
             return self.handle_query_editor_insert_mode(key).await;
@@ -1245,6 +1250,10 @@ impl App {
             KeyCode::Char('G') => {
                 self.state.query_editor.move_to_file_end();
             }
+            // ':' - Enter command mode
+            KeyCode::Char(':') => {
+                self.state.query_editor.enter_command_mode();
+            }
             // Ctrl+d and Ctrl+u for page scrolling - TODO: implement scroll methods
             // KeyCode::Char('d') if key.modifiers == KeyModifiers::CONTROL => {
             //     self.state.query_editor.scroll_half_page_down();
@@ -1302,6 +1311,76 @@ impl App {
         }
         Ok(())
     }
+
+    /// Handle query editor command mode (vim : commands)
+    async fn handle_query_editor_command_mode(&mut self, key: KeyEvent) -> Result<()> {
+        match key.code {
+            // Esc - Exit command mode
+            KeyCode::Esc => {
+                self.state.query_editor.exit_command_mode();
+            }
+            // Backspace - Remove character from command buffer
+            KeyCode::Backspace => {
+                self.state.query_editor.backspace_command_buffer();
+            }
+            // Enter - Execute command
+            KeyCode::Enter => {
+                let command = self.state.query_editor.get_command_buffer().to_string();
+                self.state.query_editor.exit_command_mode();
+
+                // Parse and execute command
+                match command.trim() {
+                    ":w" => {
+                        // Save file
+                        if let Err(e) = self.state.save_sql_file_with_connection().await {
+                            self.state.toast_manager.error(format!("Failed to save file: {}", e));
+                        } else {
+                            self.state.query_editor.mark_saved();
+                            self.state.toast_manager.success("File saved successfully");
+                        }
+                    }
+                    ":q" => {
+                        // Clear editor (with confirmation if modified)
+                        if self.state.query_editor.is_modified() {
+                            self.state.toast_manager.warning("No write since last change (use :q! to force)");
+                        } else {
+                            self.state.query_editor.reset();
+                            self.state.toast_manager.info("Editor cleared");
+                        }
+                    }
+                    ":q!" => {
+                        // Force clear editor
+                        self.state.query_editor.reset();
+                        self.state.toast_manager.info("Editor cleared");
+                    }
+                    ":wq" => {
+                        // Save and clear
+                        if let Err(e) = self.state.save_sql_file_with_connection().await {
+                            self.state.toast_manager.error(format!("Failed to save file: {}", e));
+                        } else {
+                            self.state.query_editor.mark_saved();
+                            self.state.query_editor.reset();
+                            self.state.toast_manager.success("File saved and editor cleared");
+                        }
+                    }
+                    cmd if cmd.starts_with(":w ") => {
+                        // Save with filename - future enhancement
+                        self.state.toast_manager.warning("Save with filename not yet implemented");
+                    }
+                    _ => {
+                        self.state.toast_manager.error(format!("Unknown command: {}", command));
+                    }
+                }
+            }
+            // Regular typing - add to command buffer
+            KeyCode::Char(c) => {
+                self.state.query_editor.add_to_command_buffer(c);
+            }
+            _ => {}
+        }
+        Ok(())
+    }
+
     async fn handle_connection_modal_key_event(&mut self, key: KeyEvent) -> Result<()> {
         use crate::ui::components::{ConnectionField, PasswordStorageType};
 

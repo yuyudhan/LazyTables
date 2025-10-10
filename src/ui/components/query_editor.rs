@@ -43,6 +43,10 @@ pub struct QueryEditor {
     is_modified: bool,
     /// Pending vim command (for commands like 'dd', 'dw', etc.)
     pending_command: Option<String>,
+    /// Whether in command mode (vim : commands)
+    is_command_mode: bool,
+    /// Command buffer for : commands
+    command_buffer: String,
 }
 
 impl Clone for QueryEditor {
@@ -65,6 +69,8 @@ impl Clone for QueryEditor {
             current_file: self.current_file.clone(),
             is_modified: self.is_modified,
             pending_command: None,
+            is_command_mode: false,
+            command_buffer: String::new(),
         }
     }
 }
@@ -95,6 +101,8 @@ impl QueryEditor {
             current_file: None,
             is_modified: false,
             pending_command: None,
+            is_command_mode: false,
+            command_buffer: String::new(),
         }
     }
 
@@ -117,6 +125,8 @@ impl QueryEditor {
         self.is_insert_mode = false;
         self.current_file = None;
         self.pending_command = None;
+        self.is_command_mode = false;
+        self.command_buffer.clear();
         self.hide_suggestions();
     }
 
@@ -982,6 +992,43 @@ impl QueryEditor {
         self.pending_command.as_ref()
     }
 
+    // Command mode methods (for : commands like :w, :q, etc.)
+
+    /// Enter command mode (vim : commands)
+    pub fn enter_command_mode(&mut self) {
+        self.is_command_mode = true;
+        self.command_buffer = ":".to_string();
+    }
+
+    /// Exit command mode
+    pub fn exit_command_mode(&mut self) {
+        self.is_command_mode = false;
+        self.command_buffer.clear();
+    }
+
+    /// Check if in command mode
+    pub fn is_in_command_mode(&self) -> bool {
+        self.is_command_mode
+    }
+
+    /// Add character to command buffer
+    pub fn add_to_command_buffer(&mut self, ch: char) {
+        self.command_buffer.push(ch);
+    }
+
+    /// Remove last character from command buffer
+    pub fn backspace_command_buffer(&mut self) {
+        if self.command_buffer.len() > 1 {
+            // Keep at least the ':' character
+            self.command_buffer.pop();
+        }
+    }
+
+    /// Get current command buffer
+    pub fn get_command_buffer(&self) -> &str {
+        &self.command_buffer
+    }
+
     fn apply_syntax_highlighting_with_line_numbers(&self, text: &str) -> Text<'static> {
         let syntax = self.get_syntax();
         let theme = &self.theme_set.themes["base16-ocean.dark"];
@@ -1076,7 +1123,9 @@ impl QueryEditor {
                 String::new()
             },
             if self.is_modified { " [+]" } else { "" },
-            if self.is_insert_mode {
+            if self.is_command_mode {
+                " [COMMAND]"
+            } else if self.is_insert_mode {
                 " [INSERT]"
             } else {
                 " [NORMAL]"
@@ -1159,6 +1208,34 @@ impl QueryEditor {
 
             if cursor_y < editor_inner.height && cursor_x < editor_inner.width {
                 f.set_cursor_position((editor_inner.x + cursor_x, editor_inner.y + cursor_y));
+            }
+        }
+
+        // Render command line at bottom if in command mode
+        if self.is_command_mode && self.is_focused {
+            let command_line_y = editor_inner.y + editor_inner.height.saturating_sub(1);
+            let command_line_area = Rect {
+                x: editor_inner.x,
+                y: command_line_y,
+                width: editor_inner.width,
+                height: 1,
+            };
+
+            let command_text = Line::from(vec![
+                Span::styled(
+                    &self.command_buffer,
+                    Style::default()
+                        .fg(Color::Yellow)
+                        .add_modifier(Modifier::BOLD),
+                ),
+            ]);
+
+            f.render_widget(Paragraph::new(command_text), command_line_area);
+
+            // Set cursor at end of command buffer
+            let cursor_x = editor_inner.x + self.command_buffer.len() as u16;
+            if cursor_x < editor_inner.x + editor_inner.width {
+                f.set_cursor_position((cursor_x, command_line_y));
             }
         }
 
