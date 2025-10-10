@@ -11,7 +11,8 @@ use crate::{
 };
 
 // Re-export for backward compatibility
-pub use crate::state::ui::{FocusedPane, HelpMode, HelpPaneFocus, QueryEditMode};
+pub use crate::state::ui::{FocusedPane, HelpMode, HelpPaneFocus};
+pub use crate::state::view::{AppView, ConnectionFormMode, OverlayView, TextInputMode};
 
 /// Query editor movement directions
 #[derive(Debug, Clone, Copy)]
@@ -321,13 +322,13 @@ impl AppState {
 
     /// Open the add connection modal
     pub fn open_add_connection_modal(&mut self) {
-        self.ui.show_add_connection_modal = true;
+        self.ui.show_overlay(OverlayView::ConnectionForm(ConnectionFormMode::Add));
         self.connection_modal_state = ConnectionModalState::new(); // Reset state
     }
 
     /// Close the add connection modal
     pub fn close_add_connection_modal(&mut self) {
-        self.ui.show_add_connection_modal = false;
+        self.ui.return_to_main();
         self.connection_modal_state.clear(); // Clear any input
     }
 
@@ -341,13 +342,15 @@ impl AppState {
         {
             self.connection_modal_state
                 .populate_from_connection(connection);
-            self.ui.show_edit_connection_modal = true;
+            self.ui.show_overlay(OverlayView::ConnectionForm(
+                ConnectionFormMode::Edit(Box::new(connection.clone())),
+            ));
         }
     }
 
     /// Close the edit connection modal
     pub fn close_edit_connection_modal(&mut self) {
-        self.ui.show_edit_connection_modal = false;
+        self.ui.return_to_main();
         self.connection_modal_state.clear(); // Clear any input
     }
 
@@ -355,26 +358,31 @@ impl AppState {
     pub fn save_connection_from_modal(&mut self) -> Result<(), String> {
         let mut connection = self.connection_modal_state.try_create_connection()?;
 
-        if self.ui.show_edit_connection_modal {
-            // Update existing connection - preserve ID
-            if let Some(existing) = self
-                .db
-                .connections
-                .connections
-                .get(self.ui.selected_connection)
+        if self.ui.current_view.is_connection_form() {
+            // Check if we're editing
+            if let Some(OverlayView::ConnectionForm(ConnectionFormMode::Edit(_existing_conn))) =
+                self.ui.current_view.overlay()
             {
-                connection.id = existing.id.clone();
-                if let Err(e) = self.db.connections.update_connection(connection) {
-                    return Err(format!("Failed to update connection: {e}"));
+                // Update existing connection - preserve ID
+                if let Some(existing) = self
+                    .db
+                    .connections
+                    .connections
+                    .get(self.ui.selected_connection)
+                {
+                    connection.id = existing.id.clone();
+                    if let Err(e) = self.db.connections.update_connection(connection) {
+                        return Err(format!("Failed to update connection: {e}"));
+                    }
                 }
+                self.close_edit_connection_modal();
+            } else {
+                // Add new connection
+                if let Err(e) = self.db.connections.add_connection(connection) {
+                    return Err(format!("Failed to add connection: {e}"));
+                }
+                self.close_add_connection_modal();
             }
-            self.close_edit_connection_modal();
-        } else {
-            // Add new connection
-            if let Err(e) = self.db.connections.add_connection(connection) {
-                return Err(format!("Failed to add connection: {e}"));
-            }
-            self.close_add_connection_modal();
         }
 
         self.clamp_connection_selection();
@@ -845,7 +853,7 @@ impl AppState {
         self.ui.query_cursor_line = 0;
         self.ui.query_cursor_column = 0;
         self.ui.query_viewport_offset = 0; // Reset viewport to top
-        self.ui.query_edit_mode = QueryEditMode::Normal;
+        self.ui.text_input_mode = TextInputMode::Normal;
 
         crate::log_info!("Set current_sql_file to: {:?}", self.ui.current_sql_file);
 
@@ -1566,7 +1574,7 @@ impl AppState {
     /// Open table creator view
     pub fn open_table_creator(&mut self) {
         crate::log_info!("Opening table creator view");
-        self.ui.show_table_creator = true;
+        self.ui.show_overlay(OverlayView::TableCreator);
         self.table_creator_state = TableCreatorState::new();
         crate::log_debug!("Table creator state initialized");
     }
@@ -1574,7 +1582,7 @@ impl AppState {
     /// Close table creator view
     pub fn close_table_creator(&mut self) {
         crate::log_info!("Closing table creator view");
-        self.ui.show_table_creator = false;
+        self.ui.return_to_main();
         self.table_creator_state.clear();
         crate::log_debug!("Table creator state cleared");
     }
@@ -1583,7 +1591,7 @@ impl AppState {
     pub async fn open_table_editor(&mut self) {
         if let Some(table_name) = self.ui.get_selected_table_name() {
             crate::log_info!("Opening table editor for table '{}'", table_name);
-            self.ui.show_table_editor = true;
+            self.ui.show_overlay(OverlayView::TableEditor);
             self.table_editor_state = TableEditorState::new(table_name.clone());
 
             // Load table schema from database
@@ -1609,7 +1617,7 @@ impl AppState {
     /// Close table editor view
     pub fn close_table_editor(&mut self) {
         crate::log_info!("Closing table editor view");
-        self.ui.show_table_editor = false;
+        self.ui.return_to_main();
         self.table_editor_state.clear();
         crate::log_debug!("Table editor state cleared");
     }
@@ -1988,7 +1996,7 @@ impl AppState {
         self.ui.query_cursor_line = 0;
         self.ui.query_cursor_column = 0;
         self.ui.query_viewport_offset = 0;
-        self.ui.query_edit_mode = QueryEditMode::Normal;
+        self.ui.text_input_mode = TextInputMode::Normal;
     }
 
     /// Update query editor database context when connection changes

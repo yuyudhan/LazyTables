@@ -155,7 +155,7 @@ impl Command for AddConnectionCommand {
 
         context.state.connection_modal_state = ConnectionModalState::new();
         context.state.connection_modal_state.current_step = ModalStep::DatabaseTypeSelection;
-        context.state.ui.show_add_connection_modal = true;
+        context.state.open_add_connection_modal();
 
         Ok(CommandResult::Action(CommandAction::OpenModal(
             ModalType::Connection,
@@ -192,7 +192,7 @@ impl Command for EditConnectionCommand {
         if !context.state.db.connections.connections.is_empty() {
             let selected = context.state.ui.selected_connection;
 
-            if let Some(connection) = context.state.db.connections.connections.get(selected) {
+            if let Some(connection) = context.state.db.connections.connections.get(selected).cloned() {
                 // Load existing connection data into modal
                 use crate::ui::components::connection_modal::{ConnectionModalState, ModalStep};
 
@@ -213,12 +213,13 @@ impl Command for EditConnectionCommand {
                 // Note: Password is not pre-populated for security reasons
                 modal_state.password = String::new();
 
+                let conn_name = connection.name.clone();
                 context.state.connection_modal_state = modal_state;
-                context.state.ui.show_edit_connection_modal = true;
+                context.state.open_edit_connection_modal();
 
                 Ok(CommandResult::SuccessWithMessage(format!(
                     "Editing connection: {}",
-                    connection.name
+                    conn_name
                 )))
             } else {
                 Ok(CommandResult::Error(
