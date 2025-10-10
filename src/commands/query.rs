@@ -125,11 +125,16 @@ impl Command for SaveQueryCommand {
             .join(".lazytables")
             .join("sql_files");
 
-        // Ensure directory exists
-        std::fs::create_dir_all(&sql_dir)?;
-
         let filepath = sql_dir.join(&filename);
-        std::fs::write(&filepath, query)?;
+
+        // Use async file I/O with block_on (Command trait doesn't support async)
+        // TODO: Move to background task with event notification for truly non-blocking operation
+        tokio::runtime::Handle::current().block_on(async {
+            // Ensure directory exists
+            crate::io::async_fs::create_dir_all(&sql_dir).await?;
+            // Write file
+            crate::io::async_fs::write(&filepath, query).await
+        })?;
 
         // Update state
         context.state.ui.current_sql_file = Some(filename.clone());

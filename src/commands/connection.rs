@@ -336,8 +336,8 @@ pub struct RefreshConnectionsCommand;
 
 impl Command for RefreshConnectionsCommand {
     fn execute(&self, context: &mut CommandContext) -> Result<CommandResult> {
-        // Reload connections from storage
-        match crate::database::connection::ConnectionStorage::load() {
+        // Reload connections from storage (using block_on temporarily - will be replaced with background task)
+        match tokio::runtime::Handle::current().block_on(crate::database::connection::ConnectionStorage::load()) {
             Ok(storage) => {
                 let old_count = context.state.db.connections.connections.len();
                 context.state.db.connections = storage;

@@ -147,11 +147,16 @@ impl Command for SaveCommand {
                         .join(".lazytables")
                         .join("sql_files");
 
-                    // Ensure directory exists
-                    std::fs::create_dir_all(&sql_dir)?;
-
                     let filepath = sql_dir.join(&filename);
-                    std::fs::write(&filepath, query)?;
+
+                    // Use async file I/O with block_on (Command trait doesn't support async)
+                    // TODO: Move to background task with event notification for truly non-blocking operation
+                    tokio::runtime::Handle::current().block_on(async {
+                        // Ensure directory exists
+                        crate::io::async_fs::create_dir_all(&sql_dir).await?;
+                        // Write file
+                        crate::io::async_fs::write(&filepath, query).await
+                    })?;
 
                     // Add success toast
                     context
@@ -251,20 +256,28 @@ impl Command for OpenCommand {
                         .join(".lazytables")
                         .join("sql_files");
 
-                    let files = std::fs::read_dir(&sql_dir)?
-                        .filter_map(|entry| entry.ok())
-                        .filter(|entry| {
-                            entry
-                                .path()
-                                .extension()
-                                .and_then(|ext| ext.to_str())
-                                .map(|ext| ext == "sql")
-                                .unwrap_or(false)
-                        })
-                        .collect::<Vec<_>>();
+                    // Use async file I/O with block_on (Command trait doesn't support async)
+                    // TODO: Move to background task with event notification for truly non-blocking operation
+                    let files = tokio::runtime::Handle::current().block_on(async {
+                        let entries = crate::io::async_fs::read_dir(&sql_dir).await?;
+                        let filtered: Vec<_> = entries
+                            .into_iter()
+                            .filter(|entry| {
+                                entry
+                                    .path()
+                                    .extension()
+                                    .and_then(|ext| ext.to_str())
+                                    .map(|ext| ext == "sql")
+                                    .unwrap_or(false)
+                            })
+                            .collect();
+                        Ok::<_, crate::core::error::LazyTablesError>(filtered)
+                    })?;
 
                     if selected < files.len() {
-                        let content = std::fs::read_to_string(files[selected].path())?;
+                        let content = tokio::runtime::Handle::current().block_on(async {
+                            crate::io::async_fs::read_to_string(files[selected].path()).await
+                        })?;
                         context.state.query_content = content;
                         context.state.ui.current_sql_file =
                             Some(files[selected].file_name().to_string_lossy().to_string());
