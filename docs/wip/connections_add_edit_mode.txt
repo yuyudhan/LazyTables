@@ -1,0 +1,36 @@
+====================****====================
+When the connection testing is happening, when the connection edit or add modal, I also want a key binding to abort the connection testing.
+
+====================****====================
+When the testing loading is shown I also want to show the timer in the form of n/N where small case n means the number of seconds that have passed and capital N is the total number of seconds for which it will wait.
+
+====================****====================
+DONE:
+So we have a mode called connection addition and connection editing mode. In that mode, look at the entire workflow. So first of all, I see that it is asking for a selection of the database and inside that also it is asking for the database selection. We want just when somebody presses A or E on the connections pane, they should go into the editing mode and that view should handle everything. In that mode also, we have panes. So switching between those panes should be done by the tab key. In fact, I don't even want two panes there. All I want is a single view to edit or add the connection where they select the database type and the connection parameters. And they have certain key bindings as well as buttons. The button should be there, but key bindings should also be there. So when I press those key bindings like I press small case T to test the connection, small case S to save the connection. Can you check if this is how it is happening and what is the difference? So we want the easy to use system and a good user experience and not want to unnecessarily over complicate things. So suggest how this can be handled and please do it for me. What is the plan? What is the suggestion and how to achieve a best user experience here?
+
+====================****====================
+DONE:
+look at the connection edit add addition modal that opens I want you to redesign the fields and everything we want a more two column view left side should be the field name right should be the input and keep it simple I don't want too complex no unnecessary box drawing etc it should look plain but it should have a very good user experience and work properly also show buttons view because we also have shortcuts like T to test S to save right so I once I'm in a field I cannot press on any of those so I should keep the tab pressed to go into a place where I can press a key binding and that key binding should get respected because in the field when I press let's say T it is taken as the field value rather than a key binding I hope you understand devise me a plan
+
+====================****====================
+DONE:
+When in the connections add edit modal, let's say if I press T, the UI becomes completely unresponsive. I think I want to show a loading button in the test field when the testing is going on. So when I say loading, I want a dot dot dot kind of thing that we did in the connections pane. Similarly, we should do that in the connections add and edit model for testing. It should properly do that and respond with a responsive UI rather than the UI getting hung up. Can you please implement this properly move things which are needed to go to background. For example, testing of connection should go to background and then execute a good UX for the testing feature in the connection add slash edit modal.
+
+====================****====================
+
+====================****====================
+
+====================****====================
+
+====================****====================
+
+====================****====================
+
+====================****====================
+
+====================****====================
+
+====================****====================
+
+====================****====================
+

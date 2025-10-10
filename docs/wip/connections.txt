@@ -1,0 +1,30 @@
+====================****====================
+when a connection attempt is happening it shows connecting dot dot dot and the timer I should have a key binding there which should abort the connection attempt
+
+====================****====================
+DONE:
+When the connection is trying to get connected while pressing enter or space, so enter and space both should be allowed. Also we should show some kind of loading in the connections pane so that the user knows that it is attempting to connect till the point it has connected. Right now it just seems to be hanging up till it says failed.
+
+====================****====================
+DONE:
+Can you go through the connections pane implementation? This is the pane which I am talking about. This is the one which lists all the connections and allows us to connect to those connections. Can you check the implementation how it has been done and have we made it a good user experience or do you have any suggestions for us to implement together?
+
+====================****====================
+
+====================****====================
+
+====================****====================
+
+====================****====================
+
+====================****====================
+
+====================****====================
+
+====================****====================
+
+====================****====================
+
+====================****====================
+
+
