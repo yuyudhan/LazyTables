@@ -10,7 +10,8 @@ impl Command for StartInsertModeCommand {
     fn execute(&self, context: &mut CommandContext) -> Result<CommandResult> {
         match context.state.ui.focused_pane {
             crate::app::FocusedPane::QueryWindow => {
-                context.state.ui.text_input_mode = crate::app::state::TextInputMode::Insert;
+                // Query editor manages its own insert mode now
+                context.state.query_editor.set_insert_mode(true);
                 Ok(CommandResult::SuccessWithMessage("Insert mode".to_string()))
             }
             _ => Ok(CommandResult::Error(
@@ -41,7 +42,8 @@ pub struct ExitInsertModeCommand;
 
 impl Command for ExitInsertModeCommand {
     fn execute(&self, context: &mut CommandContext) -> Result<CommandResult> {
-        context.state.ui.text_input_mode = crate::app::state::TextInputMode::Normal;
+        // Query editor manages its own insert mode now
+        context.state.query_editor.set_insert_mode(false);
         Ok(CommandResult::SuccessWithMessage("Normal mode".to_string()))
     }
 

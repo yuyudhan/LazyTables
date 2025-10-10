@@ -151,10 +151,9 @@ pub struct AddConnectionCommand;
 impl Command for AddConnectionCommand {
     fn execute(&self, context: &mut CommandContext) -> Result<CommandResult> {
         // Initialize connection modal state
-        use crate::ui::components::connection_modal::{ConnectionModalState, ModalStep};
+        use crate::ui::components::connection_modal::ConnectionModalState;
 
         context.state.connection_modal_state = ConnectionModalState::new();
-        context.state.connection_modal_state.current_step = ModalStep::DatabaseTypeSelection;
         context.state.open_add_connection_modal();
 
         Ok(CommandResult::Action(CommandAction::OpenModal(
@@ -194,27 +193,8 @@ impl Command for EditConnectionCommand {
 
             if let Some(connection) = context.state.db.connections.connections.get(selected).cloned() {
                 // Load existing connection data into modal
-                use crate::ui::components::connection_modal::{ConnectionModalState, ModalStep};
-
-                let mut modal_state = ConnectionModalState::new();
-
-                // Pre-populate fields with existing connection data
-                modal_state.name = connection.name.clone();
-                modal_state.database_type = connection.database_type.clone();
-                modal_state.host = connection.host.clone();
-                modal_state.port_input = connection.port.to_string();
-                modal_state.database = connection.database.clone().unwrap_or_default();
-                modal_state.username = connection.username.clone();
-                modal_state.ssl_mode = connection.ssl_mode.clone();
-
-                // Set to connection details step since we already know the database type
-                modal_state.current_step = ModalStep::ConnectionDetails;
-
-                // Note: Password is not pre-populated for security reasons
-                modal_state.password = String::new();
-
+                context.state.connection_modal_state.populate_from_connection(&connection);
                 let conn_name = connection.name.clone();
-                context.state.connection_modal_state = modal_state;
                 context.state.open_edit_connection_modal();
 
                 Ok(CommandResult::SuccessWithMessage(format!(

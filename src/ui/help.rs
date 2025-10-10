@@ -61,7 +61,6 @@ impl HelpSystem {
         // Global commands
         Self::add_command(&mut lines, "q", "Quit LazyTables");
         Self::add_command(&mut lines, "?", "Toggle help");
-        Self::add_command(&mut lines, ":", "Enter command mode");
         Self::add_command(&mut lines, "C-B", "Toggle debug view");
         lines.push(Line::from(""));
         Self::add_command(&mut lines, "1-6", "Jump to pane (by number)");
@@ -93,7 +92,6 @@ impl HelpSystem {
         lines.push(Line::from(""));
         Self::add_command(&mut lines, "q", "Quit LazyTables");
         Self::add_command(&mut lines, "?", "Toggle help guide");
-        Self::add_command(&mut lines, ":", "Enter command mode");
         Self::add_command(&mut lines, "C-B", "Toggle debug view");
         lines.push(Line::from(""));
 
@@ -213,11 +211,11 @@ impl HelpSystem {
                 .fg(Color::Rgb(180, 140, 255))
                 .add_modifier(Modifier::BOLD | Modifier::UNDERLINED),
         )]));
+        Self::add_command(lines, "Type", "Direct typing in text fields");
         Self::add_command(lines, "Enter", "Save/Test connection");
         Self::add_command(lines, "←/→", "Navigate form steps");
         Self::add_command(lines, "Tab/S-Tab", "Navigate form fields");
-        Self::add_command(lines, "i", "Enter insert mode (text fields)");
-        Self::add_command(lines, "ESC", "Cancel modal/exit insert");
+        Self::add_command(lines, "ESC", "Cancel and close modal");
         Self::add_command(lines, "Ctrl+T", "Toggle connection method");
         Self::add_command(lines, "c/b", "Cancel/Go back");
         lines.push(Line::from(""));
@@ -610,12 +608,11 @@ impl HelpSystem {
                 .add_modifier(Modifier::BOLD | Modifier::UNDERLINED),
         )]));
         Self::add_command(lines, "Ctrl+Enter", "Execute query at cursor position");
-        Self::add_command(lines, "E", "Execute query at cursor (in Query mode)");
         lines.push(Line::from(""));
 
         // Query Mode Navigation & Editing
         lines.push(Line::from(vec![Span::styled(
-            "🎯 Query Mode (Vim-style Navigation)",
+            "🎯 Vim-style Editing (Query Editor Only)",
             Style::default()
                 .fg(Color::Rgb(120, 180, 255))
                 .add_modifier(Modifier::BOLD | Modifier::UNDERLINED),
@@ -624,9 +621,8 @@ impl HelpSystem {
             Span::styled("  ⌥ ", Style::default().fg(Color::Gray)),
             Span::raw("Mode Control:"),
         ]));
-        Self::add_command(lines, "ESC", "Exit Query mode / Exit insert mode");
-        Self::add_command(lines, "i", "Enter insert mode for text editing");
-        Self::add_command(lines, "q", "Quit with confirmation (save prompt)");
+        Self::add_command(lines, "i/a/o/O", "Enter insert mode (cursor/after/new line)");
+        Self::add_command(lines, "ESC", "Exit insert mode to normal mode");
         lines.push(Line::from(""));
 
         lines.push(Line::from(vec![
@@ -665,23 +661,8 @@ impl HelpSystem {
         Self::add_command(lines, "←/→/↑/↓", "Move cursor in insert mode");
         lines.push(Line::from(""));
 
-        // Vim Command Mode
-        lines.push(Line::from(vec![Span::styled(
-            "🔧 Vim Command Mode",
-            Style::default()
-                .fg(Color::Rgb(180, 140, 255))
-                .add_modifier(Modifier::BOLD | Modifier::UNDERLINED),
-        )]));
-        Self::add_command(lines, ":", "Enter vim command mode");
-        lines.push(Line::from(vec![
-            Span::styled("  📝 ", Style::default().fg(Color::Green)),
-            Span::raw("Available Commands:"),
-        ]));
-        Self::add_command(lines, ":w", "Save current query to file");
-        Self::add_command(lines, ":q", "Quit with confirmation prompt");
-        Self::add_command(lines, ":q!", "Force quit without saving");
-        Self::add_command(lines, ":wq", "Save and quit");
-        lines.push(Line::from(""));
+        // Note: Vim command mode (:w, :q, etc.) is not yet implemented
+        // Users should use Ctrl+S to save, standard navigation to switch panes
 
         // File Management Integration
         lines.push(Line::from(vec![Span::styled(

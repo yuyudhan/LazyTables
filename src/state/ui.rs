@@ -233,9 +233,6 @@ pub struct UIState {
     pub query_cursor_line: usize,
     pub query_cursor_column: usize,
 
-    // Text input mode (used in query editor and all overlays)
-    /// Text input mode (Normal or Insert)
-    pub text_input_mode: crate::state::view::TextInputMode,
     /// Whether query content has been modified
     pub query_modified: bool,
     /// Currently loaded SQL file path
@@ -252,12 +249,6 @@ pub struct UIState {
     pub details_content_height: usize,
     /// Maximum scroll offset for details pane (updated during rendering)
     pub details_max_scroll_offset: usize,
-
-    // Vim command state
-    /// Vim command buffer for :w, :q, etc
-    pub vim_command_buffer: String,
-    /// Whether we're in vim command mode (after pressing :)
-    pub in_vim_command: bool,
 
     // Overlay-specific state
     /// Debug view scroll offset
@@ -347,7 +338,6 @@ impl UIState {
             current_column: 0,
             query_cursor_line: 0,
             query_cursor_column: 0,
-            text_input_mode: crate::state::view::TextInputMode::Normal,
             query_modified: false,
             current_sql_file: None,
             query_viewport_offset: 0,
@@ -356,8 +346,6 @@ impl UIState {
             details_viewport_height: 0,
             details_content_height: 0,
             details_max_scroll_offset: 0,
-            vim_command_buffer: String::new(),
-            in_vim_command: false,
             debug_view_scroll_offset: 0,
             connection_mode_scroll_offset: 0,
             confirmation_modal: None,
@@ -595,11 +583,6 @@ impl UIState {
             self.last_left_pane = self.focused_pane;
         }
 
-        // When focusing on QueryWindow, set to normal mode so vim commands work immediately
-        if new_pane == FocusedPane::QueryWindow {
-            self.text_input_mode = crate::state::view::TextInputMode::Normal;
-        }
-
         self.focused_pane = new_pane;
     }
 
@@ -694,15 +677,11 @@ impl UIState {
     /// Return to main view from any overlay
     pub fn return_to_main(&mut self) {
         self.current_view = crate::state::view::AppView::Main;
-        // Reset text input mode when returning to main
-        self.text_input_mode = crate::state::view::TextInputMode::Normal;
     }
 
     /// Show an overlay
     pub fn show_overlay(&mut self, overlay: crate::state::view::OverlayView) {
         self.current_view = crate::state::view::AppView::Overlay(overlay);
-        // Reset text input mode when entering overlay
-        self.text_input_mode = crate::state::view::TextInputMode::Normal;
     }
 
     /// Check if currently in an overlay
@@ -713,18 +692,6 @@ impl UIState {
     /// Check if currently in main view
     pub fn is_in_main(&self) -> bool {
         self.current_view.is_main()
-    }
-
-    /// Enter vim command mode
-    pub fn enter_vim_command(&mut self) {
-        self.in_vim_command = true;
-        self.vim_command_buffer.clear();
-    }
-
-    /// Exit vim command mode
-    pub fn exit_vim_command(&mut self) {
-        self.in_vim_command = false;
-        self.vim_command_buffer.clear();
     }
 
     /// Toggle expansion state of a schema/database

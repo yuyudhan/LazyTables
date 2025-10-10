@@ -332,6 +332,6 @@ mod tests {
         let ui_state = crate::state::ui::UIState::new();
         let title = get_adaptive_title(&None, &db_state, &ui_state);
 
-        assert_eq!(title, " Tables/Views ");
+        assert_eq!(title, " [2] Tables/Views ");
     }
 }

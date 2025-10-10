@@ -405,6 +405,7 @@ impl CommandRegistry {
         // Register connection commands
         self.register(Box::new(connection::ConnectCommand));
         self.register(Box::new(connection::AddConnectionCommand));
+        self.register(Box::new(connection::TestConnectionCommand));
 
         // Register navigation commands
         self.register(Box::new(navigation::NavigateUpCommand));
