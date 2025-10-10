@@ -2,7 +2,7 @@
 
 use crate::{
     database::{ConnectionConfig, DatabaseType, SslMode},
-    state::ui::ConnectionModeType,
+    state::view::ConnectionFormMode,
     ui::theme::Theme,
 };
 use ratatui::{
@@ -96,6 +96,9 @@ impl ConnectionMode {
 
     /// Create a new connection mode for editing a connection
     pub fn new_edit(connection: ConnectionConfig) -> Self {
+        // Try to resolve the password from the connection
+        let resolved_password = connection.resolve_password(None).unwrap_or_default();
+
         let mut form_state = ConnectionFormState {
             name: connection.name.clone(),
             database_type: connection.database_type.clone(),
@@ -103,7 +106,7 @@ impl ConnectionMode {
             port: connection.port.to_string(),
             database: connection.database.clone().unwrap_or_default(),
             username: connection.username.clone(),
-            password: connection.password.clone().unwrap_or_default(),
+            password: resolved_password,
             connection_string: String::new(),
             use_connection_string: false,
             ssl_mode: connection.ssl_mode.clone(),
@@ -128,7 +131,7 @@ impl ConnectionMode {
         frame: &mut Frame,
         area: Rect,
         theme: &Theme,
-        mode_type: ConnectionModeType,
+        mode_type: ConnectionFormMode,
         scroll_offset: usize,
     ) {
         // Clear the background
@@ -136,8 +139,8 @@ impl ConnectionMode {
 
         // Main block with borders
         let title = match mode_type {
-            ConnectionModeType::Add => " Add New Connection ",
-            ConnectionModeType::Edit => " Edit Database Connection ",
+            ConnectionFormMode::Add => " Add New Connection ",
+            ConnectionFormMode::Edit(_) => " Edit Database Connection ",
         };
 
         let main_block = Block::default()
@@ -513,7 +516,7 @@ impl ConnectionMode {
         let inner_area = help_block.inner(area);
         frame.render_widget(help_block, area);
 
-        let help_text = "j/k: Navigate sections • Tab: Navigate fields • i: Insert mode • Esc: Exit insert/mode • Enter: Select database type • T: Toggle method • S: Save • C: Cancel";
+        let help_text = "Ctrl+J/K: Navigate sections • Tab/Shift+Tab: Navigate fields • i: Insert mode • Esc: Exit insert/mode • Enter: Select database type • T: Test/Toggle method • S: Save • C: Cancel";
 
         let paragraph = Paragraph::new(help_text)
             .style(Style::default().fg(theme.get_color("foreground")))

@@ -6,6 +6,7 @@ use crate::{
     constants,
     core::error::Result,
     database::ConnectionStatus,
+    state::OverlayView,
 };
 use ratatui::{
     layout::{Alignment, Constraint, Rect},
@@ -224,17 +225,17 @@ impl UI {
         }
 
         // Draw connection modal if active (either add or edit)
-        if state.ui.show_add_connection_modal || state.ui.show_edit_connection_modal {
+        if state.ui.current_view.is_connection_form() || state.ui.current_view.is_connection_form() {
             crate::ui::components::render_connection_modal(
                 frame,
                 &state.connection_modal_state,
                 frame.area(),
-                state.ui.show_edit_connection_modal, // Pass edit mode flag
+                state.ui.current_view.is_connection_form(), // Pass edit mode flag
             );
         }
 
         // Draw table creator if active
-        if state.ui.show_table_creator {
+        if state.ui.current_view.is_table_creator() {
             crate::ui::components::render_table_creator(
                 frame,
                 &mut state.table_creator_state,
@@ -243,7 +244,7 @@ impl UI {
         }
 
         // Draw table editor if active
-        if state.ui.show_table_editor {
+        if state.ui.current_view.is_table_editor() {
             crate::ui::components::render_table_editor(
                 frame,
                 &mut state.table_editor_state,
@@ -252,20 +253,20 @@ impl UI {
         }
 
         // Draw connection mode if active (full-screen overlay)
-        if state.ui.show_connection_mode {
+        if let Some(OverlayView::ConnectionForm(mode_type)) = state.ui.current_view.overlay() {
             if let Some(connection_mode) = &state.connection_mode {
                 connection_mode.render(
                     frame,
                     frame.area(),
                     &self.theme,
-                    state.ui.connection_mode_type,
+                    mode_type.clone(),
                     state.ui.connection_mode_scroll_offset,
                 );
             }
         }
 
         // Draw debug view if active (full-screen overlay)
-        if state.ui.show_debug_view {
+        if state.ui.current_view.is_debug_view() {
             let debug_messages = crate::logging::get_debug_messages();
             state.debug_view.render(
                 frame,
@@ -807,7 +808,7 @@ impl UI {
         }
 
         // Check if table creator is active
-        if state.ui.show_table_creator {
+        if state.ui.current_view.is_table_creator() {
             crate::ui::components::render_table_creator(
                 frame,
                 &mut state.table_creator_state,
@@ -1218,7 +1219,7 @@ impl UI {
         state.query_editor.set_focused(is_focused);
         state
             .query_editor
-            .set_insert_mode(state.ui.query_edit_mode == crate::app::state::QueryEditMode::Insert);
+            .set_insert_mode(state.ui.text_input_mode == crate::app::state::TextInputMode::Insert);
 
         // Set database type if we have an active connection
         if let Some(connection) = state.get_selected_connection() {
