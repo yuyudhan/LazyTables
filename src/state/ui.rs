@@ -194,28 +194,16 @@ pub enum HelpPaneFocus {
     Right,
 }
 
-/// Internal editing state for query window
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
-pub enum QueryEditMode {
-    /// Normal navigation mode
-    Normal,
-    /// Insert/edit mode for typing
-    Insert,
-}
-
-/// Connection mode type (Add new or Edit existing)
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
-pub enum ConnectionModeType {
-    /// Adding a new connection
-    Add,
-    /// Editing an existing connection
-    Edit,
-}
+// Note: QueryEditMode and ConnectionModeType have been replaced by
+// TextInputMode and ConnectionFormMode in src/state/view.rs
 
 /// UI State - All UI-related state that can be saved/restored
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct UIState {
-    /// Currently focused pane
+    /// Current application view (Main or Overlay)
+    pub current_view: crate::state::view::AppView,
+
+    /// Currently focused pane (only relevant in Main view)
     pub focused_pane: FocusedPane,
     /// Last focused left column pane (for smarter navigation)
     pub last_left_pane: FocusedPane,
@@ -245,9 +233,9 @@ pub struct UIState {
     pub query_cursor_line: usize,
     pub query_cursor_column: usize,
 
-    // Query editor state
-    /// Query editor mode
-    pub query_edit_mode: QueryEditMode,
+    // Text input mode (used in query editor and all overlays)
+    /// Text input mode (Normal or Insert)
+    pub text_input_mode: crate::state::view::TextInputMode,
     /// Whether query content has been modified
     pub query_modified: bool,
     /// Currently loaded SQL file path
@@ -271,26 +259,10 @@ pub struct UIState {
     /// Whether we're in vim command mode (after pressing :)
     pub in_vim_command: bool,
 
-    // Modal visibility states
-    /// Show connection creation modal
-    pub show_add_connection_modal: bool,
-    /// Show connection edit modal
-    pub show_edit_connection_modal: bool,
-    /// Show table creator view
-    pub show_table_creator: bool,
-    /// Show table editor view
-    pub show_table_editor: bool,
-
-    /// Show debug view (full screen debug logs and diagnostics)
-    pub show_debug_view: bool,
+    // Overlay-specific state
     /// Debug view scroll offset
     pub debug_view_scroll_offset: usize,
-
-    /// Show connection mode (full screen connection management)
-    pub show_connection_mode: bool,
-    /// Connection mode type (Add or Edit)
-    pub connection_mode_type: ConnectionModeType,
-    /// Connection mode scroll offset
+    /// Connection mode scroll offset (used for connection form overlay)
     pub connection_mode_scroll_offset: usize,
 
     /// Confirmation modal state
@@ -361,6 +333,7 @@ impl UIState {
         connections_list_state.select(Some(0));
 
         Self {
+            current_view: crate::state::view::AppView::Main,
             focused_pane: FocusedPane::Connections,
             last_left_pane: FocusedPane::Connections,
             help_mode: HelpMode::None,
@@ -374,7 +347,7 @@ impl UIState {
             current_column: 0,
             query_cursor_line: 0,
             query_cursor_column: 0,
-            query_edit_mode: QueryEditMode::Normal,
+            text_input_mode: crate::state::view::TextInputMode::Normal,
             query_modified: false,
             current_sql_file: None,
             query_viewport_offset: 0,
@@ -385,14 +358,7 @@ impl UIState {
             details_max_scroll_offset: 0,
             vim_command_buffer: String::new(),
             in_vim_command: false,
-            show_add_connection_modal: false,
-            show_edit_connection_modal: false,
-            show_table_creator: false,
-            show_table_editor: false,
-            show_debug_view: false,
             debug_view_scroll_offset: 0,
-            show_connection_mode: false,
-            connection_mode_type: ConnectionModeType::Add,
             connection_mode_scroll_offset: 0,
             confirmation_modal: None,
             expanded_schemas: std::collections::HashSet::new(),
@@ -631,7 +597,7 @@ impl UIState {
 
         // When focusing on QueryWindow, set to normal mode so vim commands work immediately
         if new_pane == FocusedPane::QueryWindow {
-            self.query_edit_mode = QueryEditMode::Normal;
+            self.text_input_mode = crate::state::view::TextInputMode::Normal;
         }
 
         self.focused_pane = new_pane;
@@ -725,14 +691,28 @@ impl UIState {
         *self = Self::new();
     }
 
-    /// Clear modal states
-    pub fn clear_modals(&mut self) {
-        self.show_add_connection_modal = false;
-        self.show_edit_connection_modal = false;
-        self.show_table_creator = false;
-        self.show_table_editor = false;
-        self.show_debug_view = false;
-        self.show_connection_mode = false;
+    /// Return to main view from any overlay
+    pub fn return_to_main(&mut self) {
+        self.current_view = crate::state::view::AppView::Main;
+        // Reset text input mode when returning to main
+        self.text_input_mode = crate::state::view::TextInputMode::Normal;
+    }
+
+    /// Show an overlay
+    pub fn show_overlay(&mut self, overlay: crate::state::view::OverlayView) {
+        self.current_view = crate::state::view::AppView::Overlay(overlay);
+        // Reset text input mode when entering overlay
+        self.text_input_mode = crate::state::view::TextInputMode::Normal;
+    }
+
+    /// Check if currently in an overlay
+    pub fn is_in_overlay(&self) -> bool {
+        self.current_view.is_overlay()
+    }
+
+    /// Check if currently in main view
+    pub fn is_in_main(&self) -> bool {
+        self.current_view.is_main()
     }
 
     /// Enter vim command mode
@@ -1324,14 +1304,15 @@ impl UIState {
         self.exit_sql_files_create();
     }
 
-    // === DEBUG VIEW FUNCTIONALITY ===
+    // === OVERLAY MANAGEMENT ===
 
-    /// Toggle debug view visibility
+    /// Toggle debug view overlay
     pub fn toggle_debug_view(&mut self) {
-        self.show_debug_view = !self.show_debug_view;
-        if self.show_debug_view {
-            // Reset scroll when opening
+        if self.current_view.is_debug_view() {
+            self.return_to_main();
+        } else {
             self.debug_view_scroll_offset = 0;
+            self.show_overlay(crate::state::view::OverlayView::DebugView);
         }
     }
 
@@ -1370,25 +1351,25 @@ impl UIState {
         self.debug_view_scroll_offset = max_lines.saturating_sub(1);
     }
 
-    // === CONNECTION MODE FUNCTIONALITY ===
-
-    /// Enter connection mode for adding a new connection
+    /// Enter connection form overlay for adding a new connection
     pub fn enter_add_connection_mode(&mut self) {
-        self.show_connection_mode = true;
-        self.connection_mode_type = ConnectionModeType::Add;
         self.connection_mode_scroll_offset = 0;
+        self.show_overlay(crate::state::view::OverlayView::ConnectionForm(
+            crate::state::view::ConnectionFormMode::Add,
+        ));
     }
 
-    /// Enter connection mode for editing an existing connection
-    pub fn enter_edit_connection_mode(&mut self) {
-        self.show_connection_mode = true;
-        self.connection_mode_type = ConnectionModeType::Edit;
+    /// Enter connection form overlay for editing an existing connection
+    pub fn enter_edit_connection_mode(&mut self, connection: crate::database::ConnectionConfig) {
         self.connection_mode_scroll_offset = 0;
+        self.show_overlay(crate::state::view::OverlayView::ConnectionForm(
+            crate::state::view::ConnectionFormMode::Edit(Box::new(connection)),
+        ));
     }
 
-    /// Exit connection mode
+    /// Exit connection mode (return to main)
     pub fn exit_connection_mode(&mut self) {
-        self.show_connection_mode = false;
+        self.return_to_main();
         self.connection_mode_scroll_offset = 0;
     }
 
