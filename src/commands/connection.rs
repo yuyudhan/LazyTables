@@ -295,10 +295,10 @@ impl Command for DisconnectCommand {
                     .connection_manager
                     .disconnect(&connection_id)
                     .await;
-            });
 
-            // Update UI state synchronously
-            context.state.disconnect_from_database_sync();
+                // Update UI state
+                context.state.disconnect_from_database_sync().await;
+            });
 
             context
                 .state

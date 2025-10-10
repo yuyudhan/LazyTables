@@ -480,7 +480,7 @@ impl App {
                         }
                         crate::ui::ConfirmationAction::DeleteSqlFile(index) => {
                             let index = *index;
-                            if let Err(e) = self.state.delete_sql_file(index) {
+                            if let Err(e) = self.state.delete_sql_file(index).await {
                                 self.state.toast_manager.error(format!("Failed to delete SQL file: {e}"));
                             } else {
                                 self.state.toast_manager.success("SQL file deleted");
@@ -812,6 +812,35 @@ impl App {
                     self.state.ui.table_search_selection_up();
                 }
             }
+            // Tab - Toggle group expansion (when on a header)
+            KeyCode::Tab if key.modifiers == KeyModifiers::NONE => {
+                if let Some(item) = self.state.ui.get_selected_item_raw() {
+                    if !item.is_selectable {
+                        // It's a group header - extract group name and toggle expansion
+                        let group_name = item.display_name
+                            .trim_start_matches("▼ ")
+                            .trim_start_matches("▶ ")
+                            .trim()
+                            .to_string();
+
+                        if !group_name.is_empty() {
+                            let is_expanded_before = self.state.ui.is_object_group_expanded(&group_name);
+                            self.state.ui.toggle_object_group_expansion(&group_name);
+                            self.state.ui.build_selectable_table_items(&self.state.db.database_objects);
+                            self.state.toast_manager.info(format!(
+                                "{} {}",
+                                if !is_expanded_before {
+                                    "Expanded"
+                                } else {
+                                    "Collapsed"
+                                },
+                                group_name
+                            ));
+                        }
+                    }
+                    // If it's not a header, Tab is handled by global keys for pane cycling
+                }
+            }
             _ => {}
         }
         Ok(())
@@ -1085,7 +1114,7 @@ impl App {
                     let selected_index = self.state.get_filtered_sql_file_selection();
                     if let Some(old_name) = filtered_files.get(selected_index) {
                         if let Some(original_index) = self.state.saved_sql_files.iter().position(|f| f == old_name) {
-                            if let Err(e) = self.state.rename_sql_file(original_index, &new_name) {
+                            if let Err(e) = self.state.rename_sql_file(original_index, &new_name).await {
                                 self.state.toast_manager.error(format!("Failed to rename file: {e}"));
                             } else {
                                 self.state.toast_manager.success("File renamed successfully");
@@ -1115,7 +1144,7 @@ impl App {
             KeyCode::Enter => {
                 let filename = self.state.ui.sql_files_create_buffer.clone();
                 if !filename.is_empty() {
-                    if let Err(e) = self.state.create_sql_file(&filename) {
+                    if let Err(e) = self.state.create_sql_file(&filename).await {
                         self.state.toast_manager.error(format!("Failed to create file: {e}"));
                     } else {
                         self.state.toast_manager.success("File created successfully");
@@ -1269,14 +1298,14 @@ impl App {
         use crate::ui::components::{ConnectionField, PasswordStorageType};
 
         match key.code {
-            // PRIORITY 1: Global shortcuts (work from any field, including text fields)
-            KeyCode::Char('t') if !key.modifiers.contains(KeyModifiers::CONTROL) => {
+            // PRIORITY 1: Global shortcuts (work from any field EXCEPT text input fields)
+            KeyCode::Char('t') if !key.modifiers.contains(KeyModifiers::CONTROL) && !self.state.connection_modal_state.is_text_field() => {
                 // Plain 't': Test connection shortcut
                 self.test_connection_from_modal().await;
             }
-            KeyCode::Char('s') => {
-                // Save shortcut - works from any field
-                if let Err(error) = self.state.save_connection_from_modal() {
+            KeyCode::Char('s') if !self.state.connection_modal_state.is_text_field() => {
+                // Save shortcut - works from any field except text input fields
+                if let Err(error) = self.state.save_connection_from_modal().await {
                     self.state
                         .toast_manager
                         .error(format!("Failed to save connection: {}", &error));
@@ -1287,8 +1316,8 @@ impl App {
                         .success("Connection saved successfully");
                 }
             }
-            KeyCode::Char('c') => {
-                // Cancel shortcut - works from any field
+            KeyCode::Char('c') if !self.state.connection_modal_state.is_text_field() => {
+                // Cancel shortcut - works from any field except text input fields
                 if self.state.ui.current_view.is_connection_form() {
                     self.state.close_add_connection_modal();
                 } else {
@@ -1428,7 +1457,7 @@ impl App {
                     }
                     ConnectionField::Save => {
                         // Activate Save button
-                        if let Err(error) = self.state.save_connection_from_modal() {
+                        if let Err(error) = self.state.save_connection_from_modal().await {
                             self.state
                                 .toast_manager
                                 .error(format!("Failed to save connection: {}", &error));
@@ -1942,7 +1971,7 @@ impl App {
                         }
 
                         // Refresh SQL files
-                        self.state.refresh_sql_files();
+                        self.state.refresh_sql_files().await;
 
                         // Clear in-progress flag and start time
                         self.state.connecting_in_progress = None;
@@ -2131,354 +2160,4 @@ impl App {
         });
     }
 
-    /// Handle key events for connection mode
-    async fn handle_connection_mode_key_event(&mut self, key: KeyEvent) -> Result<()> {
-        // First check for Escape key to exit connection mode
-        if key.code == KeyCode::Esc && key.modifiers == KeyModifiers::NONE {
-            self.state.ui.exit_connection_mode();
-            return Ok(());
-        }
-
-        // Get or create the connection mode state
-        let connection_mode = if self.state.connection_mode.is_none() {
-            match self.state.ui.current_view.overlay() {
-                Some(OverlayView::ConnectionForm(ConnectionFormMode::Add)) => {
-                    self.state.connection_mode =
-                        Some(crate::ui::components::ConnectionMode::new_add());
-                }
-                Some(OverlayView::ConnectionForm(ConnectionFormMode::Edit(_))) => {
-                    if let Some(connection) = self
-                        .state
-                        .db
-                        .connections
-                        .connections
-                        .get(self.state.ui.selected_connection)
-                        .cloned()
-                    {
-                        self.state.connection_mode =
-                            Some(crate::ui::components::ConnectionMode::new_edit(connection));
-                    } else {
-                        // No connection to edit, exit mode
-                        self.state.ui.exit_connection_mode();
-                        return Ok(());
-                    }
-                }
-                _ => {
-                    // Invalid state, exit connection mode
-                    self.state.ui.exit_connection_mode();
-                    return Ok(());
-                }
-            }
-            self.state.connection_mode.as_mut().unwrap()
-        } else {
-            self.state.connection_mode.as_mut().unwrap()
-        };
-
-        // Handle keys based on connection mode state
-        match key {
-            // Navigation keys
-            // Ctrl+J/K for section switching
-            KeyEvent {
-                code: KeyCode::Char('j'),
-                modifiers: KeyModifiers::CONTROL,
-                ..
-            } => {
-                connection_mode.next_section();
-            }
-            KeyEvent {
-                code: KeyCode::Char('k'),
-                modifiers: KeyModifiers::CONTROL,
-                ..
-            } => {
-                connection_mode.previous_section();
-            }
-            // Arrow keys for dropdown navigation and field navigation
-            KeyEvent {
-                code: KeyCode::Down,
-                modifiers: KeyModifiers::NONE,
-                ..
-            } => {
-                // Use arrow keys for dropdown navigation within fields
-                connection_mode.next_field();
-            }
-            KeyEvent {
-                code: KeyCode::Up,
-                modifiers: KeyModifiers::NONE,
-                ..
-            } => {
-                // Use arrow keys for dropdown navigation within fields
-                connection_mode.previous_field();
-            }
-            KeyEvent {
-                code: KeyCode::Tab,
-                modifiers: KeyModifiers::NONE,
-                ..
-            } => {
-                connection_mode.next_field();
-            }
-            KeyEvent {
-                code: KeyCode::BackTab,
-                modifiers: KeyModifiers::SHIFT,
-                ..
-            } => {
-                connection_mode.previous_field();
-            }
-            // Insert mode
-            KeyEvent {
-                code: KeyCode::Char('i'),
-                modifiers: KeyModifiers::NONE,
-                ..
-            } => {
-                connection_mode.enter_insert_mode();
-            }
-            // Exit insert mode
-            KeyEvent {
-                code: KeyCode::Esc,
-                modifiers: KeyModifiers::NONE,
-                ..
-            } if connection_mode.insert_mode => {
-                connection_mode.exit_insert_mode();
-            }
-            // Enter key
-            KeyEvent {
-                code: KeyCode::Enter,
-                modifiers: KeyModifiers::NONE,
-                ..
-            } => {
-                let action = connection_mode.handle_enter();
-                match action {
-                    crate::ui::components::ConnectionModeAction::TestConnection => {
-                        if let Ok(config) = connection_mode.to_connection_config() {
-                            self.test_connection_mode_config(config).await;
-                        } else {
-                            connection_mode
-                                .set_error("Invalid connection configuration".to_string());
-                        }
-                    }
-                    crate::ui::components::ConnectionModeAction::Save => {
-                        match connection_mode.to_connection_config() {
-                            Ok(mut config) => {
-                                match self.state.ui.current_view.overlay() {
-                                    Some(OverlayView::ConnectionForm(ConnectionFormMode::Add)) => {
-                                        // Add new connection
-                                        if let Err(e) =
-                                            self.state.db.connections.add_connection(config).await
-                                        {
-                                            connection_mode.set_error(format!(
-                                                "Failed to save connection: {}",
-                                                e
-                                            ));
-                                        } else {
-                                            self.state
-                                                .toast_manager
-                                                .success("Connection saved successfully");
-                                            self.state.ui.exit_connection_mode();
-                                        }
-                                    }
-                                    Some(OverlayView::ConnectionForm(ConnectionFormMode::Edit(_))) => {
-                                        // Update existing connection
-                                        if let Some(existing) = self
-                                            .state
-                                            .db
-                                            .connections
-                                            .connections
-                                            .get(self.state.ui.selected_connection)
-                                        {
-                                            config.id = existing.id.clone();
-                                            if let Err(e) =
-                                                self.state.db.connections.update_connection(config).await
-                                            {
-                                                connection_mode.set_error(format!(
-                                                    "Failed to update connection: {}",
-                                                    e
-                                                ));
-                                            } else {
-                                                self.state
-                                                    .toast_manager
-                                                    .success("Connection updated successfully");
-                                                self.state.ui.exit_connection_mode();
-                                            }
-                                        }
-                                    }
-                                    _ => {}
-                                }
-                            }
-                            Err(e) => {
-                                connection_mode.set_error(e);
-                            }
-                        }
-                    }
-                    crate::ui::components::ConnectionModeAction::Cancel => {
-                        self.state.ui.exit_connection_mode();
-                    }
-                    crate::ui::components::ConnectionModeAction::None => {}
-                }
-            }
-            // Toggle connection string/fields method
-            KeyEvent {
-                code: KeyCode::Char('t'),
-                modifiers: KeyModifiers::NONE,
-                ..
-            } if !connection_mode.insert_mode => {
-                connection_mode.toggle_input_method();
-            }
-            // Save shortcut
-            KeyEvent {
-                code: KeyCode::Char('s'),
-                modifiers: KeyModifiers::NONE,
-                ..
-            } if !connection_mode.insert_mode => {
-                // Same logic as Enter on Save action
-                match connection_mode.to_connection_config() {
-                    Ok(mut config) => match self.state.ui.current_view.overlay() {
-                        Some(OverlayView::ConnectionForm(ConnectionFormMode::Add)) => {
-                            if let Err(e) = self.state.db.connections.add_connection(config).await {
-                                connection_mode
-                                    .set_error(format!("Failed to save connection: {}", e));
-                            } else {
-                                self.state
-                                    .toast_manager
-                                    .success("Connection saved successfully");
-                                self.state.ui.exit_connection_mode();
-                            }
-                        }
-                        Some(OverlayView::ConnectionForm(ConnectionFormMode::Edit(_))) => {
-                            if let Some(existing) = self
-                                .state
-                                .db
-                                .connections
-                                .connections
-                                .get(self.state.ui.selected_connection)
-                            {
-                                config.id = existing.id.clone();
-                                if let Err(e) = self.state.db.connections.update_connection(config).await
-                                {
-                                    connection_mode
-                                        .set_error(format!("Failed to update connection: {}", e));
-                                } else {
-                                    self.state
-                                        .toast_manager
-                                        .success("Connection updated successfully");
-                                    self.state.ui.exit_connection_mode();
-                                }
-                            }
-                        }
-                        _ => {}
-                    },
-                    Err(e) => {
-                        connection_mode.set_error(e);
-                    }
-                }
-            }
-            // Cancel shortcut
-            KeyEvent {
-                code: KeyCode::Char('c'),
-                modifiers: KeyModifiers::NONE,
-                ..
-            } if !connection_mode.insert_mode => {
-                self.state.ui.exit_connection_mode();
-            }
-            // Text input in insert mode
-            KeyEvent {
-                code: KeyCode::Char(c),
-                modifiers: KeyModifiers::NONE,
-                ..
-            }
-            | KeyEvent {
-                code: KeyCode::Char(c),
-                modifiers: KeyModifiers::SHIFT,
-                ..
-            } if connection_mode.insert_mode => {
-                connection_mode.add_char(c);
-                connection_mode.clear_error(); // Clear errors when user starts typing
-            }
-            // Backspace in insert mode
-            KeyEvent {
-                code: KeyCode::Backspace,
-                modifiers: KeyModifiers::NONE,
-                ..
-            } if connection_mode.insert_mode => {
-                connection_mode.backspace();
-            }
-            _ => {}
-        }
-
-        Ok(())
-    }
-
-    /// Test connection configuration from connection mode
-    async fn test_connection_mode_config(&mut self, config: crate::database::ConnectionConfig) {
-        use crate::database::Connection;
-
-        if let Some(connection_mode) = &mut self.state.connection_mode {
-            connection_mode.clear_error();
-            self.state.toast_manager.info("Testing connection...");
-
-            match config.database_type {
-                crate::database::DatabaseType::PostgreSQL => {
-                    use crate::database::postgres::PostgresConnection;
-                    let mut conn = PostgresConnection::new(config);
-
-                    match conn.connect().await {
-                        Ok(()) => match conn.test_connection().await {
-                            Ok(()) => {
-                                self.state
-                                    .toast_manager
-                                    .success("Connection test successful!");
-                            }
-                            Err(e) => {
-                                connection_mode.set_error(format!("Connection test failed: {}", e));
-                            }
-                        },
-                        Err(e) => {
-                            connection_mode.set_error(format!("Connection failed: {}", e));
-                        }
-                    }
-                }
-                crate::database::DatabaseType::MySQL | crate::database::DatabaseType::MariaDB => {
-                    use crate::database::mysql::MySqlConnection;
-                    let mut conn = MySqlConnection::new(config);
-
-                    match conn.connect().await {
-                        Ok(()) => match conn.test_connection().await {
-                            Ok(()) => {
-                                self.state
-                                    .toast_manager
-                                    .success("Connection test successful!");
-                            }
-                            Err(e) => {
-                                connection_mode.set_error(format!("Connection test failed: {}", e));
-                            }
-                        },
-                        Err(e) => {
-                            connection_mode.set_error(format!("Connection failed: {}", e));
-                        }
-                    }
-                }
-                crate::database::DatabaseType::SQLite => {
-                    use crate::database::sqlite::SqliteConnection;
-                    let mut conn = SqliteConnection::new(config);
-
-                    match conn.connect().await {
-                        Ok(()) => match conn.test_connection().await {
-                            Ok(()) => {
-                                self.state
-                                    .toast_manager
-                                    .success("Connection test successful!");
-                            }
-                            Err(e) => {
-                                connection_mode.set_error(format!("Connection test failed: {}", e));
-                            }
-                        },
-                        Err(e) => {
-                            connection_mode.set_error(format!("Connection failed: {}", e));
-                        }
-                    }
-                }
-                _ => {
-                    connection_mode.set_error("Database type not yet supported".to_string());
-                }
-            }
-        }
-    }
 }
