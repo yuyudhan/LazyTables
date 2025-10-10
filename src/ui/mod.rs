@@ -231,6 +231,8 @@ impl UI {
                 &state.connection_modal_state,
                 frame.area(),
                 state.ui.current_view.is_connection_form(), // Pass edit mode flag
+                state.test_animation_frame,
+                state.test_connection_in_progress,
             );
         }
 
@@ -309,8 +311,10 @@ impl UI {
         // Create list items from connections to display
         let mut items: Vec<ListItem> = display_indices
             .iter()
-            .filter_map(|&index| state.db.connections.connections.get(index))
-            .map(|connection| {
+            .filter_map(|&index| {
+                state.db.connections.connections.get(index).map(|conn| (index, conn))
+            })
+            .map(|(index, connection)| {
                 // Get status symbol and color based on connection status
                 let (symbol_style, text_style) = match &connection.status {
                     ConnectionStatus::Connected => (
@@ -369,7 +373,25 @@ impl UI {
                     Span::styled(" [DB: ", Style::default().fg(Color::DarkGray)),
                     Span::styled(db_name, Style::default().fg(Color::Cyan)),
                     Span::styled("] ", Style::default().fg(Color::DarkGray)),
-                    Span::styled(connection.status_text(), text_style),
+                    Span::styled(
+                        // Add animated dots and elapsed time for connecting status
+                        if matches!(connection.status, ConnectionStatus::Connecting)
+                            && state.connecting_in_progress == Some(index)
+                        {
+                            let dots = match state.connecting_animation_frame {
+                                0 => "•",
+                                1 => "••",
+                                2 => "•••",
+                                _ => "•",
+                            };
+                            let elapsed = state.get_connection_elapsed_seconds();
+                            let timeout = state.connection_timeout_seconds;
+                            format!("Connecting {} {}/{}s", dots, elapsed, timeout)
+                        } else {
+                            connection.status_text().to_string()
+                        },
+                        text_style,
+                    ),
                 ]);
 
                 ListItem::new(line)
@@ -1217,9 +1239,7 @@ impl UI {
 
         // Update the QueryEditor component state
         state.query_editor.set_focused(is_focused);
-        state
-            .query_editor
-            .set_insert_mode(state.ui.text_input_mode == crate::app::state::TextInputMode::Insert);
+        // Note: QueryEditor manages its own insert mode state
 
         // Set database type if we have an active connection
         if let Some(connection) = state.get_selected_connection() {
@@ -1279,13 +1299,22 @@ impl UI {
             .connections
             .get(state.ui.selected_connection)
         {
+            let database = connection
+                .database
+                .as_ref()
+                .map(|d| d.as_str())
+                .unwrap_or("N/A");
+
             match &connection.status {
-                ConnectionStatus::Connected => format!(
-                    "Connected: {}@{}:{}",
-                    connection.username, connection.host, connection.port
-                ),
-                ConnectionStatus::Connecting => format!("Connecting to {}...", connection.name),
-                ConnectionStatus::Failed(_) => format!("Failed: {}", connection.name),
+                ConnectionStatus::Connected => {
+                    format!("{}:{} • {} • Connected", connection.host, connection.port, database)
+                }
+                ConnectionStatus::Connecting => {
+                    format!("{}:{} • Connecting...", connection.host, connection.port)
+                }
+                ConnectionStatus::Failed(_) => {
+                    format!("{}:{} • Failed", connection.host, connection.port)
+                }
                 ConnectionStatus::Disconnected => "Not connected".to_string(),
             }
         } else {

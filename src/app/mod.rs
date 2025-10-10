@@ -15,14 +15,24 @@ pub mod state;
 
 pub use state::{AppState, AppView, ConnectionFormMode, FocusedPane, OverlayView, TextInputMode};
 
-// Simplified internal mode for compatibility - not shown to user
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-enum Mode {
-    Normal,
-    Insert,
-    Visual,
-    Command,
-    Query,
+/// Connection event sent from background tasks to main event loop
+#[derive(Debug)]
+enum ConnectionEvent {
+    Success {
+        connection_index: usize,
+        objects: crate::database::DatabaseObjectList,
+    },
+    Failed {
+        connection_index: usize,
+        error: String,
+    },
+}
+
+/// Test connection event sent from background tasks to main event loop
+#[derive(Debug)]
+enum TestConnectionEvent {
+    Success(String),
+    Failed(String),
 }
 
 /// Main application structure
@@ -39,14 +49,16 @@ pub struct App {
     command_registry: CommandRegistry,
     /// Flag to quit the application
     should_quit: bool,
-    /// Internal mode for key handling (not shown to user)
-    mode: Mode,
-    /// Command buffer for : commands
-    command_buffer: String,
-    /// Leader key state for compound commands
-    leader_pressed: bool,
     /// Tick counter for periodic connection health checks
     tick_counter: u32,
+    /// Channel receiver for connection completion events
+    connection_events_rx: tokio::sync::mpsc::UnboundedReceiver<ConnectionEvent>,
+    /// Channel sender for connection events (cloned for background tasks)
+    connection_events_tx: tokio::sync::mpsc::UnboundedSender<ConnectionEvent>,
+    /// Channel receiver for test connection completion events
+    test_connection_events_rx: tokio::sync::mpsc::UnboundedReceiver<TestConnectionEvent>,
+    /// Channel sender for test connection events (cloned for background tasks)
+    test_connection_events_tx: tokio::sync::mpsc::UnboundedSender<TestConnectionEvent>,
 }
 
 impl App {
@@ -57,6 +69,14 @@ impl App {
         let ui = UI::new(&config)?;
         let command_registry = CommandRegistry::new();
 
+        // Create channel for connection events
+        let (connection_events_tx, connection_events_rx) =
+            tokio::sync::mpsc::unbounded_channel();
+
+        // Create channel for test connection events
+        let (test_connection_events_tx, test_connection_events_rx) =
+            tokio::sync::mpsc::unbounded_channel();
+
         Ok(Self {
             state,
             event_handler,
@@ -64,10 +84,11 @@ impl App {
             config,
             command_registry,
             should_quit: false,
-            mode: Mode::Normal,
-            command_buffer: String::new(),
-            leader_pressed: false,
             tick_counter: 0,
+            connection_events_rx,
+            connection_events_tx,
+            test_connection_events_rx,
+            test_connection_events_tx,
         })
     }
 
@@ -211,116 +232,231 @@ impl App {
     }
 
     /// Handle keyboard events
+// New simplified key event handlers for LazyTables
+// This file contains the refactored key handling logic
+// To be inserted into src/app/mod.rs
+
+    /// Handle application keyboard events (NEW SIMPLIFIED VERSION)
     async fn handle_key_event(&mut self, key: KeyEvent) -> Result<()> {
-        // Handle ESC key globally to close help overlay
-        if key.code == KeyCode::Esc && self.state.ui.help_mode != crate::app::state::HelpMode::None
-        {
-            self.state.ui.help_mode = crate::app::state::HelpMode::None;
+        // 1. Handle global keys first (work everywhere)
+        if self.handle_global_keys(key)?.is_some() {
             return Ok(());
         }
 
-        // Handle help modal navigation keys when help is active
-        if self.state.ui.help_mode != crate::app::state::HelpMode::None {
-            match (key.modifiers, key.code) {
-                // Left/Right arrow keys or h/l to switch between help panes
-                (KeyModifiers::NONE, KeyCode::Left)
-                | (KeyModifiers::NONE, KeyCode::Right)
-                | (KeyModifiers::NONE, KeyCode::Char('h'))
-                | (KeyModifiers::NONE, KeyCode::Char('l')) => {
-                    self.state.ui.toggle_help_pane_focus();
-                    return Ok(());
-                }
-                // Up/Down arrow keys or j/k for scrolling
-                (KeyModifiers::NONE, KeyCode::Up) | (KeyModifiers::NONE, KeyCode::Char('k')) => {
-                    self.state.ui.help_scroll_up();
-                    return Ok(());
-                }
-                (KeyModifiers::NONE, KeyCode::Down) | (KeyModifiers::NONE, KeyCode::Char('j')) => {
-                    // We need to pass the max_lines, but for now we'll use a reasonable default
-                    self.state.ui.help_scroll_down(100);
-                    return Ok(());
-                }
-                // Page Up/Down for faster scrolling - only consume Ctrl+D/Ctrl+U when help is actively being used
-                (KeyModifiers::NONE, KeyCode::PageUp) => {
-                    self.state.ui.help_page_up(10);
-                    return Ok(());
-                }
-                (KeyModifiers::NONE, KeyCode::PageDown) => {
-                    self.state.ui.help_page_down(100, 10);
-                    return Ok(());
-                }
-                // Only handle Ctrl+U/Ctrl+D in help mode if no other pane needs them (fall through)
-                (KeyModifiers::CONTROL, KeyCode::Char('u')) => {
-                    crate::log_debug!(
-                        "Help mode: Ctrl+U pressed, focused_pane: {:?}",
-                        self.state.ui.focused_pane
-                    );
-                    // Check if any other pane specifically needs this key
-                    if self.state.ui.focused_pane == FocusedPane::TabularOutput
-                        || self.state.ui.focused_pane == FocusedPane::QueryWindow
-                    {
-                        crate::log_debug!("Help mode: Letting Ctrl+U pass through to focused pane");
-                        // Let other handlers process this
-                    } else {
-                        crate::log_debug!("Help mode: Consuming Ctrl+U for help scrolling");
-                        self.state.ui.help_page_up(10);
-                        return Ok(());
-                    }
-                }
-                (KeyModifiers::CONTROL, KeyCode::Char('d')) => {
-                    crate::log_debug!(
-                        "Help mode: Ctrl+D pressed, focused_pane: {:?}",
-                        self.state.ui.focused_pane
-                    );
-                    // Check if any other pane specifically needs this key
-                    if self.state.ui.focused_pane == FocusedPane::TabularOutput
-                        || self.state.ui.focused_pane == FocusedPane::QueryWindow
-                    {
-                        crate::log_debug!("Help mode: Letting Ctrl+D pass through to focused pane");
-                        // Let other handlers process this
-                    } else {
-                        crate::log_debug!("Help mode: Consuming Ctrl+D for help scrolling");
-                        self.state.ui.help_page_down(100, 10);
-                        return Ok(());
-                    }
-                }
-                // Tab to switch between panes
-                (KeyModifiers::NONE, KeyCode::Tab) => {
-                    self.state.ui.toggle_help_pane_focus();
-                    return Ok(());
-                }
-                // Other keys fall through to be handled normally (like '?' for closing)
-                _ => {}
-            }
+        // 2. Handle overlays (forms, modals, debug view)
+        if self.state.ui.is_in_overlay() {
+            return self.handle_overlay_keys(key).await;
         }
 
-        // Handle ESC to exit search modes or cancel pending gg command
-        if key.code == KeyCode::Esc {
-            if self.state.ui.connections_search_active {
-                self.state.ui.exit_connections_search();
-                return Ok(());
-            } else if self.state.ui.tables_search_active {
-                self.state.ui.exit_tables_search();
-                return Ok(());
-            } else if self.state.ui.pending_gg_command {
+        // 3. Handle confirmation modals
+        if self.state.ui.confirmation_modal.is_some() {
+            return self.handle_confirmation_modal_keys(key).await;
+        }
+
+        // 4. Handle table viewer delete confirmation
+        if self.state.table_viewer_state.delete_confirmation.is_some() {
+            return self.handle_table_delete_confirmation_keys(key).await;
+        }
+
+        // 5. Route to focused pane handler (main view)
+        match self.state.ui.focused_pane {
+            FocusedPane::Connections => self.handle_connections_keys(key).await,
+            FocusedPane::Tables => self.handle_tables_keys(key).await,
+            FocusedPane::Details => self.handle_details_keys(key),
+            FocusedPane::TabularOutput => self.handle_query_results_keys(key).await,
+            FocusedPane::SqlFiles => self.handle_sql_files_keys(key).await,
+            FocusedPane::QueryWindow => self.handle_query_editor_keys(key).await,
+        }
+    }
+
+    /// Handle global keys that work everywhere
+    fn handle_global_keys(&mut self, key: KeyEvent) -> Result<Option<()>> {
+        match (key.modifiers, key.code) {
+            // Help - toggle with '?'
+            (KeyModifiers::NONE, KeyCode::Char('?')) => {
+                self.execute_command(CommandId::ToggleHelp)?;
+                Ok(Some(()))
+            }
+            // Debug view - toggle with Ctrl+B
+            (KeyModifiers::CONTROL, KeyCode::Char('b')) => {
+                self.state.ui.toggle_debug_view();
+                Ok(Some(()))
+            }
+            // Quit application - 'q' (only if not in edit modes)
+            (KeyModifiers::NONE, KeyCode::Char('q')) if self.can_quit() => {
+                self.state.ui.confirmation_modal = Some(crate::ui::ConfirmationModal {
+                    title: "Exit LazyTables".to_string(),
+                    message: "Are you sure you want to exit?\n\nAll active database connections will be closed.".to_string(),
+                    action: crate::ui::ConfirmationAction::ExitApplication,
+                });
+                Ok(Some(()))
+            }
+            // Number keys 1-6 for direct pane navigation (only in main view)
+            (KeyModifiers::NONE, KeyCode::Char(c @ '1'..='6')) if self.state.ui.is_in_main() => {
+                if let Some(pane) = FocusedPane::from_number(c.to_digit(10).unwrap() as u8) {
+                    self.state.ui.focused_pane = pane;
+                    self.state.ui.cancel_pending_gg();
+                }
+                Ok(Some(()))
+            }
+            // Tab/Shift+Tab for pane cycling
+            (KeyModifiers::NONE, KeyCode::Tab) if self.state.ui.is_in_main() => {
+                self.state.cycle_focus_forward();
                 self.state.ui.cancel_pending_gg();
-                return Ok(());
+                Ok(Some(()))
+            }
+            (KeyModifiers::SHIFT, KeyCode::BackTab) if self.state.ui.is_in_main() => {
+                self.state.cycle_focus_backward();
+                self.state.ui.cancel_pending_gg();
+                Ok(Some(()))
+            }
+            // Ctrl+h/j/k/l for pane navigation
+            (KeyModifiers::CONTROL, KeyCode::Char('h')) if self.state.ui.is_in_main() => {
+                self.state.move_focus_left();
+                Ok(Some(()))
+            }
+            (KeyModifiers::CONTROL, KeyCode::Char('j')) if self.state.ui.is_in_main() => {
+                self.state.move_focus_down();
+                Ok(Some(()))
+            }
+            (KeyModifiers::CONTROL, KeyCode::Char('k')) if self.state.ui.is_in_main() => {
+                self.state.move_focus_up();
+                Ok(Some(()))
+            }
+            (KeyModifiers::CONTROL, KeyCode::Char('l')) if self.state.ui.is_in_main() => {
+                self.state.move_focus_right();
+                Ok(Some(()))
+            }
+            _ => Ok(None), // Key not handled globally
+        }
+    }
+
+    /// Check if quit action is allowed (not in edit/insert modes)
+    fn can_quit(&self) -> bool {
+        if !self.state.ui.is_in_main() {
+            return false;
+        }
+        // Check for active edit/search modes
+        if self.state.ui.connections_search_active
+            || self.state.ui.tables_search_active
+            || self.state.ui.sql_files_search_active
+            || self.state.ui.sql_files_rename_mode
+            || self.state.ui.sql_files_create_mode
+        {
+            return false;
+        }
+        // Check table viewer edit mode
+        if self.state.ui.focused_pane == FocusedPane::TabularOutput {
+            if let Some(tab) = self.state.table_viewer_state.current_tab() {
+                if tab.in_edit_mode || tab.in_search_mode {
+                    return false;
+                }
             }
         }
+        // Check query editor insert mode
+        if self.state.ui.focused_pane == FocusedPane::QueryWindow
+            && self.state.query_editor.is_insert_mode()
+        {
+            return false;
+        }
+        true
+    }
 
-        // Handle '?' key globally for context-aware help (toggle functionality)
-        if key.code == KeyCode::Char('?') && key.modifiers == KeyModifiers::NONE {
-            self.execute_command(CommandId::ToggleHelp)?;
+    /// Handle overlay keys (connection form, table creator/editor, debug view)
+    async fn handle_overlay_keys(&mut self, key: KeyEvent) -> Result<()> {
+        // ESC always closes overlay and returns to main
+        if key.code == KeyCode::Esc {
+            self.state.ui.return_to_main();
             return Ok(());
         }
 
-        // Handle Ctrl+B globally for debug view toggle
-        if key.code == KeyCode::Char('b') && key.modifiers == KeyModifiers::CONTROL {
-            self.state.ui.toggle_debug_view();
-            return Ok(());
+        // Route to specific overlay handler
+        match &self.state.ui.current_view {
+            AppView::Overlay(OverlayView::ConnectionForm(_)) => {
+                self.handle_connection_modal_key_event(key).await
+            }
+            AppView::Overlay(OverlayView::TableCreator) => {
+                self.handle_table_creator_key_event(key).await
+            }
+            AppView::Overlay(OverlayView::TableEditor) => {
+                self.handle_table_editor_key_event(key).await
+            }
+            AppView::Overlay(OverlayView::DebugView) => {
+                self.handle_debug_view_keys(key)
+            }
+            AppView::Overlay(OverlayView::Help) => {
+                self.handle_help_keys(key)
+            }
+            _ => Ok(()),
         }
+    }
 
-        // Handle confirmation modal
+    /// Handle debug view keys
+    fn handle_debug_view_keys(&mut self, key: KeyEvent) -> Result<()> {
+        let debug_messages = crate::logging::get_debug_messages();
+        let max_lines = debug_messages.len();
+
+        match key.code {
+            KeyCode::Char('j') | KeyCode::Down => {
+                self.state.ui.debug_view_scroll_down(max_lines);
+            }
+            KeyCode::Char('k') | KeyCode::Up => {
+                self.state.ui.debug_view_scroll_up();
+            }
+            KeyCode::PageDown => {
+                self.state.ui.debug_view_page_down(max_lines, 10);
+            }
+            KeyCode::PageUp => {
+                self.state.ui.debug_view_page_up(10);
+            }
+            KeyCode::Char('g') => {
+                if self.state.ui.pending_gg_command {
+                    self.state.ui.debug_view_go_to_top();
+                    self.state.ui.pending_gg_command = false;
+                } else {
+                    self.state.ui.pending_gg_command = true;
+                }
+            }
+            KeyCode::Char('G') => {
+                self.state.ui.debug_view_go_to_bottom(max_lines);
+            }
+            KeyCode::Char('c') => {
+                crate::logging::clear_debug_messages();
+                self.state.toast_manager.info("Debug messages cleared");
+            }
+            _ => {}
+        }
+        Ok(())
+    }
+
+    /// Handle help overlay keys
+    fn handle_help_keys(&mut self, key: KeyEvent) -> Result<()> {
+        match key.code {
+            KeyCode::Left | KeyCode::Right | KeyCode::Char('h') | KeyCode::Char('l') => {
+                self.state.ui.toggle_help_pane_focus();
+            }
+            KeyCode::Up | KeyCode::Char('k') => {
+                self.state.ui.help_scroll_up();
+            }
+            KeyCode::Down | KeyCode::Char('j') => {
+                self.state.ui.help_scroll_down(100);
+            }
+            KeyCode::PageUp => {
+                self.state.ui.help_page_up(10);
+            }
+            KeyCode::PageDown => {
+                self.state.ui.help_page_down(100, 10);
+            }
+            KeyCode::Tab => {
+                self.state.ui.toggle_help_pane_focus();
+            }
+            _ => {}
+        }
+        Ok(())
+    }
+
+    /// Handle confirmation modal keys
+    async fn handle_confirmation_modal_keys(&mut self, key: KeyEvent) -> Result<()> {
         if let Some(modal) = &self.state.ui.confirmation_modal {
             match key.code {
                 KeyCode::Enter | KeyCode::Char('y') | KeyCode::Char('Y') => {
@@ -328,24 +464,13 @@ impl App {
                     match &modal.action {
                         crate::ui::ConfirmationAction::DeleteConnection(index) => {
                             let index = *index;
-                            // Delete the connection
-                            if let Some(connection) =
-                                self.state.db.connections.connections.get(index)
-                            {
+                            if let Some(connection) = self.state.db.connections.connections.get(index) {
                                 let conn_id = connection.id.clone();
-                                if let Err(e) =
-                                    self.state.db.connections.remove_connection(&conn_id)
-                                {
-                                    self.state
-                                        .toast_manager
-                                        .error(format!("Failed to delete connection: {e}"));
+                                if let Err(e) = self.state.db.connections.remove_connection(&conn_id) {
+                                    self.state.toast_manager.error(format!("Failed to delete connection: {e}"));
                                 } else {
-                                    self.state
-                                        .toast_manager
-                                        .success("Connection deleted successfully");
-                                    // Adjust selection if needed
-                                    if self.state.ui.selected_connection
-                                        >= self.state.db.connections.connections.len()
+                                    self.state.toast_manager.success("Connection deleted successfully");
+                                    if self.state.ui.selected_connection >= self.state.db.connections.connections.len()
                                         && self.state.ui.selected_connection > 0
                                     {
                                         self.state.ui.selected_connection -= 1;
@@ -353,1739 +478,835 @@ impl App {
                                 }
                             }
                         }
-                        crate::ui::ConfirmationAction::DeleteTable(_) => {
-                            // Handle table deletion if needed in future
-                        }
                         crate::ui::ConfirmationAction::DeleteSqlFile(index) => {
                             let index = *index;
-                            // Delete the SQL file
                             if let Err(e) = self.state.delete_sql_file(index) {
-                                self.state
-                                    .toast_manager
-                                    .error(format!("Failed to delete SQL file: {e}"));
+                                self.state.toast_manager.error(format!("Failed to delete SQL file: {e}"));
                             } else {
                                 self.state.toast_manager.success("SQL file deleted");
                             }
-                            // Update UI selection after deletion
-                            self.state
-                                .ui
-                                .update_sql_file_selection(self.state.saved_sql_files.len());
+                            self.state.ui.update_sql_file_selection(self.state.saved_sql_files.len());
                         }
                         crate::ui::ConfirmationAction::ExitApplication => {
-                            // Exit the application
                             self.should_quit = true;
                         }
                         crate::ui::ConfirmationAction::QuitQueryEditor => {
-                            // Quit query editor mode
-                            self.mode = Mode::Normal;
+                            // Just close the confirmation, stay in main view
                         }
+                        _ => {}
                     }
                     self.state.ui.confirmation_modal = None;
                 }
                 KeyCode::Esc | KeyCode::Char('n') | KeyCode::Char('N') => {
-                    // Cancel the action
                     self.state.ui.confirmation_modal = None;
+                }
+                _ => {}
+            }
+        }
+        Ok(())
+    }
+
+    /// Handle table delete confirmation keys
+    async fn handle_table_delete_confirmation_keys(&mut self, key: KeyEvent) -> Result<()> {
+        if let Some(confirmation) = &self.state.table_viewer_state.delete_confirmation {
+            match key.code {
+                KeyCode::Enter | KeyCode::Char('y') | KeyCode::Char('Y') => {
+                    let confirmation = confirmation.clone();
+                    if let Err(e) = self.state.delete_table_row(confirmation).await {
+                        self.state.toast_manager.error(format!("Failed to delete row: {e}"));
+                    } else {
+                        self.state.toast_manager.success("Row deleted successfully");
+                        let tab_idx = self.state.table_viewer_state.active_tab;
+                        let _ = self.state.load_table_data(tab_idx).await;
+                    }
+                    self.state.table_viewer_state.delete_confirmation = None;
+                }
+                KeyCode::Esc | KeyCode::Char('n') | KeyCode::Char('N') => {
+                    self.state.table_viewer_state.delete_confirmation = None;
+                    self.state.toast_manager.info("Delete cancelled");
+                }
+                _ => {}
+            }
+        }
+        Ok(())
+    }
+
+    /// Handle Connections pane keys - DIRECT KEY BINDINGS (no insert mode)
+    async fn handle_connections_keys(&mut self, key: KeyEvent) -> Result<()> {
+        // Search mode active - handle search input
+        if self.state.ui.connections_search_active {
+            match key.code {
+                KeyCode::Esc => {
+                    self.state.ui.exit_connections_search();
+                }
+                KeyCode::Backspace => {
+                    self.state.ui.backspace_connections_search();
+                    self.state.ui.update_filtered_connections(&self.state.db.connections.connections);
+                }
+                KeyCode::Enter => {
+                    // Get selected connection index
+                    let selected_index = if let Some(index) = self
+                        .state
+                        .ui
+                        .get_selected_connection_index(&self.state.db.connections.connections)
+                    {
+                        index
+                    } else {
+                        return Ok(()); // No connection selected
+                    };
+
+                    // Don't start new connection if one is already in progress
+                    if self.state.connecting_in_progress.is_some() {
+                        self.state.toast_manager.warning("Connection attempt already in progress");
+                        return Ok(());
+                    }
+
+                    // Mark connection as in progress
+                    self.state.connecting_in_progress = Some(selected_index);
+                    self.state.connecting_animation_frame = 0;
+                    self.state.connection_start_time = Some(std::time::Instant::now());
+
+                    // Set status to connecting immediately
+                    if let Some(conn) = self.state.db.connections.connections.get_mut(selected_index) {
+                        conn.status = crate::database::ConnectionStatus::Connecting;
+                        self.state.toast_manager.info(format!("Connecting to {}...", conn.name));
+                    }
+
+                    // Clone necessary data for background task
+                    let connection_config = self.state.db.connections.connections[selected_index].clone();
+                    let connection_manager = self.state.connection_manager.clone();
+                    let tx = self.connection_events_tx.clone();
+
+                    // Spawn connection task in background
+                    tokio::spawn(async move {
+                        // Attempt to establish connection
+                        match connection_manager.connect(&connection_config).await {
+                            Ok(_) => {
+                                // Connection succeeded, now get database objects
+                                match connection_manager.list_database_objects(&connection_config.id).await {
+                                    Ok(objects) => {
+                                        // Send success event
+                                        let _ = tx.send(ConnectionEvent::Success {
+                                            connection_index: selected_index,
+                                            objects,
+                                        });
+                                    }
+                                    Err(e) => {
+                                        // Connection succeeded but listing objects failed
+                                        let _ = tx.send(ConnectionEvent::Failed {
+                                            connection_index: selected_index,
+                                            error: format!("Failed to load database objects: {}", e),
+                                        });
+                                    }
+                                }
+                            }
+                            Err(e) => {
+                                // Connection failed
+                                let _ = tx.send(ConnectionEvent::Failed {
+                                    connection_index: selected_index,
+                                    error: e.to_string(),
+                                });
+                            }
+                        }
+                    });
+
+                    self.state.ui.exit_connections_search();
+                }
+                KeyCode::Down => {
+                    self.state.ui.connections_selection_down(&self.state.db.connections.connections);
+                }
+                KeyCode::Up => {
+                    self.state.ui.connections_selection_up(&self.state.db.connections.connections);
+                }
+                KeyCode::Char(c) => {
+                    self.state.ui.add_to_connections_search(c);
+                    self.state.ui.update_filtered_connections(&self.state.db.connections.connections);
                 }
                 _ => {}
             }
             return Ok(());
         }
 
-        // Handle debug view navigation when debug view is open
-        if self.state.ui.current_view.is_debug_view() {
-            let debug_messages = crate::logging::get_debug_messages();
-            let max_lines = debug_messages.len();
-
-            match key.code {
-                KeyCode::Char('j') | KeyCode::Down => {
-                    self.state.ui.debug_view_scroll_down(max_lines);
-                    return Ok(());
-                }
-                KeyCode::Char('k') | KeyCode::Up => {
-                    self.state.ui.debug_view_scroll_up();
-                    return Ok(());
-                }
-                KeyCode::PageDown => {
-                    self.state.ui.debug_view_page_down(max_lines, 10);
-                    return Ok(());
-                }
-                KeyCode::PageUp => {
-                    self.state.ui.debug_view_page_up(10);
-                    return Ok(());
-                }
-                KeyCode::Char('g') => {
-                    // Handle gg for go to top
-                    if self.state.ui.pending_gg_command {
-                        self.state.ui.debug_view_go_to_top();
-                        self.state.ui.pending_gg_command = false;
-                    } else {
-                        self.state.ui.pending_gg_command = true;
-                    }
-                    return Ok(());
-                }
-                KeyCode::Char('G') => {
-                    self.state.ui.debug_view_go_to_bottom(max_lines);
-                    return Ok(());
-                }
-                KeyCode::Char('c') => {
-                    // Clear debug messages
-                    crate::logging::clear_debug_messages();
-                    self.state.toast_manager.info("Debug messages cleared");
-                    return Ok(());
-                }
-                _ => {}
+        // Normal mode - direct key bindings
+        match key.code {
+            // 'a' - Add new connection
+            KeyCode::Char('a') => {
+                self.state.open_add_connection_modal();
             }
-        }
-
-        // Handle delete confirmation dialog in table viewer
-        if let Some(confirmation) = &self.state.table_viewer_state.delete_confirmation {
-            match key.code {
-                KeyCode::Enter | KeyCode::Char('y') | KeyCode::Char('Y') => {
-                    // Confirm delete
-                    let confirmation = confirmation.clone();
-                    if let Err(e) = self.state.delete_table_row(confirmation).await {
-                        self.state
-                            .toast_manager
-                            .error(format!("Failed to delete row: {e}"));
-                    } else {
-                        self.state.toast_manager.success("Row deleted successfully");
-                        // Reload table data
-                        let tab_idx = self.state.table_viewer_state.active_tab;
-                        let _ = self.state.load_table_data(tab_idx).await;
-                    }
-                    self.state.table_viewer_state.delete_confirmation = None;
-                    return Ok(());
-                }
-                KeyCode::Esc | KeyCode::Char('n') | KeyCode::Char('N') => {
-                    // Cancel delete
-                    self.state.table_viewer_state.delete_confirmation = None;
-                    self.state.toast_manager.info("Delete cancelled");
-                    return Ok(());
-                }
-                _ => {
-                    // Ignore other keys while confirmation is shown
-                    return Ok(());
-                }
+            // 'e' - Edit selected connection
+            KeyCode::Char('e') => {
+                self.state.open_edit_connection_modal();
             }
-        }
-
-        // Handle 'q' key globally to quit (except when in overlays, editing, or Query mode)
-        if key.code == KeyCode::Char('q') && key.modifiers == KeyModifiers::NONE {
-            // Don't quit if we're in an overlay or special input mode
-            if self.state.ui.is_in_main()
-                && self.state.ui.confirmation_modal.is_none()
-                && !self.state.ui.connections_search_active
-                && !self.state.ui.sql_files_search_active
-                && !self.state.ui.sql_files_rename_mode
-                && !self.state.ui.sql_files_create_mode
-                && self.mode != Mode::Query
-            {
-                // Check if we're editing in table viewer
-                if self.state.ui.focused_pane == FocusedPane::TabularOutput {
-                    if let Some(tab) = self.state.table_viewer_state.current_tab() {
-                        if !tab.in_edit_mode && !tab.in_search_mode {
-                            // Show exit confirmation modal
-                            self.state.ui.confirmation_modal = Some(crate::ui::ConfirmationModal {
-                                title: "Exit LazyTables".to_string(),
-                                message: "Are you sure you want to exit?\n\nAll active database connections will be closed.".to_string(),
-                                action: crate::ui::ConfirmationAction::ExitApplication,
-                            });
-                            return Ok(());
-                        }
-                    } else {
-                        // Show exit confirmation modal
-                        self.state.ui.confirmation_modal = Some(crate::ui::ConfirmationModal {
-                            title: "Exit LazyTables".to_string(),
-                            message: "Are you sure you want to exit?\n\nAll active database connections will be closed.".to_string(),
-                            action: crate::ui::ConfirmationAction::ExitApplication,
-                        });
-                        return Ok(());
-                    }
-                } else {
-                    // Show exit confirmation modal
+            // 'd' - Delete selected connection
+            KeyCode::Char('d') => {
+                if !self.state.db.connections.connections.is_empty() {
+                    let index = self.state.ui.selected_connection;
                     self.state.ui.confirmation_modal = Some(crate::ui::ConfirmationModal {
-                        title: "Exit LazyTables".to_string(),
-                        message: "Are you sure you want to exit?\n\nAll active database connections will be closed.".to_string(),
-                        action: crate::ui::ConfirmationAction::ExitApplication,
+                        title: "Delete Connection".to_string(),
+                        message: format!(
+                            "Are you sure you want to delete the connection '{}'?",
+                            self.state.db.connections.connections[index].name
+                        ),
+                        action: crate::ui::ConfirmationAction::DeleteConnection(index),
                     });
-                    return Ok(());
                 }
             }
-        }
+            // Enter or Space - Connect to selected database
+            KeyCode::Enter | KeyCode::Char(' ') => {
+                // Get selected connection index
+                let selected_index = if let Some(index) = self
+                    .state
+                    .ui
+                    .get_selected_connection_index(&self.state.db.connections.connections)
+                {
+                    index
+                } else {
+                    return Ok(()); // No connection selected
+                };
 
-        // Handle ESC or Enter in table viewer edit mode to save
-        if (key.code == KeyCode::Esc || key.code == KeyCode::Enter)
-            && self.state.ui.focused_pane == FocusedPane::TabularOutput
-        {
-            if let Some(tab) = self.state.table_viewer_state.current_tab_mut() {
-                if tab.in_edit_mode {
-                    // Save the edit and update database
-                    if let Some(update) = tab.save_edit() {
-                        if let Err(e) = self.state.update_table_cell(update).await {
-                            self.state
-                                .toast_manager
-                                .error(format!("Failed to update cell: {e}"));
-                        } else {
-                            self.state
-                                .toast_manager
-                                .success("Cell updated successfully");
-                        }
-                    }
+                // Don't start new connection if one is already in progress
+                if self.state.connecting_in_progress.is_some() {
+                    self.state.toast_manager.warning("Connection attempt already in progress");
                     return Ok(());
                 }
-            }
-        }
 
-        // Handle Ctrl+C in table viewer edit mode
-        if key.code == KeyCode::Char('c')
-            && key.modifiers == KeyModifiers::CONTROL
-            && self.state.ui.focused_pane == FocusedPane::TabularOutput
-        {
-            if let Some(tab) = self.state.table_viewer_state.current_tab_mut() {
-                if tab.in_edit_mode {
-                    // Cancel edit without saving
-                    tab.cancel_edit();
-                    return Ok(());
-                }
-            }
-        }
+                // Mark connection as in progress
+                self.state.connecting_in_progress = Some(selected_index);
+                self.state.connecting_animation_frame = 0;
+                self.state.connection_start_time = Some(std::time::Instant::now());
 
-        // Handle typing in table viewer edit mode or search mode
-        if self.state.ui.focused_pane == FocusedPane::TabularOutput {
-            if let Some(tab) = self.state.table_viewer_state.current_tab_mut() {
-                if tab.in_edit_mode {
-                    match key.code {
-                        KeyCode::Char(c) => {
-                            tab.edit_buffer.push(c);
-                            return Ok(());
-                        }
-                        KeyCode::Backspace => {
-                            tab.edit_buffer.pop();
-                            return Ok(());
-                        }
-                        _ => {}
-                    }
-                } else if tab.in_search_mode {
-                    match key.code {
-                        KeyCode::Esc => {
-                            tab.cancel_search();
-                            return Ok(());
-                        }
-                        KeyCode::Enter => {
-                            tab.in_search_mode = false;
-                            return Ok(());
-                        }
-                        KeyCode::Char('n') => {
-                            tab.next_search_result();
-                            return Ok(());
-                        }
-                        KeyCode::Char('N') => {
-                            tab.prev_search_result();
-                            return Ok(());
-                        }
-                        KeyCode::Char(c) => {
-                            // Don't treat navigation keys as search input
-                            if c == 'h' || c == 'l' || c == 'j' || c == 'k' {
-                                // Exit search mode and let the key be handled as navigation
-                                tab.in_search_mode = false;
-                                // Don't return early - let the key be processed normally
-                            } else {
-                                tab.search_query.push(c);
-                                tab.update_search(&tab.search_query.clone());
-                                return Ok(());
-                            }
-                        }
-                        KeyCode::Backspace => {
-                            tab.search_query.pop();
-                            tab.update_search(&tab.search_query.clone());
-                            return Ok(());
-                        }
-                        _ => {}
-                    }
+                // Set status to connecting immediately (for visual feedback)
+                if let Some(conn) = self.state.db.connections.connections.get_mut(selected_index) {
+                    conn.status = crate::database::ConnectionStatus::Connecting;
+                    self.state.toast_manager.info(format!("Connecting to {}...", conn.name));
                 }
-            }
-        }
 
-        // Handle connection mode if active
-        // Handle overlay views
-        if let Some(overlay) = self.state.ui.current_view.overlay() {
-            return match overlay {
-                OverlayView::ConnectionForm(_) => self.handle_connection_mode_key_event(key).await,
-                OverlayView::TableCreator => self.handle_table_creator_key_event(key).await,
-                OverlayView::TableEditor => self.handle_table_editor_key_event(key).await,
-                OverlayView::DebugView => {
-                    // Debug view is handled earlier in the function
-                    Ok(())
-                }
-                OverlayView::Help => {
-                    // Help is handled earlier in the function
-                    Ok(())
-                }
-            };
-        }
+                // Clone necessary data for background task
+                let connection_config = self.state.db.connections.connections[selected_index].clone();
+                let connection_manager = self.state.connection_manager.clone();
+                let tx = self.connection_events_tx.clone();
 
-        // Handle connections search input
-        if self.state.ui.connections_search_active
-            && self.state.ui.focused_pane == FocusedPane::Connections
-        {
-            match key.code {
-                KeyCode::Backspace => {
-                    self.state.ui.backspace_connections_search();
-                    // Update filtered connections after character removal
-                    self.state
-                        .ui
-                        .update_filtered_connections(&self.state.db.connections.connections);
-                    return Ok(());
-                }
-                KeyCode::Enter => {
-                    // Connect to the highlighted connection
-                    self.state.connect_to_selected_database().await;
-                    // Exit search mode
-                    self.state.ui.exit_connections_search();
-                    return Ok(());
-                }
-                KeyCode::Down => {
-                    self.state
-                        .ui
-                        .connections_selection_down(&self.state.db.connections.connections);
-                    return Ok(());
-                }
-                KeyCode::Up => {
-                    self.state
-                        .ui
-                        .connections_selection_up(&self.state.db.connections.connections);
-                    return Ok(());
-                }
-                KeyCode::Char(c) => {
-                    self.state.ui.add_to_connections_search(c);
-                    // Update filtered connections after character addition
-                    self.state
-                        .ui
-                        .update_filtered_connections(&self.state.db.connections.connections);
-                    return Ok(());
-                }
-                _ => {}
-            }
-        }
-
-        // Handle tables search input
-        if self.state.ui.tables_search_active && self.state.ui.focused_pane == FocusedPane::Tables {
-            match key.code {
-                KeyCode::Backspace => {
-                    self.state.ui.backspace_tables_search();
-                    return Ok(());
-                }
-                KeyCode::Enter => {
-                    // Select the highlighted table and open it for viewing
-                    self.state.open_table_for_viewing().await;
-                    // Exit search mode
-                    self.state.ui.exit_tables_search();
-                    return Ok(());
-                }
-                KeyCode::Down => {
-                    self.state.ui.table_search_selection_down();
-                    return Ok(());
-                }
-                KeyCode::Up => {
-                    self.state.ui.table_search_selection_up();
-                    return Ok(());
-                }
-                KeyCode::Char(c) => {
-                    self.state.ui.add_to_tables_search(c);
-                    return Ok(());
-                }
-                _ => {}
-            }
-        }
-
-        // Handle input modes in SQL files pane
-        if self.state.ui.focused_pane == FocusedPane::SqlFiles {
-            if self.state.ui.sql_files_search_active {
-                match key.code {
-                    KeyCode::Esc => {
-                        self.state.ui.exit_sql_files_search();
-                        return Ok(());
-                    }
-                    KeyCode::Backspace => {
-                        self.state.ui.backspace_sql_files_search();
-                        return Ok(());
-                    }
-                    KeyCode::Enter => {
-                        // Load the selected SQL file before exiting search mode
-                        if let Err(e) = self.state.load_selected_sql_file() {
-                            self.state
-                                .toast_manager
-                                .error(format!("Failed to load SQL file: {e}"));
-                        } else {
-                            self.state.toast_manager.success("SQL file loaded");
-                        }
-                        self.state.ui.exit_sql_files_search();
-                        return Ok(());
-                    }
-                    KeyCode::Down | KeyCode::Char('j') => {
-                        self.state.update_sql_file_selection_for_filtered(1);
-                        return Ok(());
-                    }
-                    KeyCode::Up | KeyCode::Char('k') => {
-                        self.state.update_sql_file_selection_for_filtered(-1);
-                        return Ok(());
-                    }
-                    KeyCode::Char(c) => {
-                        // Don't handle navigation keys as input
-                        if c != 'j' && c != 'k' {
-                            self.state.ui.add_to_sql_files_search(c);
-                        }
-                        return Ok(());
-                    }
-                    _ => {}
-                }
-            } else if self.state.ui.sql_files_rename_mode {
-                match key.code {
-                    KeyCode::Esc => {
-                        self.state.ui.exit_sql_files_rename();
-                        return Ok(());
-                    }
-                    KeyCode::Backspace => {
-                        self.state.ui.backspace_sql_files_rename();
-                        return Ok(());
-                    }
-                    KeyCode::Enter => {
-                        let new_name = self.state.ui.sql_files_rename_buffer.clone();
-                        if !new_name.is_empty() {
-                            let filtered_files = self.state.get_filtered_sql_files();
-                            let selected_index = self.state.get_filtered_sql_file_selection();
-                            if let Some(old_name) = filtered_files.get(selected_index) {
-                                if let Some(original_index) = self
-                                    .state
-                                    .saved_sql_files
-                                    .iter()
-                                    .position(|f| f == old_name)
-                                {
-                                    if let Err(e) =
-                                        self.state.rename_sql_file(original_index, &new_name)
-                                    {
-                                        self.state
-                                            .toast_manager
-                                            .error(format!("Failed to rename file: {e}"));
-                                    } else {
-                                        self.state
-                                            .toast_manager
-                                            .success("File renamed successfully");
-                                    }
+                // Spawn connection task in background
+                tokio::spawn(async move {
+                    // Attempt to establish connection
+                    match connection_manager.connect(&connection_config).await {
+                        Ok(_) => {
+                            // Connection succeeded, now get database objects
+                            match connection_manager.list_database_objects(&connection_config.id).await {
+                                Ok(objects) => {
+                                    // Send success event
+                                    let _ = tx.send(ConnectionEvent::Success {
+                                        connection_index: selected_index,
+                                        objects,
+                                    });
+                                }
+                                Err(e) => {
+                                    // Connection succeeded but listing objects failed
+                                    let _ = tx.send(ConnectionEvent::Failed {
+                                        connection_index: selected_index,
+                                        error: format!("Failed to load database objects: {}", e),
+                                    });
                                 }
                             }
                         }
-                        self.state.ui.exit_sql_files_rename();
-                        return Ok(());
-                    }
-                    KeyCode::Char(c) => {
-                        self.state.ui.add_to_sql_files_rename(c);
-                        return Ok(());
-                    }
-                    _ => {}
-                }
-            } else if self.state.ui.sql_files_create_mode {
-                match key.code {
-                    KeyCode::Esc => {
-                        self.state.ui.exit_sql_files_create();
-                        return Ok(());
-                    }
-                    KeyCode::Backspace => {
-                        self.state.ui.backspace_sql_files_create();
-                        return Ok(());
-                    }
-                    KeyCode::Enter => {
-                        let filename = self.state.ui.sql_files_create_buffer.clone();
-                        if !filename.is_empty() {
-                            if let Err(e) = self.state.create_sql_file(&filename) {
-                                self.state
-                                    .toast_manager
-                                    .error(format!("Failed to create file: {e}"));
-                            } else {
-                                self.state
-                                    .toast_manager
-                                    .success("File created successfully");
-                            }
-                        }
-                        self.state.ui.exit_sql_files_create();
-                        return Ok(());
-                    }
-                    KeyCode::Char(c) => {
-                        self.state.ui.add_to_sql_files_create(c);
-                        return Ok(());
-                    }
-                    _ => {}
-                }
-            }
-        }
-
-        match self.mode {
-            Mode::Normal => {
-                match (key.modifiers, key.code) {
-                    // Enter command mode with ':'
-                    (KeyModifiers::NONE, KeyCode::Char(':')) => {
-                        self.mode = Mode::Command;
-                        self.command_buffer.clear();
-                    }
-                    // Direct pane navigation with number keys (1-6)
-                    (KeyModifiers::NONE, KeyCode::Char(c @ '1'..='6')) => {
-                        self.state.ui.cancel_pending_gg();
-                        if let Some(pane) = FocusedPane::from_number(c.to_digit(10).unwrap() as u8)
-                        {
-                            self.state.ui.focused_pane = pane;
-                        }
-                    }
-                    // Tab to cycle through panes
-                    (KeyModifiers::NONE, KeyCode::Tab) => {
-                        self.state.ui.cancel_pending_gg();
-                        self.state.cycle_focus_forward();
-                    }
-                    (KeyModifiers::SHIFT, KeyCode::BackTab) => {
-                        self.state.ui.cancel_pending_gg();
-                        self.state.cycle_focus_backward();
-                    }
-                    // Vim-style navigation within panes
-                    (KeyModifiers::NONE, KeyCode::Char('j')) => {
-                        if self.state.ui.focused_pane == FocusedPane::Connections
-                            && !self.state.ui.connections_search_active
-                        {
-                            self.state
-                                .ui
-                                .connections_selection_down(&self.state.db.connections.connections);
-                        } else if self.state.ui.focused_pane == FocusedPane::Tables
-                            && !self.state.ui.tables_search_active
-                        {
-                            self.state.ui.table_search_selection_down();
-                            // Cancel any pending gg command
-                            self.state.ui.cancel_pending_gg();
-                        } else if self.state.ui.focused_pane == FocusedPane::SqlFiles
-                            && !self.state.ui.sql_files_search_active
-                            && !self.state.ui.sql_files_rename_mode
-                            && !self.state.ui.sql_files_create_mode
-                        {
-                            self.state.update_sql_file_selection_for_filtered(1);
-                        } else {
-                            self.state.move_down();
-                        }
-                    }
-                    (KeyModifiers::NONE, KeyCode::Char('k')) => {
-                        if self.state.ui.focused_pane == FocusedPane::Connections
-                            && !self.state.ui.connections_search_active
-                        {
-                            self.state
-                                .ui
-                                .connections_selection_up(&self.state.db.connections.connections);
-                        } else if self.state.ui.focused_pane == FocusedPane::Tables
-                            && !self.state.ui.tables_search_active
-                        {
-                            self.state.ui.table_search_selection_up();
-                            // Cancel any pending gg command
-                            self.state.ui.cancel_pending_gg();
-                        } else if self.state.ui.focused_pane == FocusedPane::SqlFiles
-                            && !self.state.ui.sql_files_search_active
-                            && !self.state.ui.sql_files_rename_mode
-                            && !self.state.ui.sql_files_create_mode
-                        {
-                            self.state.update_sql_file_selection_for_filtered(-1);
-                        } else {
-                            self.state.move_up();
-                        }
-                    }
-                    (KeyModifiers::NONE, KeyCode::Char('h')) => {
-                        self.state.move_left();
-                    }
-                    (KeyModifiers::NONE, KeyCode::Char('l')) => {
-                        self.state.move_right();
-                    }
-                    // Enter insert mode (or Query mode for query window, or edit cell in table viewer)
-                    (KeyModifiers::NONE, KeyCode::Char('i')) => {
-                        if self.state.ui.focused_pane == FocusedPane::TabularOutput {
-                            // Start editing cell in table viewer
-                            if let Some(tab) = self.state.table_viewer_state.current_tab_mut() {
-                                tab.start_edit();
-                            }
-                        } else if self.state.ui.focused_pane == FocusedPane::QueryWindow
-                            || self.state.ui.focused_pane == FocusedPane::SqlFiles
-                        {
-                            self.mode = Mode::Query;
-                            // Set QueryEditor to insert mode when entering Query mode with 'i'
-                            self.state.query_editor.set_insert_mode(true);
-                            self.state.ui.text_input_mode = TextInputMode::Insert;
-                        } else {
-                            self.mode = Mode::Insert;
-                        }
-                    }
-                    // Enter visual mode
-                    (KeyModifiers::NONE, KeyCode::Char('v')) => {
-                        self.mode = Mode::Visual;
-                    }
-                    // Show help overlay (already handled globally)
-                    // This branch is kept for backwards compatibility
-                    (KeyModifiers::NONE, KeyCode::Char('?')) => {
-                        // Already handled globally
-                    }
-                    // Add connection (only in connections pane)
-                    (KeyModifiers::NONE, KeyCode::Char('a')) => {
-                        if self.state.ui.focused_pane == crate::app::state::FocusedPane::Connections
-                        {
-                            self.state.ui.enter_add_connection_mode();
-                        }
-                    }
-                    // Edit table/connection based on focused pane
-                    (KeyModifiers::NONE, KeyCode::Char('e')) => {
-                        if self.state.ui.focused_pane == crate::app::state::FocusedPane::Tables
-                            && !self.state.db.tables.is_empty()
-                        {
-                            // Check if we have an active connection
-                            if let Some(connection) = self
-                                .state
-                                .db
-                                .connections
-                                .connections
-                                .get(self.state.ui.selected_connection)
-                            {
-                                if matches!(
-                                    connection.status,
-                                    crate::database::ConnectionStatus::Connected
-                                ) {
-                                    self.state.open_table_editor().await;
-                                }
-                            }
-                        } else if self.state.ui.focused_pane
-                            == crate::app::state::FocusedPane::Connections
-                            && !self.state.db.connections.connections.is_empty()
-                        {
-                            if let Some(connection) = self
-                                .state
-                                .db
-                                .connections
-                                .connections
-                                .get(self.state.ui.selected_connection)
-                                .cloned()
-                            {
-                                self.state.ui.enter_edit_connection_mode(connection);
-                            }
-                        }
-                    }
-                    // Create new table (only in tables pane when connected) or next search result
-                    (KeyModifiers::NONE, KeyCode::Char('n')) => {
-                        if self.state.ui.focused_pane == crate::app::state::FocusedPane::Tables {
-                            // Check if we have an active connection
-                            if let Some(connection) = self
-                                .state
-                                .db
-                                .connections
-                                .connections
-                                .get(self.state.ui.selected_connection)
-                            {
-                                if matches!(
-                                    connection.status,
-                                    crate::database::ConnectionStatus::Connected
-                                ) {
-                                    self.state.open_table_creator();
-                                }
-                            }
-                        } else if self.state.ui.focused_pane == FocusedPane::SqlFiles {
-                            // Create new SQL file
-                            if !self.state.ui.sql_files_search_active
-                                && !self.state.ui.sql_files_rename_mode
-                                && !self.state.ui.sql_files_create_mode
-                            {
-                                self.state.ui.enter_sql_files_create();
-                            }
-                        } else if self.state.ui.focused_pane == FocusedPane::TabularOutput {
-                            // Next search result (when not in search mode)
-                            if let Some(tab) = self.state.table_viewer_state.current_tab_mut() {
-                                if !tab.in_edit_mode
-                                    && !tab.in_search_mode
-                                    && !tab.search_results.is_empty()
-                                {
-                                    tab.next_search_result();
-                                }
-                            }
-                        }
-                    }
-                    // Previous search result
-                    (KeyModifiers::NONE, KeyCode::Char('N')) => {
-                        if self.state.ui.focused_pane == FocusedPane::TabularOutput {
-                            // Previous search result (when not in search mode)
-                            if let Some(tab) = self.state.table_viewer_state.current_tab_mut() {
-                                if !tab.in_edit_mode
-                                    && !tab.in_search_mode
-                                    && !tab.search_results.is_empty()
-                                {
-                                    tab.prev_search_result();
-                                }
-                            }
-                        }
-                    }
-                    // Handle 'x' key for different panes
-                    (KeyModifiers::NONE, KeyCode::Char('x')) => {
-                        match self.state.ui.focused_pane {
-                            FocusedPane::Connections => {
-                                // Disconnect current connection
-                                self.state.disconnect_from_database().await;
-                                self.state.toast_manager.info("Connection disconnected");
-                            }
-                            FocusedPane::TabularOutput => {
-                                // Close current tab
-                                self.state.table_viewer_state.close_current_tab();
-                            }
-                            _ => {}
-                        }
-                    }
-                    // Copy SQL file (only in SQL Files pane)
-                    (KeyModifiers::NONE, KeyCode::Char('c'))
-                        if self.state.ui.focused_pane == FocusedPane::SqlFiles =>
-                    {
-                        if !self.state.ui.sql_files_search_active
-                            && !self.state.ui.sql_files_rename_mode
-                            && !self.state.ui.sql_files_create_mode
-                            && !self.state.saved_sql_files.is_empty()
-                        {
-                            let filtered_files = self.state.get_filtered_sql_files();
-                            let selected_index = self.state.get_filtered_sql_file_selection();
-                            if let Some(filename) = filtered_files.get(selected_index) {
-                                // Find the original index in the full list
-                                if let Some(original_index) = self
-                                    .state
-                                    .saved_sql_files
-                                    .iter()
-                                    .position(|f| f == filename)
-                                {
-                                    let new_name = format!("{}_copy", filename);
-                                    if let Err(e) =
-                                        self.state.duplicate_sql_file(original_index, &new_name)
-                                    {
-                                        self.state
-                                            .toast_manager
-                                            .error(format!("Failed to copy file: {e}"));
-                                    } else {
-                                        self.state
-                                            .toast_manager
-                                            .success(format!("File copied as {new_name}"));
-                                    }
-                                }
-                            }
-                        }
-                    }
-                    // Delete connection with confirmation (only in Connections pane)
-                    (KeyModifiers::NONE, KeyCode::Char('d'))
-                        if self.state.ui.focused_pane
-                            == crate::app::state::FocusedPane::Connections =>
-                    {
-                        if let Some(connection) = self
-                            .state
-                            .db
-                            .connections
-                            .connections
-                            .get(self.state.ui.selected_connection)
-                        {
-                            let conn_name = connection.name.clone();
-                            self.state.ui.confirmation_modal = Some(crate::ui::ConfirmationModal {
-                                title: "Delete Connection".to_string(),
-                                message: format!(
-                                    "Are you sure you want to delete the connection '{conn_name}'?"
-                                ),
-                                action: crate::ui::ConfirmationAction::DeleteConnection(
-                                    self.state.ui.selected_connection,
-                                ),
+                        Err(e) => {
+                            // Connection failed
+                            let _ = tx.send(ConnectionEvent::Failed {
+                                connection_index: selected_index,
+                                error: e.to_string(),
                             });
                         }
                     }
-                    // Delete SQL file with confirmation (only in SQL Files pane)
-                    (KeyModifiers::NONE, KeyCode::Char('d'))
-                        if self.state.ui.focused_pane == FocusedPane::SqlFiles =>
-                    {
-                        if !self.state.ui.sql_files_search_active
-                            && !self.state.ui.sql_files_rename_mode
-                            && !self.state.ui.sql_files_create_mode
-                            && !self.state.saved_sql_files.is_empty()
-                        {
-                            let filtered_files = self.state.get_filtered_sql_files();
-                            let selected_index = self.state.get_filtered_sql_file_selection();
-                            if let Some(filename) = filtered_files.get(selected_index) {
-                                self.state.ui.confirmation_modal =
-                                    Some(crate::ui::ConfirmationModal {
-                                        title: "Delete SQL File".to_string(),
-                                        message: format!(
-                                        "Are you sure you want to delete the SQL file '{filename}'?"
-                                    ),
-                                        action: crate::ui::ConfirmationAction::DeleteSqlFile(
-                                            // Find the original index in the full list
-                                            self.state
-                                                .saved_sql_files
-                                                .iter()
-                                                .position(|f| f == filename)
-                                                .unwrap_or(0),
-                                        ),
-                                    });
-                            }
-                        }
-                    }
-                    // Connect/select action
-                    (KeyModifiers::NONE, KeyCode::Enter)
-                    | (KeyModifiers::NONE, KeyCode::Char(' ')) => {
-                        if self.state.ui.focused_pane == crate::app::state::FocusedPane::Connections
-                        {
-                            // Always connect to selected database (disconnecting others)
-                            // This will work correctly with search mode through get_selected_connection_index
-                            self.state.connect_to_selected_database().await;
-                        } else if self.state.ui.focused_pane
-                            == crate::app::state::FocusedPane::Tables
-                        {
-                            // Open table for viewing
-                            self.state.open_table_for_viewing().await;
-                        } else if self.state.ui.focused_pane == FocusedPane::Details {
-                            // Load metadata for current table if not already loaded
-                            if self.state.db.current_table_metadata.is_none() {
-                                if let Some(table_name) = self
-                                    .state
-                                    .db
-                                    .tables
-                                    .get(self.state.ui.selected_table)
-                                    .cloned()
-                                {
-                                    if let Err(e) =
-                                        self.state.load_table_metadata(&table_name).await
-                                    {
-                                        self.state
-                                            .toast_manager
-                                            .error(format!("Failed to load table metadata: {e}"));
-                                    }
-                                }
-                            }
-                        } else if self.state.ui.focused_pane == FocusedPane::SqlFiles {
-                            // Load selected SQL file
-                            if let Err(e) = self.state.load_selected_sql_file() {
-                                self.state
-                                    .toast_manager
-                                    .error(format!("Failed to load SQL file: {e}"));
-                            } else {
-                                self.state.toast_manager.success("SQL file loaded");
-                            }
-                        }
-                    }
-                    // SQL Query operations - when query window or SQL files pane is focused
-                    (KeyModifiers::CONTROL, KeyCode::Char('s')) => {
-                        if self.state.ui.focused_pane == FocusedPane::QueryWindow
-                            || self.state.ui.focused_pane == FocusedPane::SqlFiles
-                        {
-                            // Save current query
-                            if let Err(e) = self.state.save_query() {
-                                self.state
-                                    .toast_manager
-                                    .error(format!("Failed to save query: {e}"));
-                            } else {
-                                self.state.toast_manager.success("Query saved successfully");
-                            }
-                        }
-                    }
-                    (KeyModifiers::CONTROL, KeyCode::Char('o')) => {
-                        if self.state.ui.focused_pane == FocusedPane::QueryWindow
-                            || self.state.ui.focused_pane == FocusedPane::SqlFiles
-                        {
-                            // Refresh SQL file list
-                            self.state.refresh_sql_files();
-                            self.state.clamp_sql_file_selection();
-                        }
-                    }
-                    (KeyModifiers::CONTROL, KeyCode::Char('n')) => {
-                        if self.state.ui.focused_pane == FocusedPane::QueryWindow
-                            || self.state.ui.focused_pane == FocusedPane::SqlFiles
-                        {
-                            // Create new query file
-                            let filename = format!(
-                                "query_{}",
-                                std::time::SystemTime::now()
-                                    .duration_since(std::time::UNIX_EPOCH)
-                                    .unwrap()
-                                    .as_secs()
-                            );
-                            if let Err(e) = self.state.new_query_file(&filename) {
-                                self.state
-                                    .toast_manager
-                                    .error(format!("Failed to create new query: {e}"));
-                            } else {
-                                self.state.toast_manager.success("New query file created");
-                            }
-                        }
-                    }
-                    (KeyModifiers::CONTROL, KeyCode::Enter) => {
-                        if self.state.ui.focused_pane == FocusedPane::QueryWindow {
-                            // Execute SQL query under cursor
-                            if let Some(statement) = self.state.get_statement_under_cursor() {
-                                // Execute the SQL statement
-                                match self
-                                    .state
-                                    .db
-                                    .execute_query(
-                                        &statement,
-                                        self.state.ui.selected_connection,
-                                        &self.state.connection_manager,
-                                    )
-                                    .await
-                                {
-                                    Ok((columns, rows)) => {
-                                        // Create a new tab for query results
-                                        let query_preview = if statement.len() > 30 {
-                                            format!("{}...", &statement[..30])
-                                        } else {
-                                            statement.clone()
-                                        };
-                                        let tab_name = format!("Query: {query_preview}");
-
-                                        // Add tab and populate with results
-                                        let tab_idx =
-                                            self.state.table_viewer_state.add_tab(tab_name);
-                                        if let Some(tab) =
-                                            self.state.table_viewer_state.tabs.get_mut(tab_idx)
-                                        {
-                                            // Convert column names to ColumnInfo
-                                            tab.columns = columns.iter().map(|name| {
-                                                crate::ui::components::table_viewer::ColumnInfo {
-                                                    name: name.clone(),
-                                                    data_type: "TEXT".to_string(),
-                                                    is_nullable: true,
-                                                    is_primary_key: false,
-                                                    max_display_width: 20,
-                                                }
-                                            }).collect();
-                                            tab.rows = rows;
-                                            tab.total_rows = tab.rows.len();
-                                            tab.loading = false;
-                                            tab.error = None;
-                                        }
-
-                                        self.state.toast_manager.success(format!(
-                                            "Query executed: {} rows returned",
-                                            self.state.table_viewer_state.tabs[tab_idx].rows.len()
-                                        ));
-                                        // Focus on tabular output to see results
-                                        self.state.ui.focused_pane = FocusedPane::TabularOutput;
-                                    }
-                                    Err(e) => {
-                                        self.state
-                                            .toast_manager
-                                            .error(format!("Query failed: {e}"));
-                                    }
-                                }
-                            } else {
-                                self.state
-                                    .toast_manager
-                                    .warning("No SQL statement under cursor");
-                            }
-                        }
-                    }
-                    // Search commands
-                    (KeyModifiers::NONE, KeyCode::Char('/')) => {
-                        if self.state.ui.focused_pane == FocusedPane::Connections {
-                            // Start search mode in connections pane
-                            self.state.ui.enter_connections_search();
-                        } else if self.state.ui.focused_pane == FocusedPane::TabularOutput {
-                            // Start search mode in table viewer
-                            if let Some(tab) = self.state.table_viewer_state.current_tab_mut() {
-                                if !tab.in_edit_mode {
-                                    tab.start_search();
-                                }
-                            }
-                        } else if self.state.ui.focused_pane == FocusedPane::Tables {
-                            // Start search mode in tables pane
-                            self.state.ui.enter_tables_search();
-                        } else if self.state.ui.focused_pane == FocusedPane::SqlFiles {
-                            // Start search mode in SQL files pane
-                            if !self.state.ui.sql_files_rename_mode
-                                && !self.state.ui.sql_files_create_mode
-                            {
-                                self.state.ui.enter_sql_files_search();
-                            }
-                        }
-                    }
-                    // Handle uppercase S for previous tab (both with and without SHIFT modifier)
-                    (KeyModifiers::SHIFT, KeyCode::Char('S'))
-                    | (KeyModifiers::SHIFT, KeyCode::Char('s'))
-                    | (KeyModifiers::NONE, KeyCode::Char('S')) => {
-                        if self.state.ui.focused_pane == FocusedPane::TabularOutput {
-                            // Previous tab
-                            self.state.table_viewer_state.prev_tab();
-                        }
-                    }
-                    // Handle uppercase D for next tab (with SHIFT modifier)
-                    (KeyModifiers::SHIFT, KeyCode::Char('D'))
-                    | (KeyModifiers::SHIFT, KeyCode::Char('d'))
-                    | (KeyModifiers::NONE, KeyCode::Char('D')) => {
-                        if self.state.ui.focused_pane == FocusedPane::TabularOutput {
-                            // Next tab
-                            self.state.table_viewer_state.next_tab();
-                        }
-                    }
-                    (KeyModifiers::NONE, KeyCode::Char('r')) => {
-                        match self.state.ui.focused_pane {
-                            FocusedPane::TabularOutput => {
-                                // Reload current table
-                                if let Err(e) = self.state.reload_current_table_tab().await {
-                                    self.state
-                                        .toast_manager
-                                        .error(format!("Failed to reload table: {e}"));
-                                } else {
-                                    self.state.toast_manager.info("Table data refreshed");
-                                }
-                            }
-                            FocusedPane::Details => {
-                                // Refresh table metadata
-                                if let Some(table_name) = self.state.ui.get_selected_table_name() {
-                                    if let Err(e) =
-                                        self.state.load_table_metadata(&table_name).await
-                                    {
-                                        self.state
-                                            .toast_manager
-                                            .error(format!("Failed to refresh metadata: {e}"));
-                                    } else {
-                                        self.state.toast_manager.info("Table metadata refreshed");
-                                        // Reset scroll position to show the new data
-                                        self.state.ui.details_viewport_offset = 0;
-                                    }
-                                } else {
-                                    self.state.toast_manager.warning("No table selected");
-                                }
-                            }
-                            FocusedPane::SqlFiles => {
-                                // Rename SQL file
-                                if !self.state.ui.sql_files_search_active
-                                    && !self.state.ui.sql_files_rename_mode
-                                    && !self.state.ui.sql_files_create_mode
-                                    && !self.state.saved_sql_files.is_empty()
-                                {
-                                    let filtered_files = self.state.get_filtered_sql_files();
-                                    let selected_index =
-                                        self.state.get_filtered_sql_file_selection();
-                                    if let Some(filename) = filtered_files.get(selected_index) {
-                                        self.state.ui.enter_sql_files_rename(filename);
-                                    }
-                                }
-                            }
-                            _ => {}
-                        }
-                    }
-                    (KeyModifiers::NONE, KeyCode::Char('t')) => {
-                        if self.state.ui.focused_pane == FocusedPane::TabularOutput {
-                            // Toggle between data and schema view
-                            if let Some(tab) = self.state.table_viewer_state.current_tab_mut() {
-                                tab.toggle_view_mode();
-                                let mode_name = match tab.view_mode {
-                                    crate::ui::components::table_viewer::TableViewMode::Data => {
-                                        "Data"
-                                    }
-                                    crate::ui::components::table_viewer::TableViewMode::Schema => {
-                                        "Schema"
-                                    }
-                                };
-                                self.state
-                                    .toast_manager
-                                    .info(format!("Switched to {} view", mode_name));
-                            }
-                        }
-                    }
-                    // Pagination
-                    (KeyModifiers::CONTROL, KeyCode::Char('d')) => {
-                        crate::log_debug!(
-                            "Table pagination: Ctrl+D reached, focused_pane: {:?}",
-                            self.state.ui.focused_pane
-                        );
-                        if self.state.ui.focused_pane == FocusedPane::TabularOutput {
-                            crate::log_debug!(
-                                "Table pagination: Processing Ctrl+D for TabularOutput"
-                            );
-                            if let Some(tab) = self.state.table_viewer_state.current_tab_mut() {
-                                crate::log_debug!(
-                                    "Table pagination: Current tab found, attempting page_down()"
-                                );
-                                if tab.page_down() {
-                                    crate::log_debug!("Table pagination: page_down() returned true, reloading data");
-                                    // Need to reload data
-                                    let tab_idx = self.state.table_viewer_state.active_tab;
-                                    if let Err(e) = self.state.load_table_data(tab_idx).await {
-                                        self.state
-                                            .toast_manager
-                                            .error(format!("Failed to load next page: {e}"));
-                                    }
-                                } else {
-                                    crate::log_debug!("Table pagination: page_down() returned false (already at last page?)");
-                                }
-                            } else {
-                                crate::log_debug!("Table pagination: No current tab found");
-                            }
-                        } else {
-                            crate::log_debug!(
-                                "Table pagination: Not in TabularOutput pane, ignoring Ctrl+D"
-                            );
-                        }
-                    }
-                    (KeyModifiers::CONTROL, KeyCode::Char('u')) => {
-                        crate::log_debug!(
-                            "Table pagination: Ctrl+U reached, focused_pane: {:?}",
-                            self.state.ui.focused_pane
-                        );
-                        if self.state.ui.focused_pane == FocusedPane::TabularOutput {
-                            crate::log_debug!(
-                                "Table pagination: Processing Ctrl+U for TabularOutput"
-                            );
-                            if let Some(tab) = self.state.table_viewer_state.current_tab_mut() {
-                                crate::log_debug!(
-                                    "Table pagination: Current tab found, attempting page_up()"
-                                );
-                                if tab.page_up() {
-                                    crate::log_debug!(
-                                        "Table pagination: page_up() returned true, reloading data"
-                                    );
-                                    // Need to reload data
-                                    let tab_idx = self.state.table_viewer_state.active_tab;
-                                    if let Err(e) = self.state.load_table_data(tab_idx).await {
-                                        self.state
-                                            .toast_manager
-                                            .error(format!("Failed to load previous page: {e}"));
-                                    }
-                                } else {
-                                    crate::log_debug!("Table pagination: page_up() returned false (already at first page?)");
-                                }
-                            } else {
-                                crate::log_debug!("Table pagination: No current tab found");
-                            }
-                        } else {
-                            crate::log_debug!(
-                                "Table pagination: Not in TabularOutput pane, ignoring Ctrl+U"
-                            );
-                        }
-                    }
-                    // Jump navigation in table viewer and tables pane
-                    (KeyModifiers::NONE, KeyCode::Char('g')) => {
-                        if self.state.ui.focused_pane == FocusedPane::TabularOutput {
-                            if self.leader_pressed {
-                                // gg - jump to first row
-                                if let Some(tab) = self.state.table_viewer_state.current_tab_mut() {
-                                    tab.jump_to_first();
-                                }
-                                self.leader_pressed = false;
-                            } else {
-                                self.leader_pressed = true;
-                            }
-                        } else if self.state.ui.focused_pane == FocusedPane::Tables
-                            && !self.state.ui.tables_search_active
-                        {
-                            self.state.ui.handle_g_key_press();
-                        }
-                    }
-                    (KeyModifiers::NONE, KeyCode::Char('G')) => {
-                        if self.state.ui.focused_pane == FocusedPane::TabularOutput {
-                            // Jump to last row
-                            if let Some(tab) = self.state.table_viewer_state.current_tab_mut() {
-                                tab.jump_to_last();
-                            }
-                        } else if self.state.ui.focused_pane == FocusedPane::Tables
-                            && !self.state.ui.tables_search_active
-                        {
-                            self.state.ui.table_go_to_last();
-                        }
-                    }
-                    (KeyModifiers::NONE, KeyCode::Char('0')) => {
-                        if self.state.ui.focused_pane == FocusedPane::TabularOutput {
-                            // Jump to first column
-                            if let Some(tab) = self.state.table_viewer_state.current_tab_mut() {
-                                tab.jump_to_first_col();
-                            }
-                        }
-                    }
-                    (KeyModifiers::NONE, KeyCode::Char('$')) => {
-                        if self.state.ui.focused_pane == FocusedPane::TabularOutput {
-                            // Jump to last column
-                            if let Some(tab) = self.state.table_viewer_state.current_tab_mut() {
-                                tab.jump_to_last_col();
-                            }
-                        }
-                    }
-                    // Handle 'd' for delete row (dd vim command)
-                    (KeyModifiers::NONE, KeyCode::Char('d')) => {
-                        if self.state.ui.focused_pane == FocusedPane::TabularOutput {
-                            // Check if there's a delete confirmation dialog
-                            if self.state.table_viewer_state.delete_confirmation.is_some() {
-                                // This is handled elsewhere (Enter/Esc for confirm/cancel)
-                            } else {
-                                // Check for double 'd' press (dd command)
-                                let now = std::time::Instant::now();
-                                if let Some(last_press) = self.state.table_viewer_state.last_d_press
-                                {
-                                    if now.duration_since(last_press).as_millis() < 500 {
-                                        // Double 'd' detected - prepare delete confirmation
-                                        if let Some(confirmation) = self
-                                            .state
-                                            .table_viewer_state
-                                            .prepare_delete_confirmation()
-                                        {
-                                            self.state.table_viewer_state.delete_confirmation =
-                                                Some(confirmation);
-                                        } else {
-                                            self.state
-                                                .toast_manager
-                                                .error("Cannot delete row without primary key");
-                                        }
-                                        self.state.table_viewer_state.last_d_press = None;
-                                    } else {
-                                        self.state.table_viewer_state.last_d_press = Some(now);
-                                    }
-                                } else {
-                                    self.state.table_viewer_state.last_d_press = Some(now);
-                                }
-                            }
-                        }
-                    }
-                    // Handle 'y' for yank/copy row (yy vim command)
-                    (KeyModifiers::NONE, KeyCode::Char('y')) => {
-                        if self.state.ui.focused_pane == FocusedPane::TabularOutput {
-                            // Check for double 'y' press (yy command)
-                            let now = std::time::Instant::now();
-                            if let Some(last_press) = self.state.table_viewer_state.last_y_press {
-                                if now.duration_since(last_press).as_millis() < 500 {
-                                    // Double 'y' detected - copy row to clipboard
-                                    match self.state.table_viewer_state.copy_row_csv() {
-                                        Ok(()) => {
-                                            self.state
-                                                .toast_manager
-                                                .info("Row copied to clipboard");
-                                        }
-                                        Err(e) => {
-                                            self.state
-                                                .toast_manager
-                                                .error(format!("Failed to copy row: {e}"));
-                                        }
-                                    }
-                                    self.state.table_viewer_state.last_y_press = None;
-                                } else {
-                                    self.state.table_viewer_state.last_y_press = Some(now);
-                                }
-                            } else {
-                                self.state.table_viewer_state.last_y_press = Some(now);
-                            }
-                        }
-                    }
-                    _ => {
-                        // Handle leader key combinations
-                        if self.leader_pressed {
-                            self.leader_pressed = false;
-                            // Leader key combinations can be added here for future features
-                            // For now, just reset the leader state
-                        }
-                    }
-                }
+                });
             }
-            Mode::Insert => {
-                match key.code {
-                    KeyCode::Esc => {
-                        self.mode = Mode::Normal;
-                    }
-                    _ => {
-                        // Handle insert mode input
-                    }
-                }
+            // 'r' - Refresh connections list
+            KeyCode::Char('r') => {
+                self.state.toast_manager.info("Connections refreshed");
             }
-            Mode::Visual => {
-                match key.code {
-                    KeyCode::Esc => {
-                        self.mode = Mode::Normal;
-                    }
-                    _ => {
-                        // Handle visual mode selection
-                    }
-                }
+            // '/' - Enter search mode
+            KeyCode::Char('/') => {
+                self.state.ui.enter_connections_search();
             }
-            Mode::Command => {
-                match key.code {
-                    KeyCode::Esc => {
-                        self.command_buffer.clear();
-                        self.mode = Mode::Normal;
-                    }
-                    KeyCode::Enter => {
-                        // Execute command
-                        let command = self.command_buffer.trim();
-                        if command == "q" || command == "quit" {
-                            self.execute_command(CommandId::Quit)?;
-                        }
-                        self.command_buffer.clear();
-                        self.mode = Mode::Normal;
-                    }
-                    KeyCode::Char(c) => {
-                        self.command_buffer.push(c);
-                    }
-                    KeyCode::Backspace => {
-                        self.command_buffer.pop();
-                    }
-                    _ => {}
-                }
+            // j/k or arrow keys - Navigate
+            KeyCode::Char('j') | KeyCode::Down => {
+                self.state.ui.connections_selection_down(&self.state.db.connections.connections);
             }
-            Mode::Query => {
-                use crate::app::state::TextInputMode;
-
-                // Handle global pane navigation even in Query mode
-                match (key.modifiers, key.code) {
-                    // Direct pane navigation with number keys (1-6)
-                    (KeyModifiers::NONE, KeyCode::Char(c @ '1'..='6')) => {
-                        self.state.ui.cancel_pending_gg();
-                        if let Some(pane) = FocusedPane::from_number(c.to_digit(10).unwrap() as u8)
-                        {
-                            self.state.ui.focused_pane = pane;
-                            // If we moved away from QueryWindow, exit Query mode
-                            if self.state.ui.focused_pane
-                                != crate::app::state::FocusedPane::QueryWindow
-                            {
-                                self.mode = Mode::Normal;
-                            }
-                        }
-                        return Ok(());
-                    }
-                    // Tab to cycle through panes
-                    (KeyModifiers::NONE, KeyCode::Tab) => {
-                        self.state.ui.cancel_pending_gg();
-                        self.state.cycle_focus_forward();
-                        // If we moved away from QueryWindow, exit Query mode
-                        if self.state.ui.focused_pane != crate::app::state::FocusedPane::QueryWindow
-                        {
-                            self.mode = Mode::Normal;
-                        }
-                        return Ok(());
-                    }
-                    (KeyModifiers::SHIFT, KeyCode::BackTab) => {
-                        self.state.ui.cancel_pending_gg();
-                        self.state.cycle_focus_backward();
-                        // If we moved away from QueryWindow, exit Query mode
-                        if self.state.ui.focused_pane != crate::app::state::FocusedPane::QueryWindow
-                        {
-                            self.mode = Mode::Normal;
-                        }
-                        return Ok(());
-                    }
-                    _ => {}
-                }
-
-                // Handle vim command mode
-                if self.state.ui.in_vim_command {
-                    match key.code {
-                        KeyCode::Esc => {
-                            self.state.ui.in_vim_command = false;
-                            self.state.ui.vim_command_buffer.clear();
-                        }
-                        KeyCode::Enter => {
-                            let command = self.state.ui.vim_command_buffer.trim();
-                            crate::log_info!("=== VIM COMMAND EXECUTED: '{}' ===", command);
-                            if command == "w" {
-                                crate::log_info!("Processing :w save command");
-                                // Save file
-                                match self.state.save_sql_file_with_connection() {
-                                    Err(e) => {
-                                        crate::log_info!("Save failed with error: {}", e);
-                                        self.state
-                                            .toast_manager
-                                            .error(format!("Failed to save: {e}"));
-                                    }
-                                    Ok(_) => {
-                                        crate::log_info!("Save completed successfully");
-                                        self.state.toast_manager.success("File saved");
-                                    }
-                                }
-                            } else if command == "q" {
-                                // Quit query mode with confirmation
-                                if self.state.ui.query_modified {
-                                    // Show confirmation dialog for unsaved changes
-                                    self.state.ui.confirmation_modal = Some(crate::ui::ConfirmationModal {
-                                        title: "Quit Query Editor".to_string(),
-                                        message: "You have unsaved changes in the query editor.\nAre you sure you want to quit without saving?".to_string(),
-                                        action: crate::ui::ConfirmationAction::QuitQueryEditor,
-                                    });
-                                } else {
-                                    // No unsaved changes, still show confirmation
-                                    self.state.ui.confirmation_modal =
-                                        Some(crate::ui::ConfirmationModal {
-                                            title: "Quit Query Editor".to_string(),
-                                            message:
-                                                "Are you sure you want to quit the query editor?"
-                                                    .to_string(),
-                                            action: crate::ui::ConfirmationAction::QuitQueryEditor,
-                                        });
-                                }
-                            } else if command == "q!" {
-                                // Force quit
-                                self.mode = Mode::Normal;
-                            } else if command == "wq" {
-                                // Save and quit
-                                if let Err(e) = self.state.save_sql_file_with_connection() {
-                                    self.state
-                                        .toast_manager
-                                        .error(format!("Failed to save: {e}"));
-                                } else {
-                                    self.state.toast_manager.success("File saved");
-                                    self.mode = Mode::Normal;
-                                }
-                            }
-                            self.state.ui.in_vim_command = false;
-                            self.state.ui.vim_command_buffer.clear();
-                        }
-                        KeyCode::Char(c) => {
-                            self.state.ui.vim_command_buffer.push(c);
-                        }
-                        KeyCode::Backspace => {
-                            self.state.ui.vim_command_buffer.pop();
-                        }
-                        _ => {}
-                    }
-                } else if self.state.ui.text_input_mode == TextInputMode::Insert {
-                    // Insert mode - handle text input using QueryEditor
-                    match key.code {
-                        KeyCode::Esc => {
-                            // First check if suggestions are active and hide them
-                            if self.state.query_editor.are_suggestions_active() {
-                                self.state.query_editor.hide_suggestions();
-                            } else {
-                                // No suggestions active, exit insert mode
-                                self.state.ui.text_input_mode = TextInputMode::Normal;
-                                self.state.query_editor.set_insert_mode(false);
-                            }
-                        }
-                        KeyCode::Enter => {
-                            self.state.query_editor.insert_newline();
-                            // Sync content back to legacy field
-                            self.state.query_content =
-                                self.state.query_editor.get_content().to_string();
-                            self.state.ui.query_modified = true;
-                        }
-                        KeyCode::Char(c) => {
-                            self.state.query_editor.insert_char(c);
-                            // Sync content back to legacy field
-                            self.state.query_content =
-                                self.state.query_editor.get_content().to_string();
-                            self.state.ui.query_modified = true;
-                        }
-                        KeyCode::Backspace => {
-                            self.state.query_editor.backspace();
-                            // Sync content back to legacy field
-                            self.state.query_content =
-                                self.state.query_editor.get_content().to_string();
-                            self.state.ui.query_modified = true;
-                        }
-                        KeyCode::Left => {
-                            self.state.query_editor.move_cursor_left();
-                        }
-                        KeyCode::Right => {
-                            self.state.query_editor.move_cursor_right();
-                        }
-                        KeyCode::Up => {
-                            // If suggestions are active, navigate suggestions, otherwise move cursor
-                            if self.state.query_editor.are_suggestions_active() {
-                                self.state.query_editor.move_suggestion_up();
-                            } else {
-                                self.state.query_editor.move_cursor_up();
-                            }
-                        }
-                        KeyCode::Down => {
-                            // If suggestions are active, navigate suggestions, otherwise move cursor
-                            if self.state.query_editor.are_suggestions_active() {
-                                self.state.query_editor.move_suggestion_down();
-                            } else {
-                                self.state.query_editor.move_cursor_down();
-                            }
-                        }
-                        KeyCode::Tab => {
-                            // Accept suggestion if available
-                            if self.state.query_editor.are_suggestions_active() {
-                                self.state.query_editor.accept_suggestion();
-                                // Sync content back to legacy field
-                                self.state.query_content =
-                                    self.state.query_editor.get_content().to_string();
-                                self.state.ui.query_modified = true;
-                            }
-                        }
-                        _ => {}
-                    }
-                } else if key.modifiers == KeyModifiers::CONTROL {
-                    // Handle Ctrl key combinations in query mode
-                    if key.code == KeyCode::Enter {
-                        // Execute query at cursor position
-                        match self.state.execute_query_at_cursor().await {
-                            Ok(()) => {
-                                // Query executed successfully, result is already in the data pane
-                            }
-                            Err(_) => {
-                                // Error is already shown in toast notification
-                            }
-                        }
-                    }
-                } else {
-                    // Normal mode - vim navigation
-                    if let (KeyModifiers::CONTROL, KeyCode::Enter) = (key.modifiers, key.code) {
-                        // Execute query at cursor position
-                        match self.state.execute_query_at_cursor().await {
-                            Ok(()) => {
-                                // Query executed successfully, result is already in the data pane
-                            }
-                            Err(_) => {
-                                // Error is already shown in toast notification
-                            }
-                        }
-                    }
-
-                    // Handle normal mode key presses (no modifiers)
-                    match key.code {
-                        KeyCode::Esc => {
-                            // Cancel any pending vim commands first
-                            if self.state.query_editor.has_pending_command() {
-                                self.state.query_editor.cancel_pending_command();
-                            } else {
-                                self.mode = Mode::Normal;
-                            }
-                        }
-                        KeyCode::Char('i') => {
-                            self.state.ui.text_input_mode = TextInputMode::Insert;
-                            self.state.query_editor.set_insert_mode(true);
-                        }
-                        KeyCode::Char(':') => {
-                            self.state.ui.in_vim_command = true;
-                            self.state.ui.vim_command_buffer.clear();
-                        }
-                        KeyCode::Char('q') => {
-                            // Quit query mode with confirmation
-                            if self.state.ui.query_modified {
-                                // Show confirmation dialog for unsaved changes
-                                self.state.ui.confirmation_modal = Some(crate::ui::ConfirmationModal {
-                                    title: "Quit Query Editor".to_string(),
-                                    message: "You have unsaved changes in the query editor.\nAre you sure you want to quit without saving?".to_string(),
-                                    action: crate::ui::ConfirmationAction::QuitQueryEditor,
-                                });
-                            } else {
-                                // No unsaved changes, still show confirmation
-                                self.state.ui.confirmation_modal =
-                                    Some(crate::ui::ConfirmationModal {
-                                        title: "Quit Query Editor".to_string(),
-                                        message: "Are you sure you want to quit the query editor?"
-                                            .to_string(),
-                                        action: crate::ui::ConfirmationAction::QuitQueryEditor,
-                                    });
-                            }
-                        }
-                        // Vim navigation using QueryEditor methods
-                        KeyCode::Char('h') => {
-                            self.state.query_editor.move_cursor_left();
-                        }
-                        KeyCode::Char('j') => {
-                            self.state.query_editor.move_cursor_down();
-                        }
-                        KeyCode::Char('k') => {
-                            self.state.query_editor.move_cursor_up();
-                        }
-                        KeyCode::Char('l') => {
-                            self.state.query_editor.move_cursor_right();
-                        }
-                        KeyCode::Char('E') => {
-                            // Execute query at cursor position with 'E' key
-                            match self.state.execute_query_at_cursor().await {
-                                Ok(()) => {
-                                    // Query executed successfully, result is already in the data pane
-                                }
-                                Err(_) => {
-                                    // Error is already shown in toast notification
-                                }
-                            }
-                        }
-                        // Arrow key navigation (same as vim keys for consistency)
-                        KeyCode::Left => {
-                            self.state.query_editor.move_cursor_left();
-                        }
-                        KeyCode::Right => {
-                            self.state.query_editor.move_cursor_right();
-                        }
-                        KeyCode::Up => {
-                            self.state.query_editor.move_cursor_up();
-                        }
-                        KeyCode::Down => {
-                            self.state.query_editor.move_cursor_down();
-                        }
-                        // Word navigation
-                        KeyCode::Char('w') => {
-                            self.state.query_editor.move_to_next_word();
-                        }
-                        KeyCode::Char('b') => {
-                            self.state.query_editor.move_to_prev_word();
-                        }
-                        KeyCode::Char('e') => {
-                            self.state.query_editor.move_to_end_of_word();
-                        }
-                        // Line navigation
-                        KeyCode::Char('0') => {
-                            self.state.query_editor.move_to_line_start();
-                        }
-                        KeyCode::Char('$') => {
-                            self.state.query_editor.move_to_line_end();
-                        }
-                        // File navigation
-                        KeyCode::Char('g') => {
-                            // Check for double 'g' (gg command)
-                            // Note: For simplicity, using single 'g' for now
-                            // TODO: Implement proper double-key detection
-                            self.state.query_editor.move_to_file_start();
-                        }
-                        KeyCode::Char('G') => {
-                            self.state.query_editor.move_to_file_end();
-                        }
-                        // Line editing commands - need to handle in catch-all to support multi-char commands
-                        KeyCode::Char('D') => {
-                            self.state.query_editor.delete_to_line_end();
-                            // Sync content back to legacy field
-                            self.state.query_content =
-                                self.state.query_editor.get_content().to_string();
-                            self.state.ui.query_modified = true;
-                        }
-                        // Vim insert mode commands
-                        KeyCode::Char('o') => {
-                            self.state.query_editor.insert_line_below();
-                            // Sync content back to legacy field
-                            self.state.query_content =
-                                self.state.query_editor.get_content().to_string();
-                            self.state.ui.query_modified = true;
-                        }
-                        KeyCode::Char('O') => {
-                            self.state.query_editor.insert_line_above();
-                            // Sync content back to legacy field
-                            self.state.query_content =
-                                self.state.query_editor.get_content().to_string();
-                            self.state.ui.query_modified = true;
-                        }
-                        KeyCode::Char('A') => {
-                            self.state.query_editor.append_to_line_end();
-                        }
-                        KeyCode::Char('I') => {
-                            self.state.query_editor.insert_at_line_start();
-                        }
-                        // Page scrolling (Ctrl+d, Ctrl+u) - only when QueryWindow is focused
-                        KeyCode::Char('d')
-                            if key.modifiers.contains(KeyModifiers::CONTROL)
-                                && self.state.ui.focused_pane == FocusedPane::QueryWindow =>
-                        {
-                            self.state.scroll_half_page_down();
-                        }
-                        KeyCode::Char('u')
-                            if key.modifiers.contains(KeyModifiers::CONTROL)
-                                && self.state.ui.focused_pane == FocusedPane::QueryWindow =>
-                        {
-                            self.state.scroll_half_page_up();
-                        }
-                        // Legacy shortcuts (Ctrl+s, Ctrl+n)
-                        KeyCode::Char('s') if key.modifiers.contains(KeyModifiers::CONTROL) => {
-                            if let Err(e) = self.state.save_sql_file_with_connection() {
-                                self.state
-                                    .toast_manager
-                                    .error(format!("Failed to save: {e}"));
-                            } else {
-                                self.state.toast_manager.success("File saved");
-                            }
-                        }
-                        KeyCode::Char('n') if key.modifiers.contains(KeyModifiers::CONTROL) => {
-                            // Create new query file
-                            let filename = format!(
-                                "query_{}.sql",
-                                std::time::SystemTime::now()
-                                    .duration_since(std::time::UNIX_EPOCH)
-                                    .unwrap()
-                                    .as_secs()
-                            );
-                            self.state.ui.current_sql_file = Some(filename);
-                            self.state.query_content = String::new();
-                            self.state.ui.query_modified = false;
-                            self.state.ui.query_cursor_line = 0;
-                            self.state.ui.query_cursor_column = 0;
-                            self.state.toast_manager.success("New query file created");
-                        }
-                        // Catch-all for other characters (including vim commands)
-                        KeyCode::Char(c) => {
-                            // Try to handle as vim command (handles 'd', 'dd', 'dw', etc.)
-                            if self.state.query_editor.handle_vim_command(c) {
-                                // Command was handled, sync content
-                                self.state.query_content =
-                                    self.state.query_editor.get_content().to_string();
-                                self.state.ui.query_modified = true;
-                            }
-                            // If not handled as vim command, it's ignored (already handled above)
-                        }
-                        // Execute query
-                        KeyCode::Enter if key.modifiers.contains(KeyModifiers::CONTROL) => {
-                            if let Some(statement) = self.state.get_statement_under_cursor() {
-                                // TODO: Execute the SQL statement
-                                println!("Executing SQL: {statement}");
-                            }
-                        }
-                        _ => {}
-                    }
-                }
+            KeyCode::Char('k') | KeyCode::Up => {
+                self.state.ui.connections_selection_up(&self.state.db.connections.connections);
             }
+            _ => {}
         }
-
         Ok(())
     }
 
-    /// Handle connection modal key events
+    /// Handle Tables pane keys - DIRECT KEY BINDINGS
+    async fn handle_tables_keys(&mut self, key: KeyEvent) -> Result<()> {
+        // Search mode active
+        if self.state.ui.tables_search_active {
+            match key.code {
+                KeyCode::Esc => {
+                    self.state.ui.exit_tables_search();
+                }
+                KeyCode::Backspace => {
+                    self.state.ui.backspace_tables_search();
+                }
+                KeyCode::Enter => {
+                    self.state.open_table_for_viewing().await;
+                    self.state.ui.exit_tables_search();
+                }
+                KeyCode::Down => {
+                    self.state.ui.table_search_selection_down();
+                }
+                KeyCode::Up => {
+                    self.state.ui.table_search_selection_up();
+                }
+                KeyCode::Char(c) => {
+                    self.state.ui.add_to_tables_search(c);
+                }
+                _ => {}
+            }
+            return Ok(());
+        }
+
+        // Normal mode
+        match key.code {
+            // Enter - Open table for viewing
+            KeyCode::Enter => {
+                self.state.open_table_for_viewing().await;
+            }
+            // 'r' - Refresh tables list
+            KeyCode::Char('r') => {
+                self.state.connect_to_selected_database().await;
+                self.state.toast_manager.info("Tables refreshed");
+            }
+            // '/' - Enter search mode
+            KeyCode::Char('/') => {
+                self.state.ui.enter_tables_search();
+            }
+            // j/k - Navigate
+            KeyCode::Char('j') | KeyCode::Down => {
+                self.state.ui.table_search_selection_down();
+                self.state.ui.cancel_pending_gg();
+            }
+            KeyCode::Char('k') | KeyCode::Up => {
+                self.state.ui.table_search_selection_up();
+                self.state.ui.cancel_pending_gg();
+            }
+            // 'g' - First press of gg
+            KeyCode::Char('g') => {
+                self.state.ui.handle_g_key_press();
+            }
+            // 'G' - Jump to last table
+            KeyCode::Char('G') => {
+                self.state.ui.table_go_to_last();
+            }
+            // Space/Tab - Toggle group expansion
+            KeyCode::Char(' ') | KeyCode::Tab if key.modifiers == KeyModifiers::NONE => {
+                // Toggle expansion of current group - implementation depends on what's selected
+                // For now, we'll skip this and implement later if needed
+            }
+            _ => {}
+        }
+        Ok(())
+    }
+
+    /// Handle Details pane keys - READ-ONLY (just scrolling)
+    fn handle_details_keys(&mut self, key: KeyEvent) -> Result<()> {
+        match key.code {
+            KeyCode::Char('j') | KeyCode::Down => {
+                self.state.move_down();
+            }
+            KeyCode::Char('k') | KeyCode::Up => {
+                self.state.move_up();
+            }
+            KeyCode::Char('d') if key.modifiers == KeyModifiers::CONTROL => {
+                // Page down
+                if self.state.ui.details_viewport_offset + 10 < self.state.ui.details_max_scroll_offset {
+                    self.state.ui.details_viewport_offset += 10;
+                } else {
+                    self.state.ui.details_viewport_offset = self.state.ui.details_max_scroll_offset;
+                }
+            }
+            KeyCode::Char('u') if key.modifiers == KeyModifiers::CONTROL => {
+                // Page up
+                self.state.ui.details_viewport_offset = self.state.ui.details_viewport_offset.saturating_sub(10);
+            }
+            KeyCode::Char('g') => {
+                if self.state.ui.pending_gg_command {
+                    self.state.ui.details_viewport_offset = 0;
+                    self.state.ui.pending_gg_command = false;
+                } else {
+                    self.state.ui.pending_gg_command = true;
+                }
+            }
+            KeyCode::Char('G') => {
+                self.state.ui.details_viewport_offset = self.state.ui.details_max_scroll_offset;
+            }
+            _ => {}
+        }
+        Ok(())
+    }
+
+    /// Handle Query Results pane keys - has its own edit mode
+    async fn handle_query_results_keys(&mut self, key: KeyEvent) -> Result<()> {
+        // Check if in edit mode
+        if let Some(tab) = self.state.table_viewer_state.current_tab_mut() {
+            if tab.in_edit_mode {
+                return self.handle_table_viewer_edit_mode(key).await;
+            }
+            if tab.in_search_mode {
+                return self.handle_table_viewer_search_mode(key).await;
+            }
+        }
+
+        // Normal navigation mode
+        match key.code {
+            // 'i' or Enter - Start editing current cell
+            KeyCode::Char('i') | KeyCode::Enter => {
+                if let Some(tab) = self.state.table_viewer_state.current_tab_mut() {
+                    tab.start_edit();
+                }
+            }
+            // 'd' - Delete current row
+            KeyCode::Char('d') => {
+                // Trigger delete confirmation
+                if let Some(_tab) = self.state.table_viewer_state.current_tab() {
+                    // Build delete confirmation - implementation simplified for now
+                    self.state.toast_manager.info("Delete row: Press 'dd' to confirm");
+                }
+            }
+            // '/' - Enter search mode
+            KeyCode::Char('/') => {
+                if let Some(tab) = self.state.table_viewer_state.current_tab_mut() {
+                    tab.start_search();
+                }
+            }
+            // Ctrl+r - Refresh table data
+            KeyCode::Char('r') if key.modifiers == KeyModifiers::CONTROL => {
+                let tab_idx = self.state.table_viewer_state.active_tab;
+                if let Err(e) = self.state.load_table_data(tab_idx).await {
+                    self.state.toast_manager.error(format!("Failed to refresh: {e}"));
+                } else {
+                    self.state.toast_manager.success("Table data refreshed");
+                }
+            }
+            // h/j/k/l - Navigate cells
+            KeyCode::Char('h') | KeyCode::Left => {
+                self.state.move_left();
+            }
+            KeyCode::Char('j') | KeyCode::Down => {
+                self.state.move_down();
+            }
+            KeyCode::Char('k') | KeyCode::Up => {
+                self.state.move_up();
+            }
+            KeyCode::Char('l') | KeyCode::Right => {
+                self.state.move_right();
+            }
+            _ => {}
+        }
+        Ok(())
+    }
+
+    /// Handle table viewer edit mode keys
+    async fn handle_table_viewer_edit_mode(&mut self, key: KeyEvent) -> Result<()> {
+        if let Some(tab) = self.state.table_viewer_state.current_tab_mut() {
+            match key.code {
+                KeyCode::Esc | KeyCode::Enter => {
+                    // Save edit
+                    if let Some(update) = tab.save_edit() {
+                        if let Err(e) = self.state.update_table_cell(update).await {
+                            self.state.toast_manager.error(format!("Failed to update cell: {e}"));
+                        } else {
+                            self.state.toast_manager.success("Cell updated successfully");
+                        }
+                    }
+                }
+                KeyCode::Char(c) if key.modifiers == KeyModifiers::CONTROL && c == 'c' => {
+                    // Cancel edit
+                    tab.cancel_edit();
+                }
+                KeyCode::Char(c) => {
+                    tab.edit_buffer.push(c);
+                }
+                KeyCode::Backspace => {
+                    tab.edit_buffer.pop();
+                }
+                _ => {}
+            }
+        }
+        Ok(())
+    }
+
+    /// Handle table viewer search mode keys
+    async fn handle_table_viewer_search_mode(&mut self, key: KeyEvent) -> Result<()> {
+        if let Some(tab) = self.state.table_viewer_state.current_tab_mut() {
+            match key.code {
+                KeyCode::Esc => {
+                    tab.cancel_search();
+                }
+                KeyCode::Enter => {
+                    tab.in_search_mode = false;
+                }
+                KeyCode::Char('n') => {
+                    tab.next_search_result();
+                }
+                KeyCode::Char('N') => {
+                    tab.prev_search_result();
+                }
+                KeyCode::Char(c) if !matches!(c, 'h' | 'j' | 'k' | 'l') => {
+                    tab.search_query.push(c);
+                    tab.update_search(&tab.search_query.clone());
+                }
+                KeyCode::Backspace => {
+                    tab.search_query.pop();
+                    tab.update_search(&tab.search_query.clone());
+                }
+                _ => {}
+            }
+        }
+        Ok(())
+    }
+
+    /// Handle SQL Files pane keys - DIRECT KEY BINDINGS
+    async fn handle_sql_files_keys(&mut self, key: KeyEvent) -> Result<()> {
+        // Handle special input modes
+        if self.state.ui.sql_files_search_active {
+            return self.handle_sql_files_search_mode(key).await;
+        }
+        if self.state.ui.sql_files_rename_mode {
+            return self.handle_sql_files_rename_mode(key).await;
+        }
+        if self.state.ui.sql_files_create_mode {
+            return self.handle_sql_files_create_mode(key).await;
+        }
+
+        // Normal mode
+        match key.code {
+            // Enter - Load selected SQL file
+            KeyCode::Enter => {
+                if let Err(e) = self.state.load_selected_sql_file() {
+                    self.state.toast_manager.error(format!("Failed to load SQL file: {e}"));
+                } else {
+                    self.state.toast_manager.success("SQL file loaded");
+                }
+            }
+            // 'n' - Create new file
+            KeyCode::Char('n') => {
+                self.state.ui.enter_sql_files_create();
+            }
+            // 'r' - Rename file
+            KeyCode::Char('r') => {
+                if let Some(filename) = self.state.get_selected_sql_file() {
+                    self.state.ui.enter_sql_files_rename(&filename);
+                }
+            }
+            // 'd' - Delete file
+            KeyCode::Char('d') => {
+                if !self.state.saved_sql_files.is_empty() {
+                    let index = self.state.get_filtered_sql_file_selection();
+                    self.state.ui.confirmation_modal = Some(crate::ui::ConfirmationModal {
+                        title: "Delete SQL File".to_string(),
+                        message: format!(
+                            "Are you sure you want to delete '{}'?",
+                            self.state.saved_sql_files.get(index).unwrap_or(&String::new())
+                        ),
+                        action: crate::ui::ConfirmationAction::DeleteSqlFile(index),
+                    });
+                }
+            }
+            // '/' - Enter search mode
+            KeyCode::Char('/') => {
+                self.state.ui.enter_sql_files_search();
+            }
+            // j/k - Navigate files
+            KeyCode::Char('j') | KeyCode::Down => {
+                self.state.update_sql_file_selection_for_filtered(1);
+            }
+            KeyCode::Char('k') | KeyCode::Up => {
+                self.state.update_sql_file_selection_for_filtered(-1);
+            }
+            _ => {}
+        }
+        Ok(())
+    }
+
+    /// Handle SQL files search mode
+    async fn handle_sql_files_search_mode(&mut self, key: KeyEvent) -> Result<()> {
+        match key.code {
+            KeyCode::Esc => {
+                self.state.ui.exit_sql_files_search();
+            }
+            KeyCode::Backspace => {
+                self.state.ui.backspace_sql_files_search();
+            }
+            KeyCode::Enter => {
+                if let Err(e) = self.state.load_selected_sql_file() {
+                    self.state.toast_manager.error(format!("Failed to load SQL file: {e}"));
+                } else {
+                    self.state.toast_manager.success("SQL file loaded");
+                }
+                self.state.ui.exit_sql_files_search();
+            }
+            KeyCode::Down | KeyCode::Char('j') => {
+                self.state.update_sql_file_selection_for_filtered(1);
+            }
+            KeyCode::Up | KeyCode::Char('k') => {
+                self.state.update_sql_file_selection_for_filtered(-1);
+            }
+            KeyCode::Char(c) if !matches!(c, 'j' | 'k') => {
+                self.state.ui.add_to_sql_files_search(c);
+            }
+            _ => {}
+        }
+        Ok(())
+    }
+
+    /// Handle SQL files rename mode
+    async fn handle_sql_files_rename_mode(&mut self, key: KeyEvent) -> Result<()> {
+        match key.code {
+            KeyCode::Esc => {
+                self.state.ui.exit_sql_files_rename();
+            }
+            KeyCode::Backspace => {
+                self.state.ui.backspace_sql_files_rename();
+            }
+            KeyCode::Enter => {
+                let new_name = self.state.ui.sql_files_rename_buffer.clone();
+                if !new_name.is_empty() {
+                    let filtered_files = self.state.get_filtered_sql_files();
+                    let selected_index = self.state.get_filtered_sql_file_selection();
+                    if let Some(old_name) = filtered_files.get(selected_index) {
+                        if let Some(original_index) = self.state.saved_sql_files.iter().position(|f| f == old_name) {
+                            if let Err(e) = self.state.rename_sql_file(original_index, &new_name) {
+                                self.state.toast_manager.error(format!("Failed to rename file: {e}"));
+                            } else {
+                                self.state.toast_manager.success("File renamed successfully");
+                            }
+                        }
+                    }
+                }
+                self.state.ui.exit_sql_files_rename();
+            }
+            KeyCode::Char(c) => {
+                self.state.ui.add_to_sql_files_rename(c);
+            }
+            _ => {}
+        }
+        Ok(())
+    }
+
+    /// Handle SQL files create mode
+    async fn handle_sql_files_create_mode(&mut self, key: KeyEvent) -> Result<()> {
+        match key.code {
+            KeyCode::Esc => {
+                self.state.ui.exit_sql_files_create();
+            }
+            KeyCode::Backspace => {
+                self.state.ui.backspace_sql_files_create();
+            }
+            KeyCode::Enter => {
+                let filename = self.state.ui.sql_files_create_buffer.clone();
+                if !filename.is_empty() {
+                    if let Err(e) = self.state.create_sql_file(&filename) {
+                        self.state.toast_manager.error(format!("Failed to create file: {e}"));
+                    } else {
+                        self.state.toast_manager.success("File created successfully");
+                        // Load the new file
+                        let _ = self.state.load_query_file(&filename);
+                    }
+                }
+                self.state.ui.exit_sql_files_create();
+            }
+            KeyCode::Char(c) => {
+                self.state.ui.add_to_sql_files_create(c);
+            }
+            _ => {}
+        }
+        Ok(())
+    }
+
+    /// Handle Query Editor pane keys - ONLY PANE WITH VIM INSERT MODE
+    async fn handle_query_editor_keys(&mut self, key: KeyEvent) -> Result<()> {
+        // Check if query editor is in insert mode
+        if self.state.query_editor.is_insert_mode() {
+            return self.handle_query_editor_insert_mode(key).await;
+        }
+
+        // Normal mode - vim keybindings
+        match key.code {
+            // Ctrl+Enter - Execute query at cursor (works in both modes)
+            KeyCode::Enter if key.modifiers == KeyModifiers::CONTROL => {
+                if let Err(e) = self.state.execute_query_at_cursor().await {
+                    self.state.toast_manager.error(format!("Query execution failed: {e}"));
+                }
+            }
+            // 'i' - Enter insert mode at cursor
+            KeyCode::Char('i') => {
+                self.state.query_editor.set_insert_mode(true);
+            }
+            // 'a' - Enter insert mode after cursor
+            KeyCode::Char('a') => {
+                self.state.query_editor.move_cursor_right();
+                self.state.query_editor.set_insert_mode(true);
+            }
+            // 'o' - New line below + insert mode
+            KeyCode::Char('o') => {
+                self.state.query_editor.insert_newline();
+                self.state.query_editor.set_insert_mode(true);
+            }
+            // 'O' - New line above + insert mode
+            KeyCode::Char('O') => {
+                self.state.query_editor.move_cursor_up();
+                self.state.query_editor.move_to_line_end();
+                self.state.query_editor.insert_newline();
+                self.state.query_editor.set_insert_mode(true);
+            }
+            // Vim motions
+            KeyCode::Char('h') | KeyCode::Left => {
+                self.state.query_editor.move_cursor_left();
+            }
+            KeyCode::Char('j') | KeyCode::Down => {
+                self.state.query_editor.move_cursor_down();
+            }
+            KeyCode::Char('k') | KeyCode::Up => {
+                self.state.query_editor.move_cursor_up();
+            }
+            KeyCode::Char('l') | KeyCode::Right => {
+                self.state.query_editor.move_cursor_right();
+            }
+            KeyCode::Char('w') => {
+                self.state.query_editor.move_to_next_word();
+            }
+            KeyCode::Char('b') => {
+                self.state.query_editor.move_to_prev_word();
+            }
+            KeyCode::Char('e') => {
+                self.state.query_editor.move_to_end_of_word();
+            }
+            KeyCode::Char('0') => {
+                self.state.query_editor.move_to_line_start();
+            }
+            KeyCode::Char('$') => {
+                self.state.query_editor.move_to_line_end();
+            }
+            KeyCode::Char('g') => {
+                if self.state.ui.pending_gg_command {
+                    self.state.query_editor.move_to_file_start();
+                    self.state.ui.pending_gg_command = false;
+                } else {
+                    self.state.ui.pending_gg_command = true;
+                }
+            }
+            KeyCode::Char('G') => {
+                self.state.query_editor.move_to_file_end();
+            }
+            // Ctrl+d and Ctrl+u for page scrolling - TODO: implement scroll methods
+            // KeyCode::Char('d') if key.modifiers == KeyModifiers::CONTROL => {
+            //     self.state.query_editor.scroll_half_page_down();
+            // }
+            // KeyCode::Char('u') if key.modifiers == KeyModifiers::CONTROL => {
+            //     self.state.query_editor.scroll_half_page_up();
+            // }
+            _ => {}
+        }
+        Ok(())
+    }
+
+    /// Handle query editor insert mode
+    async fn handle_query_editor_insert_mode(&mut self, key: KeyEvent) -> Result<()> {
+        match key.code {
+            // Esc - Exit insert mode
+            KeyCode::Esc => {
+                if self.state.query_editor.are_suggestions_active() {
+                    self.state.query_editor.hide_suggestions();
+                } else {
+                    self.state.query_editor.set_insert_mode(false);
+                }
+            }
+            // Ctrl+Enter - Execute query
+            KeyCode::Enter if key.modifiers == KeyModifiers::CONTROL => {
+                if let Err(e) = self.state.execute_query_at_cursor().await {
+                    self.state.toast_manager.error(format!("Query execution failed: {e}"));
+                }
+            }
+            // Enter - Insert newline
+            KeyCode::Enter => {
+                self.state.query_editor.insert_newline();
+                self.state.query_content = self.state.query_editor.get_content().to_string();
+                self.state.ui.query_modified = true;
+            }
+            // Regular typing
+            KeyCode::Char(c) => {
+                self.state.query_editor.insert_char(c);
+                self.state.query_content = self.state.query_editor.get_content().to_string();
+                self.state.ui.query_modified = true;
+            }
+            // Backspace
+            KeyCode::Backspace => {
+                self.state.query_editor.backspace();
+                self.state.query_content = self.state.query_editor.get_content().to_string();
+                self.state.ui.query_modified = true;
+            }
+            // Tab
+            KeyCode::Tab => {
+                self.state.query_editor.insert_char('\t');
+                self.state.query_content = self.state.query_editor.get_content().to_string();
+                self.state.ui.query_modified = true;
+            }
+            _ => {}
+        }
+        Ok(())
+    }
     async fn handle_connection_modal_key_event(&mut self, key: KeyEvent) -> Result<()> {
         use crate::ui::components::{ConnectionField, PasswordStorageType};
 
         match key.code {
-            // Direct text input for text fields
-            KeyCode::Char(c) if self.state.connection_modal_state.is_text_field() => {
-                self.state.connection_modal_state.handle_char_input(c);
+            // PRIORITY 1: Global shortcuts (work from any field, including text fields)
+            KeyCode::Char('t') if !key.modifiers.contains(KeyModifiers::CONTROL) => {
+                // Plain 't': Test connection shortcut
+                self.test_connection_from_modal().await;
             }
-            KeyCode::Backspace if self.state.connection_modal_state.is_text_field() => {
-                self.state.connection_modal_state.handle_backspace();
-            }
-            KeyCode::Esc => {
-                // In connection details step, Esc goes back to database type selection
-                if self.state.connection_modal_state.current_step
-                    == crate::ui::components::ModalStep::ConnectionDetails
-                {
-                    self.state.connection_modal_state.go_back();
+            KeyCode::Char('s') => {
+                // Save shortcut - works from any field
+                if let Err(error) = self.state.save_connection_from_modal() {
+                    self.state
+                        .toast_manager
+                        .error(format!("Failed to save connection: {}", &error));
+                    self.state.connection_modal_state.error_message = Some(error);
                 } else {
-                    // Close the appropriate modal
-                    if self.state.ui.current_view.is_connection_form() {
-                        self.state.close_add_connection_modal();
-                    } else {
-                        self.state.close_edit_connection_modal();
-                    }
+                    self.state
+                        .toast_manager
+                        .success("Connection saved successfully");
+                }
+            }
+            KeyCode::Char('c') => {
+                // Cancel shortcut - works from any field
+                if self.state.ui.current_view.is_connection_form() {
+                    self.state.close_add_connection_modal();
+                } else {
+                    self.state.close_edit_connection_modal();
+                }
+            }
+
+            // PRIORITY 2: Navigation and special keys
+            KeyCode::Esc => {
+                // Close the appropriate modal
+                if self.state.ui.current_view.is_connection_form() {
+                    self.state.close_add_connection_modal();
+                } else {
+                    self.state.close_edit_connection_modal();
                 }
             }
             KeyCode::Tab => {
-                // Tab for next field navigation within sections
+                // Tab for next field navigation
                 self.state.connection_modal_state.focused_field =
                     self.state.connection_modal_state.get_smart_next_field();
             }
             KeyCode::BackTab => {
-                // Shift+Tab for previous field navigation within sections
+                // Shift+Tab for previous field navigation
                 self.state.connection_modal_state.focused_field =
                     self.state.connection_modal_state.get_smart_previous_field();
-            }
-            // Ctrl+J/K for section switching between database type and connection details
-            KeyCode::Char('j') if key.modifiers.contains(KeyModifiers::CONTROL) => {
-                match self.state.connection_modal_state.current_step {
-                    crate::ui::components::ModalStep::DatabaseTypeSelection => {
-                        // Move to connection details section
-                        self.state.connection_modal_state.advance_step();
-                    }
-                    crate::ui::components::ModalStep::ConnectionDetails => {
-                        // Already at the bottom section, do nothing
-                    }
-                }
-            }
-            KeyCode::Char('k') if key.modifiers.contains(KeyModifiers::CONTROL) => {
-                match self.state.connection_modal_state.current_step {
-                    crate::ui::components::ModalStep::DatabaseTypeSelection => {
-                        // Already at the top section, do nothing
-                    }
-                    crate::ui::components::ModalStep::ConnectionDetails => {
-                        // Move back to database type section
-                        self.state.connection_modal_state.go_back();
-                    }
-                }
             }
             // Arrow keys for navigation within sections
             KeyCode::Down => {
@@ -2192,9 +1413,14 @@ impl App {
                 }
             }
             KeyCode::Enter => {
+                // Handle Enter on button fields specially
                 match self.state.connection_modal_state.focused_field {
+                    ConnectionField::Test => {
+                        // Activate Test button
+                        self.test_connection_from_modal().await;
+                    }
                     ConnectionField::Save => {
-                        // Try to save the connection
+                        // Activate Save button
                         if let Err(error) = self.state.save_connection_from_modal() {
                             self.state
                                 .toast_manager
@@ -2207,102 +1433,53 @@ impl App {
                         }
                     }
                     ConnectionField::Cancel => {
-                        // Close the appropriate modal
+                        // Activate Cancel button
                         if self.state.ui.current_view.is_connection_form() {
                             self.state.close_add_connection_modal();
                         } else {
                             self.state.close_edit_connection_modal();
                         }
                     }
-                    ConnectionField::Test => {
-                        // Test the connection
-                        self.test_connection_from_modal().await;
-                    }
-                    ConnectionField::DatabaseType => {
-                        // In database type selection step, Enter advances to next step
-                        if self.state.connection_modal_state.current_step
-                            == crate::ui::components::ModalStep::DatabaseTypeSelection
-                        {
-                            self.state.connection_modal_state.advance_step();
-                        } else {
-                            self.state.connection_modal_state.next_field();
-                        }
-                    }
                     _ => {
-                        // For regular fields, Enter moves to next field
+                        // For all other fields, Enter moves to next field
                         self.state.connection_modal_state.next_field();
                     }
                 }
             }
-            KeyCode::Char('s') => {
-                // Save shortcut - works from any field
-                if let Err(error) = self.state.save_connection_from_modal() {
-                    self.state
-                        .toast_manager
-                        .error(format!("Failed to save connection: {}", &error));
-                    self.state.connection_modal_state.error_message = Some(error);
-                } else {
-                    self.state
-                        .toast_manager
-                        .success("Connection saved successfully");
-                }
-            }
-            KeyCode::Char('c') => {
-                // Cancel shortcut - works from any field
-                if self.state.ui.current_view.is_connection_form() {
-                    self.state.close_add_connection_modal();
-                } else {
-                    self.state.close_edit_connection_modal();
-                }
-            }
-            KeyCode::Char('b') => {
-                // Back shortcut (only in connection details step)
-                if self.state.connection_modal_state.current_step
-                    == crate::ui::components::ModalStep::ConnectionDetails
-                {
-                    self.state.connection_modal_state.go_back();
-                }
-            }
-            KeyCode::Char('t') => {
-                // Handle 'T' key based on modifiers
-                if key.modifiers.contains(KeyModifiers::CONTROL) {
-                    // Ctrl+T: Toggle between connection string and individual fields
-                    if self.state.connection_modal_state.current_step
-                        == crate::ui::components::ModalStep::ConnectionDetails
-                    {
-                        self.state.connection_modal_state.using_connection_string =
-                            !self.state.connection_modal_state.using_connection_string;
+            // Ctrl+T: Toggle between connection string and individual fields
+            KeyCode::Char('t') if key.modifiers.contains(KeyModifiers::CONTROL) => {
+                self.state.connection_modal_state.using_connection_string =
+                    !self.state.connection_modal_state.using_connection_string;
 
-                        // Clear the opposite fields when switching
-                        if self.state.connection_modal_state.using_connection_string {
-                            // Clear individual fields when switching to connection string
-                            self.state.connection_modal_state.host = "localhost".to_string();
-                            self.state.connection_modal_state.port_input =
-                                match self.state.connection_modal_state.database_type {
-                                    crate::database::DatabaseType::PostgreSQL => "5432".to_string(),
-                                    crate::database::DatabaseType::MySQL
-                                    | crate::database::DatabaseType::MariaDB => "3306".to_string(),
-                                    _ => "5432".to_string(),
-                                };
-                            self.state.connection_modal_state.database.clear();
-                            self.state.connection_modal_state.username.clear();
-                            self.state.connection_modal_state.password.clear();
-                        } else {
-                            // Clear connection string when switching to individual fields
-                            self.state.connection_modal_state.connection_string.clear();
-                        }
-
-                        // Clear any test status when switching input methods
-                        self.state.connection_modal_state.test_status = None;
-                    }
+                // Clear the opposite fields when switching
+                if self.state.connection_modal_state.using_connection_string {
+                    // Clear individual fields when switching to connection string
+                    self.state.connection_modal_state.host = "localhost".to_string();
+                    self.state.connection_modal_state.port_input =
+                        match self.state.connection_modal_state.database_type {
+                            crate::database::DatabaseType::PostgreSQL => "5432".to_string(),
+                            crate::database::DatabaseType::MySQL
+                            | crate::database::DatabaseType::MariaDB => "3306".to_string(),
+                            _ => "5432".to_string(),
+                        };
+                    self.state.connection_modal_state.database.clear();
+                    self.state.connection_modal_state.username.clear();
+                    self.state.connection_modal_state.password.clear();
                 } else {
-                    // Plain T: Test connection shortcut - works from any field in connection details step
-                    if self.state.connection_modal_state.current_step
-                        == crate::ui::components::ModalStep::ConnectionDetails
-                    {
-                        self.test_connection_from_modal().await;
-                    }
+                    // Clear connection string when switching to individual fields
+                    self.state.connection_modal_state.connection_string.clear();
                 }
+
+                // Clear any test status when switching input methods
+                self.state.connection_modal_state.test_status = None;
+            }
+
+            // PRIORITY 3: Text input for text fields (lowest priority, after shortcuts)
+            KeyCode::Char(c) if self.state.connection_modal_state.is_text_field() => {
+                self.state.connection_modal_state.handle_char_input(c);
+            }
+            KeyCode::Backspace if self.state.connection_modal_state.is_text_field() => {
+                self.state.connection_modal_state.handle_backspace();
             }
             _ => {}
         }
@@ -2663,6 +1840,183 @@ impl App {
         // Increment tick counter
         self.tick_counter = self.tick_counter.wrapping_add(1);
 
+        // Handle ongoing connection attempt
+        if let Some(connecting_index) = self.state.connecting_in_progress {
+            // Animate loading dots every tick (250ms interval)
+            self.state.connecting_animation_frame = (self.state.connecting_animation_frame + 1) % 3;
+
+            // Check for timeout
+            if let Some(start_time) = self.state.connection_start_time {
+                let elapsed = start_time.elapsed().as_secs();
+                if elapsed >= self.state.connection_timeout_seconds {
+                    // Timeout reached, mark as failed
+                    if let Some(conn) = self
+                        .state
+                        .db
+                        .connections
+                        .connections
+                        .get_mut(connecting_index)
+                    {
+                        conn.status = crate::database::ConnectionStatus::Failed(format!(
+                            "Connection timeout after {} seconds",
+                            elapsed
+                        ));
+                        self.state
+                            .toast_manager
+                            .error("Connection timeout");
+                    }
+                    self.state.connecting_in_progress = None;
+                    self.state.connection_start_time = None;
+                    // Don't process events if we just timed out
+                    return Ok(());
+                }
+            }
+
+            // Check for completion events (NON-BLOCKING)
+            if let Ok(event) = self.connection_events_rx.try_recv() {
+                match event {
+                    ConnectionEvent::Success {
+                        connection_index,
+                        objects,
+                    } => {
+                        // Connection succeeded! Update state
+                        if let Some(conn) = self
+                            .state
+                            .db
+                            .connections
+                            .connections
+                            .get_mut(connection_index)
+                        {
+                            conn.status = crate::database::ConnectionStatus::Connected;
+                        }
+
+                        // Update database state
+                        self.state.db.database_objects = Some(objects.clone());
+                        self.state.db.tables = objects
+                            .tables
+                            .iter()
+                            .map(|t| {
+                                if t.schema.as_deref() == Some("public") || t.schema.is_none() {
+                                    t.name.clone()
+                                } else {
+                                    t.qualified_name()
+                                }
+                            })
+                            .collect();
+
+                        // Update UI
+                        self.state
+                            .ui
+                            .build_selectable_table_items(&self.state.db.database_objects);
+                        self.state.update_table_selection();
+
+                        // Show success message
+                        if let Some(conn) = self
+                            .state
+                            .db
+                            .connections
+                            .connections
+                            .get(connection_index)
+                        {
+                            self.state
+                                .toast_manager
+                                .success(format!("Connected to {}", conn.name));
+
+                            // Update active connection in app state database
+                            let _ = self
+                                .state
+                                .app_state_db
+                                .set_active_connection(
+                                    &conn.id,
+                                    &conn.name,
+                                    conn.database_type.display_name(),
+                                )
+                                .await;
+                        }
+
+                        // Refresh SQL files
+                        self.state.refresh_sql_files();
+
+                        // Clear in-progress flag and start time
+                        self.state.connecting_in_progress = None;
+                        self.state.connection_start_time = None;
+                    }
+                    ConnectionEvent::Failed {
+                        connection_index,
+                        error,
+                    } => {
+                        // Connection failed
+                        if let Some(conn) = self
+                            .state
+                            .db
+                            .connections
+                            .connections
+                            .get_mut(connection_index)
+                        {
+                            conn.status = crate::database::ConnectionStatus::Failed(error.clone());
+                            self.state
+                                .toast_manager
+                                .error(format!("Connection failed: {}", error));
+                        }
+                        self.state.connecting_in_progress = None;
+                        self.state.connection_start_time = None;
+                    }
+                }
+            }
+        }
+
+        // Handle ongoing test connection attempt
+        if self.state.test_connection_in_progress {
+            // Animate loading dots every tick (250ms interval)
+            self.state.test_animation_frame = (self.state.test_animation_frame + 1) % 3;
+
+            // Check for timeout
+            if let Some(start_time) = self.state.test_start_time {
+                let elapsed = start_time.elapsed().as_secs();
+                if elapsed >= 30 {
+                    // 30 second timeout for test connections
+                    use crate::ui::components::TestConnectionStatus;
+                    self.state.connection_modal_state.test_status =
+                        Some(TestConnectionStatus::Failed(format!(
+                            "Test timeout after {} seconds",
+                            elapsed
+                        )));
+                    self.state.test_connection_in_progress = false;
+                    self.state.test_start_time = None;
+                    self.state
+                        .toast_manager
+                        .error("Test connection timeout");
+                    return Ok(());
+                }
+            }
+
+            // Check for test completion events (NON-BLOCKING)
+            if let Ok(event) = self.test_connection_events_rx.try_recv() {
+                use crate::ui::components::TestConnectionStatus;
+
+                match event {
+                    TestConnectionEvent::Success(msg) => {
+                        self.state.connection_modal_state.test_status =
+                            Some(TestConnectionStatus::Success(msg));
+                        self.state
+                            .toast_manager
+                            .success("Test connection successful");
+                    }
+                    TestConnectionEvent::Failed(error) => {
+                        self.state.connection_modal_state.test_status =
+                            Some(TestConnectionStatus::Failed(error.clone()));
+                        self.state
+                            .toast_manager
+                            .error(format!("Test connection failed: {}", error));
+                    }
+                }
+
+                // Clear in-progress flag and start time
+                self.state.test_connection_in_progress = false;
+                self.state.test_start_time = None;
+            }
+        }
+
         // Perform connection health check every 100 ticks (approximately every 25 seconds with 250ms intervals)
         if self.tick_counter % 100 == 0 {
             // Only check health if we have an active connection
@@ -2682,113 +2036,92 @@ impl App {
 
     /// Test connection from modal
     async fn test_connection_from_modal(&mut self) {
-        use crate::database::Connection;
         use crate::ui::components::TestConnectionStatus;
 
-        // Set status to testing
+        // Don't start new test if one is already in progress
+        if self.state.test_connection_in_progress {
+            self.state
+                .toast_manager
+                .warning("Test already in progress");
+            return;
+        }
+
+        // Set status to testing and start timer
         self.state.connection_modal_state.test_status = Some(TestConnectionStatus::Testing);
+        self.state.test_connection_in_progress = true;
+        self.state.test_animation_frame = 0;
+        self.state.test_start_time = Some(std::time::Instant::now());
 
-        // Try to create a connection config
-        match self.state.connection_modal_state.try_create_connection() {
-            Ok(config) => {
-                // Create a connection instance based on database type
-                use crate::database::DatabaseType;
-
-                match config.database_type {
-                    DatabaseType::PostgreSQL => {
-                        use crate::database::postgres::PostgresConnection;
-                        let mut conn = PostgresConnection::new(config);
-
-                        // Try to connect
-                        match conn.connect().await {
-                            Ok(()) => {
-                                // Try to test the connection
-                                match conn.test_connection().await {
-                                    Ok(()) => {
-                                        self.state.connection_modal_state.test_status =
-                                            Some(TestConnectionStatus::Success(
-                                                "Connection successful!".to_string(),
-                                            ));
-                                    }
-                                    Err(e) => {
-                                        self.state.connection_modal_state.test_status =
-                                            Some(TestConnectionStatus::Failed(format!(
-                                                "Test failed: {e}"
-                                            )));
-                                    }
-                                }
-                            }
-                            Err(e) => {
-                                self.state.connection_modal_state.test_status = Some(
-                                    TestConnectionStatus::Failed(format!("Connection failed: {e}")),
-                                );
-                            }
-                        }
-                    }
-                    DatabaseType::MySQL | DatabaseType::MariaDB => {
-                        use crate::database::mysql::MySqlConnection;
-                        let mut conn = MySqlConnection::new(config);
-
-                        match conn.connect().await {
-                            Ok(()) => match conn.test_connection().await {
-                                Ok(()) => {
-                                    self.state.connection_modal_state.test_status =
-                                        Some(TestConnectionStatus::Success(
-                                            "Connection successful!".to_string(),
-                                        ));
-                                }
-                                Err(e) => {
-                                    self.state.connection_modal_state.test_status = Some(
-                                        TestConnectionStatus::Failed(format!("Test failed: {e}")),
-                                    );
-                                }
-                            },
-                            Err(e) => {
-                                self.state.connection_modal_state.test_status = Some(
-                                    TestConnectionStatus::Failed(format!("Connection failed: {e}")),
-                                );
-                            }
-                        }
-                    }
-                    DatabaseType::SQLite => {
-                        use crate::database::sqlite::SqliteConnection;
-                        let mut conn = SqliteConnection::new(config);
-
-                        match conn.connect().await {
-                            Ok(()) => match conn.test_connection().await {
-                                Ok(()) => {
-                                    self.state.connection_modal_state.test_status =
-                                        Some(TestConnectionStatus::Success(
-                                            "Connection successful!".to_string(),
-                                        ));
-                                }
-                                Err(e) => {
-                                    self.state.connection_modal_state.test_status = Some(
-                                        TestConnectionStatus::Failed(format!("Test failed: {e}")),
-                                    );
-                                }
-                            },
-                            Err(e) => {
-                                self.state.connection_modal_state.test_status = Some(
-                                    TestConnectionStatus::Failed(format!("Connection failed: {e}")),
-                                );
-                            }
-                        }
-                    }
-                    _ => {
-                        self.state.connection_modal_state.test_status =
-                            Some(TestConnectionStatus::Failed(
-                                "Database type not yet supported".to_string(),
-                            ));
-                    }
-                }
-            }
+        // Try to create a connection config (no uniqueness check needed for testing)
+        let config = match self
+            .state
+            .connection_modal_state
+            .try_create_connection(&[], None)
+        {
+            Ok(config) => config,
             Err(e) => {
-                self.state.connection_modal_state.test_status = Some(TestConnectionStatus::Failed(
+                // Invalid config - send error immediately
+                let _ = self.test_connection_events_tx.send(TestConnectionEvent::Failed(
                     format!("Invalid configuration: {e}"),
                 ));
+                return;
             }
-        }
+        };
+
+        // Clone sender for background task
+        let tx = self.test_connection_events_tx.clone();
+
+        // Spawn background task to test connection
+        tokio::spawn(async move {
+            use crate::database::{Connection, DatabaseType};
+
+            let result = match config.database_type {
+                DatabaseType::PostgreSQL => {
+                    use crate::database::postgres::PostgresConnection;
+                    let mut conn = PostgresConnection::new(config);
+
+                    match conn.connect().await {
+                        Ok(()) => conn.test_connection().await.map(|_| "Connection successful!".to_string()),
+                        Err(e) => Err(crate::core::error::LazyTablesError::Connection(format!(
+                            "Connection failed: {e}"
+                        ))),
+                    }
+                }
+                DatabaseType::MySQL | DatabaseType::MariaDB => {
+                    use crate::database::mysql::MySqlConnection;
+                    let mut conn = MySqlConnection::new(config);
+
+                    match conn.connect().await {
+                        Ok(()) => conn.test_connection().await.map(|_| "Connection successful!".to_string()),
+                        Err(e) => Err(crate::core::error::LazyTablesError::Connection(format!(
+                            "Connection failed: {e}"
+                        ))),
+                    }
+                }
+                DatabaseType::SQLite => {
+                    use crate::database::sqlite::SqliteConnection;
+                    let mut conn = SqliteConnection::new(config);
+
+                    match conn.connect().await {
+                        Ok(()) => conn.test_connection().await.map(|_| "Connection successful!".to_string()),
+                        Err(e) => Err(crate::core::error::LazyTablesError::Connection(format!(
+                            "Connection failed: {e}"
+                        ))),
+                    }
+                }
+                _ => Err(crate::core::error::LazyTablesError::Connection(
+                    "Database type not yet supported".to_string(),
+                )),
+            };
+
+            // Send result back to main loop
+            let event = match result {
+                Ok(msg) => TestConnectionEvent::Success(msg),
+                Err(e) => TestConnectionEvent::Failed(e.to_string()),
+            };
+
+            let _ = tx.send(event);
+        });
     }
 
     /// Handle key events for connection mode

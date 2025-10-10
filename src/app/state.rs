@@ -54,6 +54,20 @@ pub struct AppState {
     pub app_state_db: AppStateDb,
     /// Persistent connection manager
     pub connection_manager: ConnectionManager,
+    /// Connection attempt in progress (stores connection index being attempted)
+    pub connecting_in_progress: Option<usize>,
+    /// Animation frame counter for loading dots (0-2)
+    pub connecting_animation_frame: u8,
+    /// Connection attempt start time for timeout tracking
+    pub connection_start_time: Option<std::time::Instant>,
+    /// Connection timeout in seconds
+    pub connection_timeout_seconds: u64,
+    /// Test connection in progress (modal test button)
+    pub test_connection_in_progress: bool,
+    /// Animation frame counter for test connection loading dots (0-2)
+    pub test_animation_frame: u8,
+    /// Test connection start time for timeout tracking
+    pub test_start_time: Option<std::time::Instant>,
 }
 
 impl AppState {
@@ -86,6 +100,13 @@ impl AppState {
             connection_mode: None,
             app_state_db: AppStateDb::new(),
             connection_manager: ConnectionManager::new(),
+            connecting_in_progress: None,
+            connecting_animation_frame: 0,
+            connection_start_time: None,
+            connection_timeout_seconds: 30, // 30 seconds timeout
+            test_connection_in_progress: false,
+            test_animation_frame: 0,
+            test_start_time: None,
         };
 
         // Load SQL files during initialization
@@ -102,6 +123,15 @@ impl AppState {
                 Ok(())
             }
             Err(e) => Err(format!("Failed to initialize application database: {}", e)),
+        }
+    }
+
+    /// Get elapsed connection time in seconds
+    pub fn get_connection_elapsed_seconds(&self) -> u64 {
+        if let Some(start_time) = self.connection_start_time {
+            start_time.elapsed().as_secs()
+        } else {
+            0
         }
     }
 
@@ -356,7 +386,21 @@ impl AppState {
 
     /// Save connection from modal
     pub fn save_connection_from_modal(&mut self) -> Result<(), String> {
-        let mut connection = self.connection_modal_state.try_create_connection()?;
+        // Get original connection name if editing
+        let original_name = if let Some(OverlayView::ConnectionForm(ConnectionFormMode::Edit(
+            existing_conn,
+        ))) = self.ui.current_view.overlay()
+        {
+            Some(existing_conn.name.as_str())
+        } else {
+            None
+        };
+
+        // Validate and create connection with uniqueness check
+        let mut connection = self.connection_modal_state.try_create_connection(
+            &self.db.connections.connections,
+            original_name,
+        )?;
 
         if self.ui.current_view.is_connection_form() {
             // Check if we're editing
@@ -853,7 +897,6 @@ impl AppState {
         self.ui.query_cursor_line = 0;
         self.ui.query_cursor_column = 0;
         self.ui.query_viewport_offset = 0; // Reset viewport to top
-        self.ui.text_input_mode = TextInputMode::Normal;
 
         crate::log_info!("Set current_sql_file to: {:?}", self.ui.current_sql_file);
 
@@ -1996,7 +2039,6 @@ impl AppState {
         self.ui.query_cursor_line = 0;
         self.ui.query_cursor_column = 0;
         self.ui.query_viewport_offset = 0;
-        self.ui.text_input_mode = TextInputMode::Normal;
     }
 
     /// Update query editor database context when connection changes
