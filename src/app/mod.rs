@@ -832,22 +832,13 @@ impl App {
                         self.mode = Mode::Command;
                         self.command_buffer.clear();
                     }
-                    // Pane navigation with Ctrl+h/j/k/l (directional movement)
-                    (KeyModifiers::CONTROL, KeyCode::Char('h')) => {
+                    // Direct pane navigation with number keys (1-6)
+                    (KeyModifiers::NONE, KeyCode::Char(c @ '1'..='6')) => {
                         self.state.ui.cancel_pending_gg();
-                        self.state.move_focus_left();
-                    }
-                    (KeyModifiers::CONTROL, KeyCode::Char('j')) => {
-                        self.state.ui.cancel_pending_gg();
-                        self.state.move_focus_down();
-                    }
-                    (KeyModifiers::CONTROL, KeyCode::Char('k')) => {
-                        self.state.ui.cancel_pending_gg();
-                        self.state.move_focus_up();
-                    }
-                    (KeyModifiers::CONTROL, KeyCode::Char('l')) => {
-                        self.state.ui.cancel_pending_gg();
-                        self.state.move_focus_right();
+                        if let Some(pane) = FocusedPane::from_number(c.to_digit(10).unwrap() as u8)
+                        {
+                            self.state.ui.focused_pane = pane;
+                        }
                     }
                     // Tab to cycle through panes
                     (KeyModifiers::NONE, KeyCode::Tab) => {
@@ -1631,10 +1622,25 @@ impl App {
 
                 // Handle global pane navigation even in Query mode
                 match (key.modifiers, key.code) {
-                    // Pane navigation with Ctrl+h/j/k/l (works in all modes)
-                    (KeyModifiers::CONTROL, KeyCode::Char('h')) => {
+                    // Direct pane navigation with number keys (1-6)
+                    (KeyModifiers::NONE, KeyCode::Char(c @ '1'..='6')) => {
                         self.state.ui.cancel_pending_gg();
-                        self.state.move_focus_left();
+                        if let Some(pane) = FocusedPane::from_number(c.to_digit(10).unwrap() as u8)
+                        {
+                            self.state.ui.focused_pane = pane;
+                            // If we moved away from QueryWindow, exit Query mode
+                            if self.state.ui.focused_pane
+                                != crate::app::state::FocusedPane::QueryWindow
+                            {
+                                self.mode = Mode::Normal;
+                            }
+                        }
+                        return Ok(());
+                    }
+                    // Tab to cycle through panes
+                    (KeyModifiers::NONE, KeyCode::Tab) => {
+                        self.state.ui.cancel_pending_gg();
+                        self.state.cycle_focus_forward();
                         // If we moved away from QueryWindow, exit Query mode
                         if self.state.ui.focused_pane != crate::app::state::FocusedPane::QueryWindow
                         {
@@ -1642,29 +1648,9 @@ impl App {
                         }
                         return Ok(());
                     }
-                    (KeyModifiers::CONTROL, KeyCode::Char('j')) => {
+                    (KeyModifiers::SHIFT, KeyCode::BackTab) => {
                         self.state.ui.cancel_pending_gg();
-                        self.state.move_focus_down();
-                        // If we moved away from QueryWindow, exit Query mode
-                        if self.state.ui.focused_pane != crate::app::state::FocusedPane::QueryWindow
-                        {
-                            self.mode = Mode::Normal;
-                        }
-                        return Ok(());
-                    }
-                    (KeyModifiers::CONTROL, KeyCode::Char('k')) => {
-                        self.state.ui.cancel_pending_gg();
-                        self.state.move_focus_up();
-                        // If we moved away from QueryWindow, exit Query mode
-                        if self.state.ui.focused_pane != crate::app::state::FocusedPane::QueryWindow
-                        {
-                            self.mode = Mode::Normal;
-                        }
-                        return Ok(());
-                    }
-                    (KeyModifiers::CONTROL, KeyCode::Char('l')) => {
-                        self.state.ui.cancel_pending_gg();
-                        self.state.move_focus_right();
+                        self.state.cycle_focus_backward();
                         // If we moved away from QueryWindow, exit Query mode
                         if self.state.ui.focused_pane != crate::app::state::FocusedPane::QueryWindow
                         {
@@ -2065,138 +2051,124 @@ impl App {
                 }
             }
             KeyCode::Tab => {
-                // Enhanced Tab navigation that handles pane switching
-                match self.state.connection_modal_state.current_step {
-                    crate::ui::components::ModalStep::DatabaseTypeSelection => {
-                        match self.state.connection_modal_state.focused_field {
-                            ConnectionField::Cancel => {
-                                // From Cancel in database type selection, advance to connection details step
-                                self.state.connection_modal_state.advance_step();
-                            }
-                            _ => {
-                                // Use smart navigation within database type selection
-                                self.state.connection_modal_state.focused_field =
-                                    self.state.connection_modal_state.get_smart_next_field();
-                            }
-                        }
-                    }
-                    crate::ui::components::ModalStep::ConnectionDetails => {
-                        match self.state.connection_modal_state.focused_field {
-                            ConnectionField::Name => {
-                                // From Name field in connection details, go back to database type selection
-                                self.state.connection_modal_state.go_back();
-                            }
-                            _ => {
-                                // Use smart navigation within connection details
-                                self.state.connection_modal_state.focused_field =
-                                    self.state.connection_modal_state.get_smart_next_field();
-                            }
-                        }
-                    }
-                }
+                // Tab for next field navigation within sections
+                self.state.connection_modal_state.focused_field =
+                    self.state.connection_modal_state.get_smart_next_field();
             }
             KeyCode::BackTab => {
-                // Enhanced BackTab navigation that handles pane switching
+                // Shift+Tab for previous field navigation within sections
+                self.state.connection_modal_state.focused_field =
+                    self.state.connection_modal_state.get_smart_previous_field();
+            }
+            // Ctrl+J/K for section switching between database type and connection details
+            KeyCode::Char('j') if key.modifiers.contains(KeyModifiers::CONTROL) => {
                 match self.state.connection_modal_state.current_step {
                     crate::ui::components::ModalStep::DatabaseTypeSelection => {
-                        match self.state.connection_modal_state.focused_field {
-                            ConnectionField::DatabaseType => {
-                                // From DatabaseType, go to Cancel (wrap around)
-                                self.state.connection_modal_state.focused_field =
-                                    ConnectionField::Cancel;
-                            }
-                            _ => {
-                                // Use smart navigation within database type selection
-                                self.state.connection_modal_state.focused_field =
-                                    self.state.connection_modal_state.get_smart_previous_field();
-                            }
-                        }
+                        // Move to connection details section
+                        self.state.connection_modal_state.advance_step();
                     }
                     crate::ui::components::ModalStep::ConnectionDetails => {
-                        match self.state.connection_modal_state.focused_field {
-                            ConnectionField::Cancel => {
-                                // From Cancel field in connection details, go back to database type selection
-                                self.state.connection_modal_state.go_back();
-                            }
-                            _ => {
-                                // Use smart navigation within connection details
-                                self.state.connection_modal_state.focused_field =
-                                    self.state.connection_modal_state.get_smart_previous_field();
-                            }
-                        }
+                        // Already at the bottom section, do nothing
                     }
                 }
             }
-            KeyCode::Down
-                if matches!(
-                    self.state.connection_modal_state.focused_field,
-                    ConnectionField::DatabaseType
-                        | ConnectionField::SslMode
-                        | ConnectionField::PasswordStorageType
-                ) =>
-            {
-                // Handle dropdown navigation
+            KeyCode::Char('k') if key.modifiers.contains(KeyModifiers::CONTROL) => {
+                match self.state.connection_modal_state.current_step {
+                    crate::ui::components::ModalStep::DatabaseTypeSelection => {
+                        // Already at the top section, do nothing
+                    }
+                    crate::ui::components::ModalStep::ConnectionDetails => {
+                        // Move back to database type section
+                        self.state.connection_modal_state.go_back();
+                    }
+                }
+            }
+            // Arrow keys for navigation within sections
+            KeyCode::Down => {
+                // Handle database type and other dropdowns specially
                 match self.state.connection_modal_state.focused_field {
                     ConnectionField::DatabaseType => {
+                        // Navigate database type dropdown
                         let current = self
                             .state
                             .connection_modal_state
                             .db_type_list_state
                             .selected()
                             .unwrap_or(0);
-                        let new_index = (current + 1).min(3); // 4 database types (0-3)
+                        let max_types = 4; // PostgreSQL, MySQL, MariaDB, SQLite
+                        let new_index = if current + 1 < max_types {
+                            current + 1
+                        } else {
+                            0
+                        };
                         self.state
                             .connection_modal_state
                             .select_database_type(new_index);
                     }
                     ConnectionField::SslMode => {
+                        // Navigate SSL mode dropdown
                         let current = self
                             .state
                             .connection_modal_state
                             .ssl_list_state
                             .selected()
                             .unwrap_or(0);
-                        let new_index = (current + 1).min(5); // 6 SSL modes (0-5)
+                        let max_modes = 6; // All SSL modes
+                        let new_index = if current + 1 < max_modes {
+                            current + 1
+                        } else {
+                            0
+                        };
                         self.state.connection_modal_state.select_ssl_mode(new_index);
                     }
                     ConnectionField::PasswordStorageType => {
+                        // Cycle through password storage types
                         self.state
                             .connection_modal_state
                             .cycle_password_storage_type();
                     }
-                    _ => {}
+                    _ => {
+                        // For other fields, move to next field
+                        self.state.connection_modal_state.focused_field =
+                            self.state.connection_modal_state.get_smart_next_field();
+                    }
                 }
             }
-            KeyCode::Up
-                if matches!(
-                    self.state.connection_modal_state.focused_field,
-                    ConnectionField::DatabaseType
-                        | ConnectionField::SslMode
-                        | ConnectionField::PasswordStorageType
-                ) =>
-            {
-                // Handle dropdown navigation
+            KeyCode::Up => {
+                // Handle database type and other dropdowns specially
                 match self.state.connection_modal_state.focused_field {
                     ConnectionField::DatabaseType => {
+                        // Navigate database type dropdown
                         let current = self
                             .state
                             .connection_modal_state
                             .db_type_list_state
                             .selected()
                             .unwrap_or(0);
-                        let new_index = current.saturating_sub(1);
+                        let max_types = 4; // PostgreSQL, MySQL, MariaDB, SQLite
+                        let new_index = if current > 0 {
+                            current - 1
+                        } else {
+                            max_types - 1
+                        };
                         self.state
                             .connection_modal_state
                             .select_database_type(new_index);
                     }
                     ConnectionField::SslMode => {
+                        // Navigate SSL mode dropdown
                         let current = self
                             .state
                             .connection_modal_state
                             .ssl_list_state
                             .selected()
                             .unwrap_or(0);
-                        let new_index = current.saturating_sub(1);
+                        let max_modes = 6; // All SSL modes
+                        let new_index = if current > 0 {
+                            current - 1
+                        } else {
+                            max_modes - 1
+                        };
                         self.state.connection_modal_state.select_ssl_mode(new_index);
                     }
                     ConnectionField::PasswordStorageType => {
@@ -2208,14 +2180,12 @@ impl App {
                                 PasswordStorageType::Encrypted => PasswordStorageType::Environment,
                             };
                     }
-                    _ => {}
+                    _ => {
+                        // For other fields, move to previous field
+                        self.state.connection_modal_state.focused_field =
+                            self.state.connection_modal_state.get_smart_previous_field();
+                    }
                 }
-            }
-            KeyCode::Down | KeyCode::Char('j') => {
-                self.state.connection_modal_state.next_field();
-            }
-            KeyCode::Up | KeyCode::Char('k') => {
-                self.state.connection_modal_state.previous_field();
             }
             KeyCode::Enter => {
                 match self.state.connection_modal_state.focused_field {
@@ -2858,29 +2828,37 @@ impl App {
         // Handle keys based on connection mode state
         match key {
             // Navigation keys
+            // Ctrl+J/K for section switching
             KeyEvent {
                 code: KeyCode::Char('j'),
-                modifiers: KeyModifiers::NONE,
-                ..
-            }
-            | KeyEvent {
-                code: KeyCode::Down,
-                modifiers: KeyModifiers::NONE,
+                modifiers: KeyModifiers::CONTROL,
                 ..
             } => {
                 connection_mode.next_section();
             }
             KeyEvent {
                 code: KeyCode::Char('k'),
+                modifiers: KeyModifiers::CONTROL,
+                ..
+            } => {
+                connection_mode.previous_section();
+            }
+            // Arrow keys for dropdown navigation and field navigation
+            KeyEvent {
+                code: KeyCode::Down,
                 modifiers: KeyModifiers::NONE,
                 ..
+            } => {
+                // Use arrow keys for dropdown navigation within fields
+                connection_mode.next_field();
             }
-            | KeyEvent {
+            KeyEvent {
                 code: KeyCode::Up,
                 modifiers: KeyModifiers::NONE,
                 ..
             } => {
-                connection_mode.previous_section();
+                // Use arrow keys for dropdown navigation within fields
+                connection_mode.previous_field();
             }
             KeyEvent {
                 code: KeyCode::Tab,
