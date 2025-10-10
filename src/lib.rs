@@ -8,6 +8,7 @@ pub mod constants;
 pub mod core;
 pub mod database;
 pub mod event;
+pub mod io;
 pub mod logging;
 pub mod security;
 pub mod state;
