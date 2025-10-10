@@ -300,12 +300,17 @@ impl App {
                 Ok(Some(()))
             }
             // Tab/Shift+Tab for pane cycling
-            (KeyModifiers::NONE, KeyCode::Tab) if self.state.ui.is_in_main() => {
+            // Skip Tab in query editor insert mode (Tab inserts tab character there)
+            (KeyModifiers::NONE, KeyCode::Tab) if self.state.ui.is_in_main()
+                && !(self.state.ui.focused_pane == FocusedPane::QueryWindow
+                     && self.state.query_editor.is_insert_mode()) => {
                 self.state.cycle_focus_forward();
                 self.state.ui.cancel_pending_gg();
                 Ok(Some(()))
             }
-            (KeyModifiers::SHIFT, KeyCode::BackTab) if self.state.ui.is_in_main() => {
+            (KeyModifiers::SHIFT, KeyCode::BackTab) if self.state.ui.is_in_main()
+                && !(self.state.ui.focused_pane == FocusedPane::QueryWindow
+                     && self.state.query_editor.is_insert_mode()) => {
                 self.state.cycle_focus_backward();
                 self.state.ui.cancel_pending_gg();
                 Ok(Some(()))
