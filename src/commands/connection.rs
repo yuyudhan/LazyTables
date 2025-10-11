@@ -191,9 +191,19 @@ impl Command for EditConnectionCommand {
         if !context.state.db.connections.connections.is_empty() {
             let selected = context.state.ui.selected_connection;
 
-            if let Some(connection) = context.state.db.connections.connections.get(selected).cloned() {
+            if let Some(connection) = context
+                .state
+                .db
+                .connections
+                .connections
+                .get(selected)
+                .cloned()
+            {
                 // Load existing connection data into modal
-                context.state.connection_modal_state.populate_from_connection(&connection);
+                context
+                    .state
+                    .connection_modal_state
+                    .populate_from_connection(&connection);
                 let conn_name = connection.name.clone();
                 context.state.open_edit_connection_modal();
 
@@ -337,7 +347,9 @@ pub struct RefreshConnectionsCommand;
 impl Command for RefreshConnectionsCommand {
     fn execute(&self, context: &mut CommandContext) -> Result<CommandResult> {
         // Reload connections from storage (using block_on temporarily - will be replaced with background task)
-        match tokio::runtime::Handle::current().block_on(crate::database::connection::ConnectionStorage::load()) {
+        match tokio::runtime::Handle::current()
+            .block_on(crate::database::connection::ConnectionStorage::load())
+        {
             Ok(storage) => {
                 let old_count = context.state.db.connections.connections.len();
                 context.state.db.connections = storage;

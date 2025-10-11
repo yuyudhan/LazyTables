@@ -772,8 +772,10 @@ impl ConnectionModalState {
             }
             _ => {
                 // For unsupported database types, just note it
-                Some("ℹ Connection string validation not yet supported for this database type"
-                    .to_string())
+                Some(
+                    "ℹ Connection string validation not yet supported for this database type"
+                        .to_string(),
+                )
             }
         }
     }
@@ -883,6 +885,7 @@ fn render_modal_overlay(frame: &mut Frame, area: Rect) {
 }
 
 /// Render the connection creation modal
+#[allow(clippy::too_many_arguments)]
 pub fn render_connection_modal(
     f: &mut Frame,
     modal_state: &ConnectionModalState,
@@ -943,10 +946,26 @@ pub fn render_connection_modal(
     render_modal_header_with_hints(f, modal_state, main_chunks[0]);
 
     // Render unified form
-    render_unified_form(f, modal_state, main_chunks[1], test_animation_frame, test_in_progress, test_elapsed_seconds, test_timeout_seconds);
+    render_unified_form(
+        f,
+        modal_state,
+        main_chunks[1],
+        test_animation_frame,
+        test_in_progress,
+        test_elapsed_seconds,
+        test_timeout_seconds,
+    );
 
     // Render error/status area only
-    render_modal_status(f, modal_state, main_chunks[2], test_animation_frame, test_in_progress, test_elapsed_seconds, test_timeout_seconds);
+    render_modal_status(
+        f,
+        modal_state,
+        main_chunks[2],
+        test_animation_frame,
+        test_in_progress,
+        test_elapsed_seconds,
+        test_timeout_seconds,
+    );
 }
 
 /// Render the modal header with navigation and keystroke hints
@@ -1061,7 +1080,15 @@ fn render_unified_form(
     f.render_widget(instruction_paragraph, chunks[0]);
 
     // Form fields
-    render_form_fields(f, modal_state, chunks[1], test_animation_frame, test_in_progress, test_elapsed_seconds, test_timeout_seconds);
+    render_form_fields(
+        f,
+        modal_state,
+        chunks[1],
+        test_animation_frame,
+        test_in_progress,
+        test_elapsed_seconds,
+        test_timeout_seconds,
+    );
 }
 
 /// Render the form fields
@@ -1092,9 +1119,9 @@ fn render_form_fields(
     let main_layout = Layout::default()
         .direction(Direction::Vertical)
         .constraints([
-            Constraint::Min(0),      // Fields area (flexible)
-            Constraint::Length(1),   // Spacer
-            Constraint::Length(3),   // Button bar (fixed at bottom, 3 lines: border + text + border)
+            Constraint::Min(0),    // Fields area (flexible)
+            Constraint::Length(1), // Spacer
+            Constraint::Length(3), // Button bar (fixed at bottom, 3 lines: border + text + border)
         ])
         .split(area);
 
@@ -1300,9 +1327,16 @@ fn render_form_fields(
     );
 
     // Render button bar (from main_layout, guaranteed at bottom)
-    render_button_bar(f, modal_state, main_layout[2], test_animation_frame, test_in_progress, test_elapsed_seconds, test_timeout_seconds);
+    render_button_bar(
+        f,
+        modal_state,
+        main_layout[2],
+        test_animation_frame,
+        test_in_progress,
+        test_elapsed_seconds,
+        test_timeout_seconds,
+    );
 }
-
 
 /// Get connection string example for database type
 fn get_connection_string_example(db_type: &DatabaseType) -> &'static str {
@@ -1363,13 +1397,7 @@ fn render_label_value_field(
 }
 
 /// Render a label-dropdown field pair (two-column, no boxes)
-fn render_label_dropdown_field(
-    f: &mut Frame,
-    label: &str,
-    value: &str,
-    focused: bool,
-    area: Rect,
-) {
+fn render_label_dropdown_field(f: &mut Frame, label: &str, value: &str, focused: bool, area: Rect) {
     // Split area into label (35%) and dropdown (65%)
     let chunks = Layout::default()
         .direction(Direction::Horizontal)
@@ -1485,16 +1513,12 @@ fn render_button_bar(
     let cancel_block = Block::default()
         .borders(Borders::ALL)
         .border_style(if cancel_focused {
-            Style::default()
-                .fg(Color::Red)
-                .add_modifier(Modifier::BOLD)
+            Style::default().fg(Color::Red).add_modifier(Modifier::BOLD)
         } else {
             Style::default().fg(Color::Rgb(178, 34, 34)) // Firebrick
         });
     let cancel_style = if cancel_focused {
-        Style::default()
-            .fg(Color::Red)
-            .add_modifier(Modifier::BOLD)
+        Style::default().fg(Color::Red).add_modifier(Modifier::BOLD)
     } else {
         Style::default().fg(Color::Rgb(255, 99, 71)) // Tomato
     };
@@ -1504,7 +1528,6 @@ fn render_button_bar(
         .alignment(Alignment::Center);
     f.render_widget(cancel_btn, button_chunks[4]);
 }
-
 
 /// Render only status/error messages (no buttons)
 fn render_modal_status(
@@ -1527,12 +1550,15 @@ fn render_modal_status(
                     _ => "•",
                 };
                 (
-                    format!("🔄 Testing connection {} {}/{}s", dots, test_elapsed_seconds, test_timeout_seconds),
+                    format!(
+                        "🔄 Testing connection {} {}/{}s",
+                        dots, test_elapsed_seconds, test_timeout_seconds
+                    ),
                     Style::default()
                         .fg(Color::Yellow)
                         .add_modifier(Modifier::BOLD),
                 )
-            },
+            }
             TestConnectionStatus::Success(msg) => (
                 format!("✅ {msg}"),
                 Style::default()

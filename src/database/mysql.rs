@@ -792,6 +792,29 @@ impl MySqlConnection {
     }
 }
 
+fn parse_mysql_type(type_str: &str) -> DataType {
+    let type_lower = type_str.to_lowercase();
+
+    match type_lower.as_str() {
+        "tinyint" | "smallint" | "mediumint" | "int" | "integer" => DataType::Integer,
+        "bigint" => DataType::BigInt,
+        "decimal" | "numeric" | "dec" => DataType::Decimal,
+        "float" => DataType::Float,
+        "double" | "double precision" | "real" => DataType::Double,
+        "bit" => DataType::Boolean,
+        "char" | "varchar" => DataType::Text,
+        "tinytext" | "text" | "mediumtext" | "longtext" => DataType::Text,
+        "date" => DataType::Date,
+        "time" => DataType::Time,
+        "datetime" | "timestamp" => DataType::Timestamp,
+        "year" => DataType::Integer,
+        "binary" | "varbinary" | "blob" | "tinyblob" | "mediumblob" | "longblob" => DataType::Bytea,
+        "json" => DataType::Json,
+        "enum" | "set" => DataType::Text,
+        _ => DataType::Text,
+    }
+}
+
 /// Parse MySQL data type string to internal DataType enum
 #[cfg(test)]
 mod tests {
@@ -963,28 +986,5 @@ mod tests {
         assert!(keywords.contains(&"AUTO_INCREMENT".to_string()));
         assert!(functions.contains(&"COUNT".to_string()));
         assert!(functions.contains(&"JSON_EXTRACT".to_string()));
-    }
-}
-
-fn parse_mysql_type(type_str: &str) -> DataType {
-    let type_lower = type_str.to_lowercase();
-
-    match type_lower.as_str() {
-        "tinyint" | "smallint" | "mediumint" | "int" | "integer" => DataType::Integer,
-        "bigint" => DataType::BigInt,
-        "decimal" | "numeric" | "dec" => DataType::Decimal,
-        "float" => DataType::Float,
-        "double" | "double precision" | "real" => DataType::Double,
-        "bit" => DataType::Boolean,
-        "char" | "varchar" => DataType::Text,
-        "tinytext" | "text" | "mediumtext" | "longtext" => DataType::Text,
-        "date" => DataType::Date,
-        "time" => DataType::Time,
-        "datetime" | "timestamp" => DataType::Timestamp,
-        "year" => DataType::Integer,
-        "binary" | "varbinary" | "blob" | "tinyblob" | "mediumblob" | "longblob" => DataType::Bytea,
-        "json" => DataType::Json,
-        "enum" | "set" => DataType::Text,
-        _ => DataType::Text,
     }
 }

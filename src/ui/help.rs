@@ -622,7 +622,11 @@ impl HelpSystem {
             Span::styled("  ⌥ ", Style::default().fg(Color::Gray)),
             Span::raw("Mode Control:"),
         ]));
-        Self::add_command(lines, "i/a/o/O", "Enter insert mode (cursor/after/new line)");
+        Self::add_command(
+            lines,
+            "i/a/o/O",
+            "Enter insert mode (cursor/after/new line)",
+        );
         Self::add_command(lines, "ESC", "Exit insert mode to normal mode");
         lines.push(Line::from(""));
 

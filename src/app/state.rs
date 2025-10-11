@@ -85,7 +85,10 @@ impl AppState {
         // Update list states based on loaded connections
         ui.update_connection_selection(db.connections.connections.len());
 
-        let app_state = Self {
+        // Don't load SQL files during initialization to avoid block_on in async context
+        // They will be loaded lazily when first needed or when a connection is established
+
+        Self {
             ui,
             db,
             connection_modal_state: ConnectionModalState::new(),
@@ -107,12 +110,7 @@ impl AppState {
             test_connection_in_progress: false,
             test_animation_frame: 0,
             test_start_time: None,
-        };
-
-        // Don't load SQL files during initialization to avoid block_on in async context
-        // They will be loaded lazily when first needed or when a connection is established
-
-        app_state
+        }
     }
 
     /// Initialize the application state database asynchronously
@@ -352,7 +350,8 @@ impl AppState {
 
     /// Open the add connection modal
     pub fn open_add_connection_modal(&mut self) {
-        self.ui.show_overlay(OverlayView::ConnectionForm(ConnectionFormMode::Add));
+        self.ui
+            .show_overlay(OverlayView::ConnectionForm(ConnectionFormMode::Add));
         self.connection_modal_state = ConnectionModalState::new(); // Reset state
     }
 
@@ -372,9 +371,10 @@ impl AppState {
         {
             self.connection_modal_state
                 .populate_from_connection(connection);
-            self.ui.show_overlay(OverlayView::ConnectionForm(
-                ConnectionFormMode::Edit(Box::new(connection.clone())),
-            ));
+            self.ui
+                .show_overlay(OverlayView::ConnectionForm(ConnectionFormMode::Edit(
+                    Box::new(connection.clone()),
+                )));
         }
     }
 
@@ -387,20 +387,19 @@ impl AppState {
     /// Save connection from modal
     pub async fn save_connection_from_modal(&mut self) -> Result<(), String> {
         // Get original connection name if editing
-        let original_name = if let Some(OverlayView::ConnectionForm(ConnectionFormMode::Edit(
-            existing_conn,
-        ))) = self.ui.current_view.overlay()
-        {
-            Some(existing_conn.name.as_str())
-        } else {
-            None
-        };
+        let original_name =
+            if let Some(OverlayView::ConnectionForm(ConnectionFormMode::Edit(existing_conn))) =
+                self.ui.current_view.overlay()
+            {
+                Some(existing_conn.name.as_str())
+            } else {
+                None
+            };
 
         // Validate and create connection with uniqueness check
-        let mut connection = self.connection_modal_state.try_create_connection(
-            &self.db.connections.connections,
-            original_name,
-        )?;
+        let mut connection = self
+            .connection_modal_state
+            .try_create_connection(&self.db.connections.connections, original_name)?;
 
         if self.ui.current_view.is_connection_form() {
             // Check if we're editing
@@ -523,8 +522,8 @@ impl AppState {
                 connection.status = ConnectionStatus::Disconnected;
             }
         }
-        // Save updated connection statuses
-        let _ = self.db.connections.save();
+        // Save updated connection statuses (fire-and-forget)
+        std::mem::drop(self.db.connections.save());
     }
 
     /// Attempt to connect to the selected database
@@ -626,8 +625,8 @@ impl AppState {
                 // Removed refresh_sql_files() call here to avoid block_on in async context
             }
 
-            // Save updated connection status
-            let _ = self.db.connections.save();
+            // Save updated connection status (fire-and-forget)
+            std::mem::drop(self.db.connections.save());
         }
     }
 
@@ -679,8 +678,8 @@ impl AppState {
 
             // Note: App state database clearing is handled in the async version
 
-            // Save updated connection status
-            let _ = self.db.connections.save();
+            // Save updated connection status (fire-and-forget)
+            std::mem::drop(self.db.connections.save());
 
             // Refresh SQL files to clear the list (no connection = no files)
             self.refresh_sql_files().await;
@@ -783,7 +782,10 @@ impl AppState {
     }
 
     /// Save current query content to a file (only if connection is active)
-    pub async fn save_query_as(&mut self, filename: &str) -> Result<(), Box<dyn std::error::Error>> {
+    pub async fn save_query_as(
+        &mut self,
+        filename: &str,
+    ) -> Result<(), Box<dyn std::error::Error>> {
         use crate::config::Config;
 
         // Get connection-specific directory - require active connection
@@ -914,7 +916,10 @@ impl AppState {
     }
 
     /// Create a new SQL file (only if connection is active)
-    pub async fn new_query_file(&mut self, filename: &str) -> Result<(), Box<dyn std::error::Error>> {
+    pub async fn new_query_file(
+        &mut self,
+        filename: &str,
+    ) -> Result<(), Box<dyn std::error::Error>> {
         // Check if connection is active before creating new file
         if let Some(connection) = self
             .db
@@ -1343,7 +1348,9 @@ impl AppState {
             crate::log_info!("Directory created/exists successfully");
             // Write file
             crate::io::async_fs::write(&file_path, &content_to_save).await
-        }.await {
+        }
+        .await
+        {
             Ok(_) => crate::log_info!("File write successful"),
             Err(e) => {
                 crate::log_info!("File write failed: {}", e);
@@ -1365,7 +1372,10 @@ impl AppState {
     }
 
     /// Delete a SQL file by index
-    pub async fn delete_sql_file(&mut self, file_index: usize) -> Result<(), Box<dyn std::error::Error>> {
+    pub async fn delete_sql_file(
+        &mut self,
+        file_index: usize,
+    ) -> Result<(), Box<dyn std::error::Error>> {
         if file_index >= self.saved_sql_files.len() {
             return Err("Invalid file index".into());
         }
@@ -1391,13 +1401,17 @@ impl AppState {
 
         // Use async file I/O
         let mut deleted = false;
-        let exists_connection = crate::io::async_fs::exists(&connection_path).await.unwrap_or(false);
+        let exists_connection = crate::io::async_fs::exists(&connection_path)
+            .await
+            .unwrap_or(false);
         if exists_connection {
             crate::io::async_fs::remove_file(&connection_path).await?;
             deleted = true;
         }
 
-        let exists_root = crate::io::async_fs::exists(&root_path).await.unwrap_or(false);
+        let exists_root = crate::io::async_fs::exists(&root_path)
+            .await
+            .unwrap_or(false);
         if exists_root {
             crate::io::async_fs::remove_file(&root_path).await?;
             deleted = true;
@@ -1451,12 +1465,16 @@ impl AppState {
         let new_root_path = root_dir.join(format!("{new_name}.sql"));
 
         // Use async file I/O
-        let exists_connection = crate::io::async_fs::exists(&old_connection_path).await.unwrap_or(false);
+        let exists_connection = crate::io::async_fs::exists(&old_connection_path)
+            .await
+            .unwrap_or(false);
 
         if exists_connection {
             crate::io::async_fs::rename(&old_connection_path, &new_connection_path).await?;
         } else {
-            let exists_root = crate::io::async_fs::exists(&old_root_path).await.unwrap_or(false);
+            let exists_root = crate::io::async_fs::exists(&old_root_path)
+                .await
+                .unwrap_or(false);
 
             if exists_root {
                 crate::io::async_fs::rename(&old_root_path, &new_root_path).await?;
@@ -1505,12 +1523,16 @@ impl AppState {
 
         // Use async file I/O
         let (content, use_connection_dir) = async {
-            let exists_connection = crate::io::async_fs::exists(&source_connection_path).await.unwrap_or(false);
+            let exists_connection = crate::io::async_fs::exists(&source_connection_path)
+                .await
+                .unwrap_or(false);
             if exists_connection {
                 let content = crate::io::async_fs::read_to_string(&source_connection_path).await?;
                 Ok::<_, Box<dyn std::error::Error>>((content, true))
             } else {
-                let exists_root = crate::io::async_fs::exists(&source_root_path).await.unwrap_or(false);
+                let exists_root = crate::io::async_fs::exists(&source_root_path)
+                    .await
+                    .unwrap_or(false);
                 if exists_root {
                     let content = crate::io::async_fs::read_to_string(&source_root_path).await?;
                     Ok((content, false))
@@ -1518,7 +1540,8 @@ impl AppState {
                     Err("Source file not found".into())
                 }
             }
-        }.await?;
+        }
+        .await?;
 
         // Write to the same location (connection-specific if it existed there, otherwise root)
         let target_path = if use_connection_dir {
@@ -1533,7 +1556,10 @@ impl AppState {
     }
 
     /// Create a new SQL file
-    pub async fn create_sql_file(&mut self, filename: &str) -> Result<(), Box<dyn std::error::Error>> {
+    pub async fn create_sql_file(
+        &mut self,
+        filename: &str,
+    ) -> Result<(), Box<dyn std::error::Error>> {
         let connection_name = if let Some(connection) = self
             .db
             .connections
@@ -1960,8 +1986,8 @@ impl AppState {
                     // Show user feedback
                     self.toast_manager.error("Database connection lost");
 
-                    // Save updated connection status
-                    let _ = self.db.connections.save();
+                    // Save updated connection status (fire-and-forget)
+                    std::mem::drop(self.db.connections.save());
 
                     return false;
                 }
@@ -2284,7 +2310,10 @@ impl Default for AppState {
         // Update list states based on loaded connections
         ui.update_connection_selection(db.connections.connections.len());
 
-        let app_state = Self {
+        // Don't load SQL files during initialization to avoid potential blocking
+        // They will be loaded lazily when first needed or when a connection is established
+
+        Self {
             ui,
             db,
             connection_modal_state: ConnectionModalState::new(),
@@ -2306,11 +2335,6 @@ impl Default for AppState {
             test_connection_in_progress: false,
             test_animation_frame: 0,
             test_start_time: None,
-        };
-
-        // Don't load SQL files during initialization to avoid potential blocking
-        // They will be loaded lazily when first needed or when a connection is established
-
-        app_state
+        }
     }
 }

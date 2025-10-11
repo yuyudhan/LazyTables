@@ -44,7 +44,11 @@ pub async fn read_to_string<P: AsRef<Path>>(path: P) -> Result<String> {
 
     match result {
         Ok(Ok(contents)) => {
-            crate::log_debug!("Successfully read {} bytes from {}", contents.len(), path_display);
+            crate::log_debug!(
+                "Successfully read {} bytes from {}",
+                contents.len(),
+                path_display
+            );
             Ok(contents)
         }
         Ok(Err(e)) => {
@@ -89,13 +93,21 @@ pub async fn write<P: AsRef<Path>, C: AsRef<[u8]>>(path: P, contents: C) -> Resu
     let contents_ref = contents.as_ref();
     let byte_count = contents_ref.len();
 
-    crate::log_debug!("Writing {} bytes to file asynchronously: {}", byte_count, path_display);
+    crate::log_debug!(
+        "Writing {} bytes to file asynchronously: {}",
+        byte_count,
+        path_display
+    );
 
     let result = timeout(FILE_OP_TIMEOUT, fs::write(&path, contents_ref)).await;
 
     match result {
         Ok(Ok(())) => {
-            crate::log_debug!("Successfully wrote {} bytes to {}", byte_count, path_display);
+            crate::log_debug!(
+                "Successfully wrote {} bytes to {}",
+                byte_count,
+                path_display
+            );
             Ok(())
         }
         Ok(Err(e)) => {
@@ -205,7 +217,11 @@ pub async fn read_dir<P: AsRef<Path>>(path: P) -> Result<Vec<fs::DirEntry>> {
 
     match result {
         Ok(Ok(entries)) => {
-            crate::log_debug!("Successfully read {} entries from {}", entries.len(), path_display);
+            crate::log_debug!(
+                "Successfully read {} entries from {}",
+                entries.len(),
+                path_display
+            );
             Ok(entries)
         }
         Ok(Err(e)) => {
@@ -307,7 +323,11 @@ pub async fn rename<P: AsRef<Path>, Q: AsRef<Path>>(from: P, to: Q) -> Result<()
     let from_display = from.display().to_string();
     let to_display = to.display().to_string();
 
-    crate::log_debug!("Renaming asynchronously: {} to {}", from_display, to_display);
+    crate::log_debug!(
+        "Renaming asynchronously: {} to {}",
+        from_display,
+        to_display
+    );
 
     let result = timeout(FILE_OP_TIMEOUT, fs::rename(&from, &to)).await;
 

@@ -70,8 +70,7 @@ impl App {
         let command_registry = CommandRegistry::new();
 
         // Create channel for connection events
-        let (connection_events_tx, connection_events_rx) =
-            tokio::sync::mpsc::unbounded_channel();
+        let (connection_events_tx, connection_events_rx) = tokio::sync::mpsc::unbounded_channel();
 
         // Create channel for test connection events
         let (test_connection_events_tx, test_connection_events_rx) =
@@ -231,12 +230,7 @@ impl App {
         Ok(())
     }
 
-    /// Handle keyboard events
-// New simplified key event handlers for LazyTables
-// This file contains the refactored key handling logic
-// To be inserted into src/app/mod.rs
-
-    /// Handle application keyboard events (NEW SIMPLIFIED VERSION)
+    /// Handle application keyboard events
     async fn handle_key_event(&mut self, key: KeyEvent) -> Result<()> {
         // 1. Handle global keys first (work everywhere)
         if self.handle_global_keys(key)?.is_some() {
@@ -301,16 +295,20 @@ impl App {
             }
             // Tab/Shift+Tab for pane cycling
             // Skip Tab in query editor insert mode (Tab inserts tab character there)
-            (KeyModifiers::NONE, KeyCode::Tab) if self.state.ui.is_in_main()
-                && !(self.state.ui.focused_pane == FocusedPane::QueryWindow
-                     && self.state.query_editor.is_insert_mode()) => {
+            (KeyModifiers::NONE, KeyCode::Tab)
+                if self.state.ui.is_in_main()
+                    && !(self.state.ui.focused_pane == FocusedPane::QueryWindow
+                        && self.state.query_editor.is_insert_mode()) =>
+            {
                 self.state.cycle_focus_forward();
                 self.state.ui.cancel_pending_gg();
                 Ok(Some(()))
             }
-            (KeyModifiers::SHIFT, KeyCode::BackTab) if self.state.ui.is_in_main()
-                && !(self.state.ui.focused_pane == FocusedPane::QueryWindow
-                     && self.state.query_editor.is_insert_mode()) => {
+            (KeyModifiers::SHIFT, KeyCode::BackTab)
+                if self.state.ui.is_in_main()
+                    && !(self.state.ui.focused_pane == FocusedPane::QueryWindow
+                        && self.state.query_editor.is_insert_mode()) =>
+            {
                 self.state.cycle_focus_backward();
                 self.state.ui.cancel_pending_gg();
                 Ok(Some(()))
@@ -386,12 +384,8 @@ impl App {
             AppView::Overlay(OverlayView::TableEditor) => {
                 self.handle_table_editor_key_event(key).await
             }
-            AppView::Overlay(OverlayView::DebugView) => {
-                self.handle_debug_view_keys(key)
-            }
-            AppView::Overlay(OverlayView::Help) => {
-                self.handle_help_keys(key)
-            }
+            AppView::Overlay(OverlayView::DebugView) => self.handle_debug_view_keys(key),
+            AppView::Overlay(OverlayView::Help) => self.handle_help_keys(key),
             _ => Ok(()),
         }
     }
@@ -469,13 +463,22 @@ impl App {
                     match &modal.action {
                         crate::ui::ConfirmationAction::DeleteConnection(index) => {
                             let index = *index;
-                            if let Some(connection) = self.state.db.connections.connections.get(index) {
+                            if let Some(connection) =
+                                self.state.db.connections.connections.get(index)
+                            {
                                 let conn_id = connection.id.clone();
-                                if let Err(e) = self.state.db.connections.remove_connection(&conn_id).await {
-                                    self.state.toast_manager.error(format!("Failed to delete connection: {e}"));
+                                if let Err(e) =
+                                    self.state.db.connections.remove_connection(&conn_id).await
+                                {
+                                    self.state
+                                        .toast_manager
+                                        .error(format!("Failed to delete connection: {e}"));
                                 } else {
-                                    self.state.toast_manager.success("Connection deleted successfully");
-                                    if self.state.ui.selected_connection >= self.state.db.connections.connections.len()
+                                    self.state
+                                        .toast_manager
+                                        .success("Connection deleted successfully");
+                                    if self.state.ui.selected_connection
+                                        >= self.state.db.connections.connections.len()
                                         && self.state.ui.selected_connection > 0
                                     {
                                         self.state.ui.selected_connection -= 1;
@@ -486,11 +489,15 @@ impl App {
                         crate::ui::ConfirmationAction::DeleteSqlFile(index) => {
                             let index = *index;
                             if let Err(e) = self.state.delete_sql_file(index).await {
-                                self.state.toast_manager.error(format!("Failed to delete SQL file: {e}"));
+                                self.state
+                                    .toast_manager
+                                    .error(format!("Failed to delete SQL file: {e}"));
                             } else {
                                 self.state.toast_manager.success("SQL file deleted");
                             }
-                            self.state.ui.update_sql_file_selection(self.state.saved_sql_files.len());
+                            self.state
+                                .ui
+                                .update_sql_file_selection(self.state.saved_sql_files.len());
                         }
                         crate::ui::ConfirmationAction::ExitApplication => {
                             self.should_quit = true;
@@ -518,7 +525,9 @@ impl App {
                 KeyCode::Enter | KeyCode::Char('y') | KeyCode::Char('Y') => {
                     let confirmation = confirmation.clone();
                     if let Err(e) = self.state.delete_table_row(confirmation).await {
-                        self.state.toast_manager.error(format!("Failed to delete row: {e}"));
+                        self.state
+                            .toast_manager
+                            .error(format!("Failed to delete row: {e}"));
                     } else {
                         self.state.toast_manager.success("Row deleted successfully");
                         let tab_idx = self.state.table_viewer_state.active_tab;
@@ -546,7 +555,9 @@ impl App {
                 }
                 KeyCode::Backspace => {
                     self.state.ui.backspace_connections_search();
-                    self.state.ui.update_filtered_connections(&self.state.db.connections.connections);
+                    self.state
+                        .ui
+                        .update_filtered_connections(&self.state.db.connections.connections);
                 }
                 KeyCode::Enter => {
                     // Get selected connection index
@@ -562,7 +573,9 @@ impl App {
 
                     // Don't start new connection if one is already in progress
                     if self.state.connecting_in_progress.is_some() {
-                        self.state.toast_manager.warning("Connection attempt already in progress");
+                        self.state
+                            .toast_manager
+                            .warning("Connection attempt already in progress");
                         return Ok(());
                     }
 
@@ -572,13 +585,22 @@ impl App {
                     self.state.connection_start_time = Some(std::time::Instant::now());
 
                     // Set status to connecting immediately
-                    if let Some(conn) = self.state.db.connections.connections.get_mut(selected_index) {
+                    if let Some(conn) = self
+                        .state
+                        .db
+                        .connections
+                        .connections
+                        .get_mut(selected_index)
+                    {
                         conn.status = crate::database::ConnectionStatus::Connecting;
-                        self.state.toast_manager.info(format!("Connecting to {}...", conn.name));
+                        self.state
+                            .toast_manager
+                            .info(format!("Connecting to {}...", conn.name));
                     }
 
                     // Clone necessary data for background task
-                    let connection_config = self.state.db.connections.connections[selected_index].clone();
+                    let connection_config =
+                        self.state.db.connections.connections[selected_index].clone();
                     let connection_manager = self.state.connection_manager.clone();
                     let tx = self.connection_events_tx.clone();
 
@@ -588,7 +610,10 @@ impl App {
                         match connection_manager.connect(&connection_config).await {
                             Ok(_) => {
                                 // Connection succeeded, now get database objects
-                                match connection_manager.list_database_objects(&connection_config.id).await {
+                                match connection_manager
+                                    .list_database_objects(&connection_config.id)
+                                    .await
+                                {
                                     Ok(objects) => {
                                         // Send success event
                                         let _ = tx.send(ConnectionEvent::Success {
@@ -600,7 +625,10 @@ impl App {
                                         // Connection succeeded but listing objects failed
                                         let _ = tx.send(ConnectionEvent::Failed {
                                             connection_index: selected_index,
-                                            error: format!("Failed to load database objects: {}", e),
+                                            error: format!(
+                                                "Failed to load database objects: {}",
+                                                e
+                                            ),
                                         });
                                     }
                                 }
@@ -618,14 +646,20 @@ impl App {
                     self.state.ui.exit_connections_search();
                 }
                 KeyCode::Down => {
-                    self.state.ui.connections_selection_down(&self.state.db.connections.connections);
+                    self.state
+                        .ui
+                        .connections_selection_down(&self.state.db.connections.connections);
                 }
                 KeyCode::Up => {
-                    self.state.ui.connections_selection_up(&self.state.db.connections.connections);
+                    self.state
+                        .ui
+                        .connections_selection_up(&self.state.db.connections.connections);
                 }
                 KeyCode::Char(c) => {
                     self.state.ui.add_to_connections_search(c);
-                    self.state.ui.update_filtered_connections(&self.state.db.connections.connections);
+                    self.state
+                        .ui
+                        .update_filtered_connections(&self.state.db.connections.connections);
                 }
                 _ => {}
             }
@@ -671,7 +705,9 @@ impl App {
 
                 // Don't start new connection if one is already in progress
                 if self.state.connecting_in_progress.is_some() {
-                    self.state.toast_manager.warning("Connection attempt already in progress");
+                    self.state
+                        .toast_manager
+                        .warning("Connection attempt already in progress");
                     return Ok(());
                 }
 
@@ -681,13 +717,22 @@ impl App {
                 self.state.connection_start_time = Some(std::time::Instant::now());
 
                 // Set status to connecting immediately (for visual feedback)
-                if let Some(conn) = self.state.db.connections.connections.get_mut(selected_index) {
+                if let Some(conn) = self
+                    .state
+                    .db
+                    .connections
+                    .connections
+                    .get_mut(selected_index)
+                {
                     conn.status = crate::database::ConnectionStatus::Connecting;
-                    self.state.toast_manager.info(format!("Connecting to {}...", conn.name));
+                    self.state
+                        .toast_manager
+                        .info(format!("Connecting to {}...", conn.name));
                 }
 
                 // Clone necessary data for background task
-                let connection_config = self.state.db.connections.connections[selected_index].clone();
+                let connection_config =
+                    self.state.db.connections.connections[selected_index].clone();
                 let connection_manager = self.state.connection_manager.clone();
                 let tx = self.connection_events_tx.clone();
 
@@ -697,7 +742,10 @@ impl App {
                     match connection_manager.connect(&connection_config).await {
                         Ok(_) => {
                             // Connection succeeded, now get database objects
-                            match connection_manager.list_database_objects(&connection_config.id).await {
+                            match connection_manager
+                                .list_database_objects(&connection_config.id)
+                                .await
+                            {
                                 Ok(objects) => {
                                     // Send success event
                                     let _ = tx.send(ConnectionEvent::Success {
@@ -734,10 +782,14 @@ impl App {
             }
             // j/k or arrow keys - Navigate
             KeyCode::Char('j') | KeyCode::Down => {
-                self.state.ui.connections_selection_down(&self.state.db.connections.connections);
+                self.state
+                    .ui
+                    .connections_selection_down(&self.state.db.connections.connections);
             }
             KeyCode::Char('k') | KeyCode::Up => {
-                self.state.ui.connections_selection_up(&self.state.db.connections.connections);
+                self.state
+                    .ui
+                    .connections_selection_up(&self.state.db.connections.connections);
             }
             _ => {}
         }
@@ -822,16 +874,20 @@ impl App {
                 if let Some(item) = self.state.ui.get_selected_item_raw() {
                     if !item.is_selectable {
                         // It's a group header - extract group name and toggle expansion
-                        let group_name = item.display_name
+                        let group_name = item
+                            .display_name
                             .trim_start_matches("▼ ")
                             .trim_start_matches("▶ ")
                             .trim()
                             .to_string();
 
                         if !group_name.is_empty() {
-                            let is_expanded_before = self.state.ui.is_object_group_expanded(&group_name);
+                            let is_expanded_before =
+                                self.state.ui.is_object_group_expanded(&group_name);
                             self.state.ui.toggle_object_group_expansion(&group_name);
-                            self.state.ui.build_selectable_table_items(&self.state.db.database_objects);
+                            self.state
+                                .ui
+                                .build_selectable_table_items(&self.state.db.database_objects);
                             self.state.toast_manager.info(format!(
                                 "{} {}",
                                 if !is_expanded_before {
@@ -862,7 +918,9 @@ impl App {
             }
             KeyCode::Char('d') if key.modifiers == KeyModifiers::CONTROL => {
                 // Page down
-                if self.state.ui.details_viewport_offset + 10 < self.state.ui.details_max_scroll_offset {
+                if self.state.ui.details_viewport_offset + 10
+                    < self.state.ui.details_max_scroll_offset
+                {
                     self.state.ui.details_viewport_offset += 10;
                 } else {
                     self.state.ui.details_viewport_offset = self.state.ui.details_max_scroll_offset;
@@ -870,7 +928,8 @@ impl App {
             }
             KeyCode::Char('u') if key.modifiers == KeyModifiers::CONTROL => {
                 // Page up
-                self.state.ui.details_viewport_offset = self.state.ui.details_viewport_offset.saturating_sub(10);
+                self.state.ui.details_viewport_offset =
+                    self.state.ui.details_viewport_offset.saturating_sub(10);
             }
             KeyCode::Char('g') => {
                 if self.state.ui.pending_gg_command {
@@ -913,7 +972,9 @@ impl App {
                 // Trigger delete confirmation
                 if let Some(_tab) = self.state.table_viewer_state.current_tab() {
                     // Build delete confirmation - implementation simplified for now
-                    self.state.toast_manager.info("Delete row: Press 'dd' to confirm");
+                    self.state
+                        .toast_manager
+                        .info("Delete row: Press 'dd' to confirm");
                 }
             }
             // '/' - Enter search mode
@@ -926,7 +987,9 @@ impl App {
             KeyCode::Char('r') if key.modifiers == KeyModifiers::CONTROL => {
                 let tab_idx = self.state.table_viewer_state.active_tab;
                 if let Err(e) = self.state.load_table_data(tab_idx).await {
-                    self.state.toast_manager.error(format!("Failed to refresh: {e}"));
+                    self.state
+                        .toast_manager
+                        .error(format!("Failed to refresh: {e}"));
                 } else {
                     self.state.toast_manager.success("Table data refreshed");
                 }
@@ -965,9 +1028,13 @@ impl App {
                     // Save edit
                     if let Some(update) = tab.save_edit() {
                         if let Err(e) = self.state.update_table_cell(update).await {
-                            self.state.toast_manager.error(format!("Failed to update cell: {e}"));
+                            self.state
+                                .toast_manager
+                                .error(format!("Failed to update cell: {e}"));
                         } else {
-                            self.state.toast_manager.success("Cell updated successfully");
+                            self.state
+                                .toast_manager
+                                .success("Cell updated successfully");
                         }
                     }
                 }
@@ -1035,7 +1102,9 @@ impl App {
             // Enter - Load selected SQL file
             KeyCode::Enter => {
                 if let Err(e) = self.state.load_selected_sql_file() {
-                    self.state.toast_manager.error(format!("Failed to load SQL file: {e}"));
+                    self.state
+                        .toast_manager
+                        .error(format!("Failed to load SQL file: {e}"));
                 } else {
                     self.state.toast_manager.success("SQL file loaded");
                 }
@@ -1058,7 +1127,10 @@ impl App {
                         title: "Delete SQL File".to_string(),
                         message: format!(
                             "Are you sure you want to delete '{}'?",
-                            self.state.saved_sql_files.get(index).unwrap_or(&String::new())
+                            self.state
+                                .saved_sql_files
+                                .get(index)
+                                .unwrap_or(&String::new())
                         ),
                         action: crate::ui::ConfirmationAction::DeleteSqlFile(index),
                     });
@@ -1091,7 +1163,9 @@ impl App {
             }
             KeyCode::Enter => {
                 if let Err(e) = self.state.load_selected_sql_file() {
-                    self.state.toast_manager.error(format!("Failed to load SQL file: {e}"));
+                    self.state
+                        .toast_manager
+                        .error(format!("Failed to load SQL file: {e}"));
                 } else {
                     self.state.toast_manager.success("SQL file loaded");
                 }
@@ -1126,11 +1200,22 @@ impl App {
                     let filtered_files = self.state.get_filtered_sql_files();
                     let selected_index = self.state.get_filtered_sql_file_selection();
                     if let Some(old_name) = filtered_files.get(selected_index) {
-                        if let Some(original_index) = self.state.saved_sql_files.iter().position(|f| f == old_name) {
-                            if let Err(e) = self.state.rename_sql_file(original_index, &new_name).await {
-                                self.state.toast_manager.error(format!("Failed to rename file: {e}"));
+                        if let Some(original_index) = self
+                            .state
+                            .saved_sql_files
+                            .iter()
+                            .position(|f| f == old_name)
+                        {
+                            if let Err(e) =
+                                self.state.rename_sql_file(original_index, &new_name).await
+                            {
+                                self.state
+                                    .toast_manager
+                                    .error(format!("Failed to rename file: {e}"));
                             } else {
-                                self.state.toast_manager.success("File renamed successfully");
+                                self.state
+                                    .toast_manager
+                                    .success("File renamed successfully");
                             }
                         }
                     }
@@ -1158,9 +1243,13 @@ impl App {
                 let filename = self.state.ui.sql_files_create_buffer.clone();
                 if !filename.is_empty() {
                     if let Err(e) = self.state.create_sql_file(&filename).await {
-                        self.state.toast_manager.error(format!("Failed to create file: {e}"));
+                        self.state
+                            .toast_manager
+                            .error(format!("Failed to create file: {e}"));
                     } else {
-                        self.state.toast_manager.success("File created successfully");
+                        self.state
+                            .toast_manager
+                            .success("File created successfully");
                         // Load the new file
                         let _ = self.state.load_query_file(&filename);
                     }
@@ -1192,13 +1281,17 @@ impl App {
             // Shift+E - Execute query at cursor (PRIMARY binding, vim-style)
             KeyCode::Char('E') => {
                 if let Err(e) = self.state.execute_query_at_cursor().await {
-                    self.state.toast_manager.error(format!("Query execution failed: {e}"));
+                    self.state
+                        .toast_manager
+                        .error(format!("Query execution failed: {e}"));
                 }
             }
             // Ctrl+Enter - Execute query at cursor (SECONDARY binding, familiar to SQL tool users)
             KeyCode::Enter if key.modifiers.contains(KeyModifiers::CONTROL) => {
                 if let Err(e) = self.state.execute_query_at_cursor().await {
-                    self.state.toast_manager.error(format!("Query execution failed: {e}"));
+                    self.state
+                        .toast_manager
+                        .error(format!("Query execution failed: {e}"));
                 }
             }
             // 'i' - Enter insert mode at cursor
@@ -1372,7 +1465,9 @@ impl App {
                     ":w" => {
                         // Save file
                         if let Err(e) = self.state.save_sql_file_with_connection().await {
-                            self.state.toast_manager.error(format!("Failed to save file: {}", e));
+                            self.state
+                                .toast_manager
+                                .error(format!("Failed to save file: {}", e));
                         } else {
                             self.state.query_editor.mark_saved();
                             self.state.toast_manager.success("File saved successfully");
@@ -1381,7 +1476,9 @@ impl App {
                     ":q" => {
                         // Clear editor (with confirmation if modified)
                         if self.state.query_editor.is_modified() {
-                            self.state.toast_manager.warning("No write since last change (use :q! to force)");
+                            self.state
+                                .toast_manager
+                                .warning("No write since last change (use :q! to force)");
                         } else {
                             self.state.query_editor.reset();
                             self.state.toast_manager.info("Editor cleared");
@@ -1395,19 +1492,27 @@ impl App {
                     ":wq" => {
                         // Save and clear
                         if let Err(e) = self.state.save_sql_file_with_connection().await {
-                            self.state.toast_manager.error(format!("Failed to save file: {}", e));
+                            self.state
+                                .toast_manager
+                                .error(format!("Failed to save file: {}", e));
                         } else {
                             self.state.query_editor.mark_saved();
                             self.state.query_editor.reset();
-                            self.state.toast_manager.success("File saved and editor cleared");
+                            self.state
+                                .toast_manager
+                                .success("File saved and editor cleared");
                         }
                     }
                     cmd if cmd.starts_with(":w ") => {
                         // Save with filename - future enhancement
-                        self.state.toast_manager.warning("Save with filename not yet implemented");
+                        self.state
+                            .toast_manager
+                            .warning("Save with filename not yet implemented");
                     }
                     _ => {
-                        self.state.toast_manager.error(format!("Unknown command: {}", command));
+                        self.state
+                            .toast_manager
+                            .error(format!("Unknown command: {}", command));
                     }
                 }
             }
@@ -1425,7 +1530,10 @@ impl App {
 
         match key.code {
             // PRIORITY 1: Global shortcuts (work from any field EXCEPT text input fields)
-            KeyCode::Char('t') if !key.modifiers.contains(KeyModifiers::CONTROL) && !self.state.connection_modal_state.is_text_field() => {
+            KeyCode::Char('t')
+                if !key.modifiers.contains(KeyModifiers::CONTROL)
+                    && !self.state.connection_modal_state.is_text_field() =>
+            {
                 // Plain 't': Test connection shortcut
                 self.test_connection_from_modal().await;
             }
@@ -2023,9 +2131,7 @@ impl App {
                             "Connection timeout after {} seconds",
                             elapsed
                         ));
-                        self.state
-                            .toast_manager
-                            .error("Connection timeout");
+                        self.state.toast_manager.error("Connection timeout");
                     }
                     self.state.connecting_in_progress = None;
                     self.state.connection_start_time = None;
@@ -2073,12 +2179,8 @@ impl App {
                         self.state.update_table_selection();
 
                         // Show success message
-                        if let Some(conn) = self
-                            .state
-                            .db
-                            .connections
-                            .connections
-                            .get(connection_index)
+                        if let Some(conn) =
+                            self.state.db.connections.connections.get(connection_index)
                         {
                             self.state
                                 .toast_manager
@@ -2145,9 +2247,7 @@ impl App {
                         )));
                     self.state.test_connection_in_progress = false;
                     self.state.test_start_time = None;
-                    self.state
-                        .toast_manager
-                        .error("Test connection timeout");
+                    self.state.toast_manager.error("Test connection timeout");
                     return Ok(());
                 }
             }
@@ -2202,9 +2302,7 @@ impl App {
 
         // Don't start new test if one is already in progress
         if self.state.test_connection_in_progress {
-            self.state
-                .toast_manager
-                .warning("Test already in progress");
+            self.state.toast_manager.warning("Test already in progress");
             return;
         }
 
@@ -2223,9 +2321,11 @@ impl App {
             Ok(config) => config,
             Err(e) => {
                 // Invalid config - send error immediately
-                let _ = self.test_connection_events_tx.send(TestConnectionEvent::Failed(
-                    format!("Invalid configuration: {e}"),
-                ));
+                let _ = self
+                    .test_connection_events_tx
+                    .send(TestConnectionEvent::Failed(format!(
+                        "Invalid configuration: {e}"
+                    )));
                 return;
             }
         };
@@ -2243,7 +2343,10 @@ impl App {
                     let mut conn = PostgresConnection::new(config);
 
                     match conn.connect().await {
-                        Ok(()) => conn.test_connection().await.map(|_| "Connection successful!".to_string()),
+                        Ok(()) => conn
+                            .test_connection()
+                            .await
+                            .map(|_| "Connection successful!".to_string()),
                         Err(e) => Err(crate::core::error::LazyTablesError::Connection(format!(
                             "Connection failed: {e}"
                         ))),
@@ -2254,7 +2357,10 @@ impl App {
                     let mut conn = MySqlConnection::new(config);
 
                     match conn.connect().await {
-                        Ok(()) => conn.test_connection().await.map(|_| "Connection successful!".to_string()),
+                        Ok(()) => conn
+                            .test_connection()
+                            .await
+                            .map(|_| "Connection successful!".to_string()),
                         Err(e) => Err(crate::core::error::LazyTablesError::Connection(format!(
                             "Connection failed: {e}"
                         ))),
@@ -2265,7 +2371,10 @@ impl App {
                     let mut conn = SqliteConnection::new(config);
 
                     match conn.connect().await {
-                        Ok(()) => conn.test_connection().await.map(|_| "Connection successful!".to_string()),
+                        Ok(()) => conn
+                            .test_connection()
+                            .await
+                            .map(|_| "Connection successful!".to_string()),
                         Err(e) => Err(crate::core::error::LazyTablesError::Connection(format!(
                             "Connection failed: {e}"
                         ))),
@@ -2285,5 +2394,4 @@ impl App {
             let _ = tx.send(event);
         });
     }
-
 }

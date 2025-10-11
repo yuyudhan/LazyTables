@@ -225,7 +225,8 @@ impl UI {
         }
 
         // Draw connection modal if active (either add or edit)
-        if state.ui.current_view.is_connection_form() || state.ui.current_view.is_connection_form() {
+        if state.ui.current_view.is_connection_form() || state.ui.current_view.is_connection_form()
+        {
             crate::ui::components::render_connection_modal(
                 frame,
                 &state.connection_modal_state,
@@ -233,7 +234,10 @@ impl UI {
                 state.ui.current_view.is_connection_form(), // Pass edit mode flag
                 state.test_animation_frame,
                 state.test_connection_in_progress,
-                state.test_start_time.map(|start| start.elapsed().as_secs()).unwrap_or(0),
+                state
+                    .test_start_time
+                    .map(|start| start.elapsed().as_secs())
+                    .unwrap_or(0),
                 state.connection_timeout_seconds,
             );
         }
@@ -314,7 +318,12 @@ impl UI {
         let mut items: Vec<ListItem> = display_indices
             .iter()
             .filter_map(|&index| {
-                state.db.connections.connections.get(index).map(|conn| (index, conn))
+                state
+                    .db
+                    .connections
+                    .connections
+                    .get(index)
+                    .map(|conn| (index, conn))
             })
             .map(|(index, connection)| {
                 // Get status symbol and color based on connection status
@@ -1301,15 +1310,14 @@ impl UI {
             .connections
             .get(state.ui.selected_connection)
         {
-            let database = connection
-                .database
-                .as_ref()
-                .map(|d| d.as_str())
-                .unwrap_or("N/A");
+            let database = connection.database.as_deref().unwrap_or("N/A");
 
             match &connection.status {
                 ConnectionStatus::Connected => {
-                    format!("{}:{} • {} • Connected", connection.host, connection.port, database)
+                    format!(
+                        "{}:{} • {} • Connected",
+                        connection.host, connection.port, database
+                    )
                 }
                 ConnectionStatus::Connecting => {
                     format!("{}:{} • Connecting...", connection.host, connection.port)

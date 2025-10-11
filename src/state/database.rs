@@ -12,7 +12,7 @@ use crate::{
 };
 
 /// Database-specific state separated from UI concerns
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Default)]
 pub struct DatabaseState {
     /// Connections storage
     pub connections: ConnectionStorage,
@@ -617,19 +617,5 @@ impl DatabaseState {
         let _ = pg_connection.disconnect().await;
 
         Ok(())
-    }
-}
-
-impl Default for DatabaseState {
-    fn default() -> Self {
-        Self {
-            connections: ConnectionStorage::default(),
-            tables: Vec::new(),
-            database_objects: None,
-            schemas: Vec::new(),
-            selected_schema: None,
-            table_load_error: None,
-            current_table_metadata: None,
-        }
     }
 }

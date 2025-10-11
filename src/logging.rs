@@ -126,82 +126,6 @@ pub fn clear_debug_messages() {
     DEBUG_LOG_STORAGE.clear();
 }
 
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn test_debug_storage_basic() {
-        // Test that we can create and clear the storage
-        clear_debug_messages();
-        let messages = get_debug_messages();
-        println!("After clear: {} messages", messages.len());
-
-        // Add a test message directly
-        let test_message = DebugMessage {
-            timestamp: chrono::Utc::now(),
-            level: "TEST".to_string(),
-            target: "test_target".to_string(),
-            message: "Test message".to_string(),
-            location: Some("test.rs:123".to_string()),
-        };
-
-        DEBUG_LOG_STORAGE.add_message(test_message);
-        let messages = get_debug_messages();
-        assert!(messages.len() > 0, "Should have at least one message");
-
-        // Find our test message
-        let test_message = messages.iter().find(|m| m.target == "test_target");
-        assert!(test_message.is_some(), "Should find our test message");
-
-        let test_message = test_message.unwrap();
-        assert_eq!(test_message.level, "TEST");
-        assert_eq!(test_message.target, "test_target");
-        assert_eq!(test_message.message, "Test message");
-        assert_eq!(test_message.location, Some("test.rs:123".to_string()));
-
-        println!("SUCCESS: Debug storage is working correctly");
-    }
-
-    #[test]
-    fn test_debug_storage_limits() {
-        // Clear messages
-        clear_debug_messages();
-
-        // Add more than the limit (1000)
-        for i in 0..1500 {
-            let message = DebugMessage {
-                timestamp: chrono::Utc::now(),
-                level: "INFO".to_string(),
-                target: "test".to_string(),
-                message: format!("Test message {}", i),
-                location: None,
-            };
-            DEBUG_LOG_STORAGE.add_message(message);
-        }
-
-        let messages = get_debug_messages();
-        assert!(
-            messages.len() <= 1000,
-            "Storage should be limited to 1000 messages, got {}",
-            messages.len()
-        );
-        assert!(messages.len() > 0, "Should have some messages");
-
-        // Should have the most recent messages (higher numbers)
-        if !messages.is_empty() {
-            let last_message = &messages[messages.len() - 1];
-            assert!(
-                last_message.message.contains("1499"),
-                "Should have the last message, got: {}",
-                last_message.message
-            );
-        }
-
-        println!("SUCCESS: Debug storage limits are working correctly");
-    }
-}
-
 /// Initialize the logging system based on mode and level
 pub fn init(level: LogLevel) -> Result<()> {
     let log_dir = get_log_dir()?;
@@ -394,4 +318,80 @@ pub fn add_debug_message(level: &str, target: &str, message: String) {
         location: None,
     };
     DEBUG_LOG_STORAGE.add_message(debug_msg);
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_debug_storage_basic() {
+        // Test that we can create and clear the storage
+        clear_debug_messages();
+        let messages = get_debug_messages();
+        println!("After clear: {} messages", messages.len());
+
+        // Add a test message directly
+        let test_message = DebugMessage {
+            timestamp: chrono::Utc::now(),
+            level: "TEST".to_string(),
+            target: "test_target".to_string(),
+            message: "Test message".to_string(),
+            location: Some("test.rs:123".to_string()),
+        };
+
+        DEBUG_LOG_STORAGE.add_message(test_message);
+        let messages = get_debug_messages();
+        assert!(!messages.is_empty(), "Should have at least one message");
+
+        // Find our test message
+        let test_message = messages.iter().find(|m| m.target == "test_target");
+        assert!(test_message.is_some(), "Should find our test message");
+
+        let test_message = test_message.unwrap();
+        assert_eq!(test_message.level, "TEST");
+        assert_eq!(test_message.target, "test_target");
+        assert_eq!(test_message.message, "Test message");
+        assert_eq!(test_message.location, Some("test.rs:123".to_string()));
+
+        println!("SUCCESS: Debug storage is working correctly");
+    }
+
+    #[test]
+    fn test_debug_storage_limits() {
+        // Clear messages
+        clear_debug_messages();
+
+        // Add more than the limit (1000)
+        for i in 0..1500 {
+            let message = DebugMessage {
+                timestamp: chrono::Utc::now(),
+                level: "INFO".to_string(),
+                target: "test".to_string(),
+                message: format!("Test message {}", i),
+                location: None,
+            };
+            DEBUG_LOG_STORAGE.add_message(message);
+        }
+
+        let messages = get_debug_messages();
+        assert!(
+            messages.len() <= 1000,
+            "Storage should be limited to 1000 messages, got {}",
+            messages.len()
+        );
+        assert!(!messages.is_empty(), "Should have some messages");
+
+        // Should have the most recent messages (higher numbers)
+        if !messages.is_empty() {
+            let last_message = &messages[messages.len() - 1];
+            assert!(
+                last_message.message.contains("1499"),
+                "Should have the last message, got: {}",
+                last_message.message
+            );
+        }
+
+        println!("SUCCESS: Debug storage limits are working correctly");
+    }
 }

@@ -1221,14 +1221,12 @@ impl QueryEditor {
                 height: 1,
             };
 
-            let command_text = Line::from(vec![
-                Span::styled(
-                    &self.command_buffer,
-                    Style::default()
-                        .fg(Color::Yellow)
-                        .add_modifier(Modifier::BOLD),
-                ),
-            ]);
+            let command_text = Line::from(vec![Span::styled(
+                &self.command_buffer,
+                Style::default()
+                    .fg(Color::Yellow)
+                    .add_modifier(Modifier::BOLD),
+            )]);
 
             f.render_widget(Paragraph::new(command_text), command_line_area);
 
