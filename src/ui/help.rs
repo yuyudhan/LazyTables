@@ -142,11 +142,15 @@ impl HelpSystem {
         ]));
         lines.push(Line::from(vec![
             Span::styled("• ", Style::default().fg(Color::Rgb(100, 220, 180))),
-            Span::raw("Press 'i' to enter insert mode in forms"),
+            Span::raw("Query Editor uses vim-style insert mode (i/a/o/O)"),
         ]));
         lines.push(Line::from(vec![
             Span::styled("• ", Style::default().fg(Color::Rgb(100, 220, 180))),
-            Span::raw("ESC exits insert mode and cancels"),
+            Span::raw("Forms use direct typing (no insert mode needed)"),
+        ]));
+        lines.push(Line::from(vec![
+            Span::styled("• ", Style::default().fg(Color::Rgb(100, 220, 180))),
+            Span::raw("ESC cancels forms and exits Query Editor insert mode"),
         ]));
         lines.push(Line::from(vec![
             Span::styled("• ", Style::default().fg(Color::Rgb(100, 220, 180))),
@@ -352,9 +356,12 @@ impl HelpSystem {
     }
 
     fn add_details_commands(lines: &mut Vec<Line<'static>>) {
+        // Basic Navigation
         Self::add_command(lines, "j/k", "Scroll up/down");
-        Self::add_command(lines, "Enter/Space", "Load detailed metadata");
-        Self::add_command(lines, "r", "Refresh metadata");
+        Self::add_command(lines, "↑/↓", "Scroll up/down (arrows)");
+        Self::add_command(lines, "Ctrl+D/U", "Page down/up (half page)");
+        Self::add_command(lines, "gg", "Jump to top");
+        Self::add_command(lines, "G", "Jump to bottom");
         lines.push(Line::from(""));
         lines.push(Line::from(Span::styled(
             "Information Displayed:",
@@ -488,20 +495,21 @@ impl HelpSystem {
                 .fg(Color::Rgb(120, 180, 255))
                 .add_modifier(Modifier::BOLD | Modifier::UNDERLINED),
         )]));
-        Self::add_command(lines, "c", "Copy/duplicate file");
-        Self::add_command(lines, "d", "Delete file (with confirmation)");
+        Self::add_command(lines, "n", "Create new file (enter create mode)");
         Self::add_command(lines, "r", "Rename file (enter rename mode)");
+        Self::add_command(lines, "d", "Delete file (with confirmation)");
         lines.push(Line::from(""));
 
-        // Create New Files
+        // Quick Actions
         lines.push(Line::from(vec![Span::styled(
-            "📝 Create New Files",
+            "⚡ Quick Actions",
             Style::default()
                 .fg(Color::Rgb(100, 220, 180))
                 .add_modifier(Modifier::BOLD | Modifier::UNDERLINED),
         )]));
-        Self::add_command(lines, "i", "Enter Query mode for editing");
+        Self::add_command(lines, "5", "Switch to Query Editor pane");
         Self::add_command(lines, "C-n", "Create new timestamped query");
+        Self::add_command(lines, "C-s", "Save current query to file");
         lines.push(Line::from(""));
 
         // Search & Filter
@@ -587,7 +595,7 @@ impl HelpSystem {
         )]));
         lines.push(Line::from(vec![
             Span::styled("  📭 ", Style::default().fg(Color::Yellow)),
-            Span::raw("\"No SQL files found (create with 'i' or Ctrl+N)\""),
+            Span::raw("\"No SQL files found (create with 'n' or Ctrl+N)\""),
         ]));
         lines.push(Line::from(vec![
             Span::styled("  🏷️ ", Style::default().fg(Color::Cyan)),
@@ -596,11 +604,6 @@ impl HelpSystem {
     }
 
     fn add_query_window_commands(lines: &mut Vec<Line<'static>>) {
-        // Entering Query Mode
-        Self::add_command(lines, "i", "Enter full-screen Query mode");
-        Self::add_command(lines, "h/j/k/l", "Navigate cursor (normal mode)");
-        lines.push(Line::from(""));
-
         // Query Execution
         lines.push(Line::from(vec![Span::styled(
             "⚡ Query Execution",
@@ -867,7 +870,7 @@ impl HelpSystem {
         f.render_widget(separator_paragraph, columns[1]);
 
         // Add elegant footer with instructions
-        let footer_text = "💡 Press ESC or ? to close • ←/→ or Tab to switch panes • ↑/↓ or j/k to scroll • PgUp/PgDown for faster scrolling";
+        let footer_text = "💡 Press ? to close • ←/→ or Tab to switch panes • ↑/↓ or j/k to scroll • PgUp/PgDown for faster scrolling";
         let footer = Paragraph::new(footer_text)
             .style(
                 Style::default()
