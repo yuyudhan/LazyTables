@@ -43,7 +43,7 @@ impl AppStateDb {
         }
 
         // Create connection string
-        let database_url = format!("sqlite:{}", db_path.display());
+        let database_url = format!("sqlite://{}", db_path.display());
 
         // Create connection pool
         let pool = SqlitePool::connect(&database_url).await?;
