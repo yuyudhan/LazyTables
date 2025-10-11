@@ -153,6 +153,12 @@ impl DatabaseState {
             .await
             .map_err(|e| format!("Failed to retrieve data: {e}"))?;
 
+        // Get table metadata for schema view
+        let metadata = connection_manager
+            .get_table_metadata(&connection.id, table_name)
+            .await
+            .ok(); // Don't fail if metadata can't be loaded
+
         // Update the tab with loaded data
         if let Some(tab) = table_viewer_state.tabs.get_mut(tab_idx) {
             // Convert columns to ColumnInfo
@@ -181,6 +187,7 @@ impl DatabaseState {
             tab.total_rows = total_rows;
             tab.loading = false;
             tab.error = None;
+            tab.table_metadata = metadata;
         }
 
         // Connection is kept alive by ConnectionManager
@@ -569,53 +576,4 @@ impl DatabaseState {
         }
     }
 
-    /// Load table schema into table editor
-    pub async fn load_table_editor_from_database(
-        &mut self,
-        connection: &ConnectionConfig,
-        table_name: &str,
-        table_editor_state: &mut crate::ui::components::TableEditorState,
-    ) -> Result<(), String> {
-        use crate::database::postgres::PostgresConnection;
-        use crate::database::Connection;
-
-        let mut pg_connection = PostgresConnection::new(connection.clone());
-        pg_connection
-            .connect()
-            .await
-            .map_err(|e| format!("Connection failed: {e}"))?;
-
-        // Query table columns from information_schema
-        let columns = pg_connection
-            .get_table_columns(table_name)
-            .await
-            .map_err(|e| format!("Failed to retrieve table columns: {e}"))?;
-
-        // Convert TableColumn to ColumnDefinition for the editor
-        use crate::ui::components::table_creator::{
-            ColumnDefinition as EditorColumnDef, PostgresDataType,
-        };
-
-        let editor_columns: Vec<EditorColumnDef> = columns
-            .into_iter()
-            .map(|col| EditorColumnDef {
-                name: col.name,
-                data_type: PostgresDataType::Text, // TODO: Map DataType to PostgresDataType properly
-                is_nullable: col.is_nullable,
-                is_primary_key: col.is_primary_key,
-                is_unique: false, // Not available in TableColumn
-                default_value: col.default_value,
-                check_constraint: None,
-                references: None,
-            })
-            .collect();
-
-        // Populate the table editor state with column information
-        table_editor_state.columns = editor_columns;
-        table_editor_state.original_columns = table_editor_state.columns.clone();
-
-        let _ = pg_connection.disconnect().await;
-
-        Ok(())
-    }
 }

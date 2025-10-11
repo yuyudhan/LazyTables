@@ -41,6 +41,7 @@ pub struct TableTab {
     pub current_search_result: usize,
     pub in_search_mode: bool,
     pub view_mode: TableViewMode,
+    pub table_metadata: Option<crate::database::TableMetadata>,
 }
 
 #[derive(Debug, Clone)]
@@ -76,6 +77,7 @@ impl TableTab {
             current_search_result: 0,
             in_search_mode: false,
             view_mode: TableViewMode::Data,
+            table_metadata: None,
         }
     }
 
@@ -1132,107 +1134,302 @@ fn render_schema_view(
     theme: &Theme,
     is_focused: bool,
 ) {
-    // Create schema rows showing column information
-    let schema_headers = vec![
-        TableCell::from(" Column Name ").style(
-            Style::default()
-                .fg(theme.get_color("text_primary"))
-                .add_modifier(Modifier::BOLD),
-        ),
-        TableCell::from(" Data Type ").style(
-            Style::default()
-                .fg(theme.get_color("text_primary"))
-                .add_modifier(Modifier::BOLD),
-        ),
-        TableCell::from(" Nullable ").style(
-            Style::default()
-                .fg(theme.get_color("text_primary"))
-                .add_modifier(Modifier::BOLD),
-        ),
-        TableCell::from(" Primary Key ").style(
-            Style::default()
-                .fg(theme.get_color("text_primary"))
-                .add_modifier(Modifier::BOLD),
-        ),
-    ];
+    use ratatui::widgets::Paragraph;
 
-    let header = Row::new(schema_headers)
-        .style(Style::default().add_modifier(Modifier::BOLD))
-        .height(1)
-        .bottom_margin(1);
+    // Build comprehensive schema information as text lines
+    let mut lines = Vec::new();
 
-    // Calculate viewport height for scrolling and update the tab
-    let viewport_height = area.height.saturating_sub(4) as usize; // Account for borders (2) + header (2)
-    tab.update_viewport_height(area.height as usize);
-    tab.ensure_selection_visible_with_height(viewport_height);
+    // Title
+    lines.push(Line::from(vec![Span::styled(
+        format!("📋 TABLE SCHEMA: {}", tab.table_name),
+        Style::default()
+            .fg(theme.get_color("primary_highlight"))
+            .add_modifier(Modifier::BOLD),
+    )]));
+    lines.push(Line::from(""));
 
-    // Create rows for each column showing its schema information - only render visible rows
-    let visible_columns: Vec<_> = tab
-        .columns
-        .iter()
-        .enumerate()
-        .skip(tab.scroll_offset_y)
-        .take(viewport_height)
-        .collect();
+    // Section 1: COLUMNS
+    lines.push(Line::from(vec![Span::styled(
+        "━━━ COLUMNS ━━━",
+        Style::default()
+            .fg(theme.get_color("accent"))
+            .add_modifier(Modifier::BOLD),
+    )]));
+    lines.push(Line::from(""));
 
-    let schema_rows: Vec<Row> = visible_columns
-        .iter()
-        .map(|(row_idx, col)| {
-            let is_selected = *row_idx == tab.selected_row;
+    for col in &tab.columns {
+        let pk_marker = if col.is_primary_key { " 🔑" } else { "" };
+        let nullable = if col.is_nullable { "NULL" } else { "NOT NULL" };
 
-            // Base style with alternating row background
-            let base_style = if *row_idx % 2 == 0 {
-                Style::default().bg(theme.get_color("row_alternate_bg"))
-            } else {
+        lines.push(Line::from(vec![
+            Span::styled("  • ", Style::default().fg(theme.get_color("success"))),
+            Span::styled(
+                format!("{}{}", col.name, pk_marker),
                 Style::default()
-            };
+                    .fg(theme.get_color("text_primary"))
+                    .add_modifier(Modifier::BOLD),
+            ),
+            Span::raw(" : "),
+            Span::styled(
+                &col.data_type,
+                Style::default().fg(theme.get_color("info")),
+            ),
+            Span::raw("  "),
+            Span::styled(
+                nullable,
+                Style::default().fg(if col.is_nullable {
+                    theme.get_color("warning")
+                } else {
+                    theme.get_color("text_secondary")
+                }),
+            ),
+        ]));
+    }
 
-            let row_style = if is_selected {
+    // Section 2: INDEXES (if metadata available)
+    if let Some(metadata) = &tab.table_metadata {
+        if !metadata.indexes.is_empty() {
+            lines.push(Line::from(""));
+            lines.push(Line::from(""));
+            lines.push(Line::from(vec![Span::styled(
+                "━━━ INDEXES ━━━",
                 Style::default()
-                    .fg(theme.get_color("selected_text"))
-                    .bg(theme.get_color("selected_bg"))
-            } else {
-                base_style
-            };
+                    .fg(theme.get_color("accent"))
+                    .add_modifier(Modifier::BOLD),
+            )]));
+            lines.push(Line::from(""));
 
-            let cells = vec![
-                TableCell::from(format!(
-                    " {} {}",
-                    if col.is_primary_key { "🔑" } else { " " },
-                    col.name
-                ))
-                .style(row_style),
-                TableCell::from(format!(" {} ", col.data_type)).style(row_style),
-                TableCell::from(format!(" {} ", if col.is_nullable { "YES" } else { "NO" }))
-                    .style(row_style),
-                TableCell::from(format!(
-                    " {} ",
-                    if col.is_primary_key { "YES" } else { "NO" }
-                ))
-                .style(row_style),
-            ];
+            for idx in &metadata.indexes {
+                let idx_type = idx.index_type.as_deref().unwrap_or("BTREE");
+                let unique_marker = if idx.is_unique { " UNIQUE" } else { "" };
+                let primary_marker = if idx.is_primary { " PRIMARY" } else { "" };
 
-            Row::new(cells).height(1).bottom_margin(0)
-        })
-        .collect();
+                lines.push(Line::from(vec![
+                    Span::styled("  📑 ", Style::default().fg(theme.get_color("info"))),
+                    Span::styled(
+                        &idx.name,
+                        Style::default()
+                            .fg(theme.get_color("text_primary"))
+                            .add_modifier(Modifier::BOLD),
+                    ),
+                    Span::raw(" "),
+                    Span::styled(
+                        format!("({}{}{})", idx_type, unique_marker, primary_marker),
+                        Style::default().fg(theme.get_color("text_secondary")),
+                    ),
+                ]));
 
-    // Calculate column widths for schema view
-    let widths = vec![
-        Constraint::Min(20), // Column Name
-        Constraint::Min(15), // Data Type
-        Constraint::Min(10), // Nullable
-        Constraint::Min(12), // Primary Key
-    ];
+                lines.push(Line::from(vec![
+                    Span::raw("     Columns: "),
+                    Span::styled(
+                        idx.columns.join(", "),
+                        Style::default().fg(theme.get_color("success")),
+                    ),
+                ]));
 
-    let table = Table::new(schema_rows, widths)
-        .header(header)
+                if let Some(size) = idx.size {
+                    let size_mb = size as f64 / (1024.0 * 1024.0);
+                    lines.push(Line::from(vec![
+                        Span::raw("     Size: "),
+                        Span::styled(
+                            format!("{:.2} MB", size_mb),
+                            Style::default().fg(theme.get_color("warning")),
+                        ),
+                    ]));
+                }
+            }
+        }
+
+        // Section 3: FOREIGN KEYS
+        if !metadata.foreign_keys.is_empty() {
+            lines.push(Line::from(""));
+            lines.push(Line::from(""));
+            lines.push(Line::from(vec![Span::styled(
+                "━━━ FOREIGN KEYS ━━━",
+                Style::default()
+                    .fg(theme.get_color("accent"))
+                    .add_modifier(Modifier::BOLD),
+            )]));
+            lines.push(Line::from(""));
+
+            for fk in &metadata.foreign_keys {
+                lines.push(Line::from(vec![
+                    Span::styled("  🔗 ", Style::default().fg(theme.get_color("info"))),
+                    Span::styled(
+                        &fk.constraint_name,
+                        Style::default()
+                            .fg(theme.get_color("text_primary"))
+                            .add_modifier(Modifier::BOLD),
+                    ),
+                ]));
+
+                lines.push(Line::from(vec![
+                    Span::raw("     "),
+                    Span::styled(
+                        fk.column_names.join(", "),
+                        Style::default().fg(theme.get_color("success")),
+                    ),
+                    Span::raw(" → "),
+                    Span::styled(
+                        &fk.referenced_table,
+                        Style::default().fg(theme.get_color("info")),
+                    ),
+                    Span::raw("("),
+                    Span::styled(
+                        fk.referenced_columns.join(", "),
+                        Style::default().fg(theme.get_color("success")),
+                    ),
+                    Span::raw(")"),
+                ]));
+
+                if let (Some(on_delete), Some(on_update)) = (&fk.on_delete, &fk.on_update) {
+                    lines.push(Line::from(vec![
+                        Span::raw("     ON DELETE "),
+                        Span::styled(
+                            on_delete,
+                            Style::default().fg(theme.get_color("warning")),
+                        ),
+                        Span::raw(" / ON UPDATE "),
+                        Span::styled(
+                            on_update,
+                            Style::default().fg(theme.get_color("warning")),
+                        ),
+                    ]));
+                }
+            }
+        }
+
+        // Section 4: CONSTRAINTS
+        if !metadata.constraints.is_empty() {
+            lines.push(Line::from(""));
+            lines.push(Line::from(""));
+            lines.push(Line::from(vec![Span::styled(
+                "━━━ CONSTRAINTS ━━━",
+                Style::default()
+                    .fg(theme.get_color("accent"))
+                    .add_modifier(Modifier::BOLD),
+            )]));
+            lines.push(Line::from(""));
+
+            for constraint in &metadata.constraints {
+                lines.push(Line::from(vec![
+                    Span::styled("  ⚡ ", Style::default().fg(theme.get_color("warning"))),
+                    Span::styled(
+                        &constraint.constraint_type,
+                        Style::default()
+                            .fg(theme.get_color("text_primary"))
+                            .add_modifier(Modifier::BOLD),
+                    ),
+                    Span::raw(": "),
+                    Span::styled(
+                        &constraint.name,
+                        Style::default().fg(theme.get_color("info")),
+                    ),
+                ]));
+
+                if let Some(definition) = &constraint.definition {
+                    lines.push(Line::from(vec![
+                        Span::raw("     "),
+                        Span::styled(
+                            definition,
+                            Style::default().fg(theme.get_color("text_secondary")),
+                        ),
+                    ]));
+                }
+            }
+        }
+
+        // Section 5: TABLE STATISTICS
+        lines.push(Line::from(""));
+        lines.push(Line::from(""));
+        lines.push(Line::from(vec![Span::styled(
+            "━━━ TABLE INFO ━━━",
+            Style::default()
+                .fg(theme.get_color("accent"))
+                .add_modifier(Modifier::BOLD),
+        )]));
+        lines.push(Line::from(""));
+
+        let table_size_mb = metadata.table_size as f64 / (1024.0 * 1024.0);
+        let indexes_size_mb = metadata.indexes_size as f64 / (1024.0 * 1024.0);
+        let total_size_mb = metadata.total_size as f64 / (1024.0 * 1024.0);
+
+        lines.push(Line::from(vec![
+            Span::raw("  • Rows: "),
+            Span::styled(
+                format!("{}", metadata.row_count),
+                Style::default()
+                    .fg(theme.get_color("success"))
+                    .add_modifier(Modifier::BOLD),
+            ),
+            Span::raw("  Columns: "),
+            Span::styled(
+                format!("{}", metadata.column_count),
+                Style::default()
+                    .fg(theme.get_color("success"))
+                    .add_modifier(Modifier::BOLD),
+            ),
+        ]));
+
+        lines.push(Line::from(vec![
+            Span::raw("  • Table Size: "),
+            Span::styled(
+                format!("{:.2} MB", table_size_mb),
+                Style::default().fg(theme.get_color("info")),
+            ),
+            Span::raw("  Index Size: "),
+            Span::styled(
+                format!("{:.2} MB", indexes_size_mb),
+                Style::default().fg(theme.get_color("info")),
+            ),
+            Span::raw("  Total: "),
+            Span::styled(
+                format!("{:.2} MB", total_size_mb),
+                Style::default()
+                    .fg(theme.get_color("warning"))
+                    .add_modifier(Modifier::BOLD),
+            ),
+        ]));
+
+        if let Some(last_vacuum) = &metadata.last_vacuum {
+            lines.push(Line::from(vec![
+                Span::raw("  • Last Vacuum: "),
+                Span::styled(
+                    last_vacuum,
+                    Style::default().fg(theme.get_color("text_secondary")),
+                ),
+            ]));
+        }
+
+        if let Some(last_analyze) = &metadata.last_analyze {
+            lines.push(Line::from(vec![
+                Span::raw("  • Last Analyze: "),
+                Span::styled(
+                    last_analyze,
+                    Style::default().fg(theme.get_color("text_secondary")),
+                ),
+            ]));
+        }
+
+        if let Some(owner) = &metadata.table_owner {
+            lines.push(Line::from(vec![
+                Span::raw("  • Owner: "),
+                Span::styled(
+                    owner,
+                    Style::default().fg(theme.get_color("text_secondary")),
+                ),
+            ]));
+        }
+    }
+
+    // Render as scrollable paragraph
+    let paragraph = Paragraph::new(lines)
         .block(
             Block::default()
                 .borders(Borders::ALL)
                 .title(format!(
-                    " {} - Schema ({} columns) [t] Toggle View ",
-                    tab.table_name,
-                    tab.columns.len()
+                    " {} - Schema View [t] Toggle | [j/k] Scroll ",
+                    tab.table_name
                 ))
                 .border_style(if is_focused {
                     Style::default().fg(theme.get_color("active_border"))
@@ -1240,10 +1437,10 @@ fn render_schema_view(
                     Style::default().fg(theme.get_color("border"))
                 }),
         )
-        .column_spacing(1)
-        .row_highlight_style(Style::default().add_modifier(Modifier::REVERSED));
+        .wrap(Wrap { trim: false })
+        .scroll((tab.scroll_offset_y as u16, 0));
 
-    f.render_widget(table, area);
+    f.render_widget(paragraph, area);
 }
 
 fn render_help(f: &mut Frame, area: Rect, theme: &Theme) {
