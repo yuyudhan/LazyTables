@@ -419,24 +419,31 @@ impl SqliteConnection {
 
                         // Try to get row count (only for tables, not views)
                         let row_count = if object_type == DatabaseObjectType::Table {
-                            let count_query = format!("SELECT COUNT(*) as cnt FROM \"{}\"", name);
-                            match sqlx::query(&count_query).fetch_one(pool).await {
-                                Ok(count_row) => {
-                                    let count: i64 = count_row.get("cnt");
-                                    Some(count)
+                            // Validate and escape table name to prevent SQL injection
+                            match validate_sqlite_identifier(&name) {
+                                Ok(safe_name) => {
+                                    let count_query = format!("SELECT COUNT(*) as cnt FROM {}", safe_name);
+                                    match sqlx::query(&count_query).fetch_one(pool).await {
+                                        Ok(count_row) => {
+                                            let count: i64 = count_row.get("cnt");
+                                            Some(count)
+                                        }
+                                        Err(_) => None,
+                                    }
                                 }
-                                Err(_) => None,
+                                Err(_) => None, // Skip invalid table names
                             }
                         } else {
                             None
                         };
 
                         // Try to get approximate size using dbstat (if available)
+                        // Note: Using parameterized query here is safe
                         let size_bytes = if object_type == DatabaseObjectType::Table {
-                            let size_query = format!(
+                            let size_query =
                                 "SELECT SUM(pageno) * (SELECT page_size FROM pragma_page_size()) as size
-                                 FROM dbstat WHERE name = ?");
-                            match sqlx::query(&size_query).bind(&name).fetch_one(pool).await {
+                                 FROM dbstat WHERE name = ?";
+                            match sqlx::query(size_query).bind(&name).fetch_one(pool).await {
                                 Ok(size_row) => size_row.get::<Option<i64>, _>("size"),
                                 Err(_) => None,
                             }
@@ -479,8 +486,11 @@ impl SqliteConnection {
     /// Get metadata for a specific table
     pub async fn get_table_metadata(&self, table_name: &str) -> Result<TableMetadata> {
         if let Some(pool) = &self.pool {
+            // Validate and escape table name
+            let safe_name = validate_sqlite_identifier(table_name)?;
+
             // Get row count
-            let count_query = format!("SELECT COUNT(*) FROM \"{table_name}\"");
+            let count_query = format!("SELECT COUNT(*) FROM {}", safe_name);
             let count_row = sqlx::query(&count_query)
                 .fetch_one(pool)
                 .await
@@ -489,8 +499,8 @@ impl SqliteConnection {
                 })?;
             let row_count: i64 = count_row.get(0);
 
-            // Get column info
-            let pragma_query = format!("PRAGMA table_info(\"{table_name}\")");
+            // Get column info (PRAGMA is safe with string interpolation for table names)
+            let pragma_query = format!("PRAGMA table_info({})", safe_name);
             let col_rows = sqlx::query(&pragma_query).fetch_all(pool).await?;
             let column_count = col_rows.len();
 
@@ -502,7 +512,7 @@ impl SqliteConnection {
                 .collect();
 
             // Get foreign keys
-            let fk_query = format!("PRAGMA foreign_key_list(\"{table_name}\")");
+            let fk_query = format!("PRAGMA foreign_key_list({})", safe_name);
             let fk_rows = sqlx::query(&fk_query).fetch_all(pool).await?;
 
             let foreign_keys: Vec<String> = fk_rows
@@ -516,7 +526,7 @@ impl SqliteConnection {
                 .collect();
 
             // Get indexes
-            let index_query = format!("PRAGMA index_list(\"{table_name}\")");
+            let index_query = format!("PRAGMA index_list({})", safe_name);
             let index_rows = sqlx::query(&index_query).fetch_all(pool).await?;
 
             let indexes: Vec<String> = index_rows
@@ -563,7 +573,9 @@ impl SqliteConnection {
     /// Get column information for a table
     pub async fn get_table_columns(&self, table_name: &str) -> Result<Vec<TableColumn>> {
         if let Some(pool) = &self.pool {
-            let query = format!("PRAGMA table_info(\"{table_name}\")");
+            // Validate and escape table name
+            let safe_name = validate_sqlite_identifier(table_name)?;
+            let query = format!("PRAGMA table_info({})", safe_name);
 
             let rows = sqlx::query(&query).fetch_all(pool).await?;
 
@@ -597,7 +609,9 @@ impl SqliteConnection {
     /// Get the row count for a table
     pub async fn get_table_row_count(&self, table_name: &str) -> Result<usize> {
         if let Some(pool) = &self.pool {
-            let query = format!("SELECT COUNT(*) FROM \"{table_name}\"");
+            // Validate and escape table name
+            let safe_name = validate_sqlite_identifier(table_name)?;
+            let query = format!("SELECT COUNT(*) FROM {}", safe_name);
             let row = sqlx::query(&query).fetch_one(pool).await?;
             let count: i64 = row.get(0);
             Ok(count as usize)
@@ -616,8 +630,11 @@ impl SqliteConnection {
         offset: usize,
     ) -> Result<Vec<Vec<String>>> {
         if let Some(pool) = &self.pool {
+            // Validate and escape table name
+            let safe_table_name = validate_sqlite_identifier(table_name)?;
+
             // Get column names first to maintain order
-            let pragma_query = format!("PRAGMA table_info(\"{table_name}\")");
+            let pragma_query = format!("PRAGMA table_info({})", safe_table_name);
             let column_rows = sqlx::query(&pragma_query).fetch_all(pool).await?;
 
             let column_names: Vec<String> = column_rows
@@ -629,15 +646,15 @@ impl SqliteConnection {
                 return Ok(Vec::new());
             }
 
-            // Build SELECT query with all columns
+            // Build SELECT query with all columns - validate each column name too
             let select_list = column_names
                 .iter()
-                .map(|col| format!("\"{col}\""))
+                .filter_map(|col| validate_sqlite_identifier(col).ok())
                 .collect::<Vec<_>>()
                 .join(", ");
 
             let query =
-                format!("SELECT {select_list} FROM \"{table_name}\" LIMIT {limit} OFFSET {offset}");
+                format!("SELECT {select_list} FROM {} LIMIT {} OFFSET {}", safe_table_name, limit, offset);
 
             let rows = sqlx::query(&query).fetch_all(pool).await?;
 
@@ -696,6 +713,22 @@ impl SqliteConnection {
             ))
         }
     }
+}
+
+/// Validate and escape SQLite identifiers to prevent SQL injection
+/// SQLite allows double quotes or brackets for identifiers
+fn validate_sqlite_identifier(name: &str) -> Result<String> {
+    // Check for null bytes and other dangerous characters
+    if name.contains('\0') || name.is_empty() {
+        return Err(LazyTablesError::Connection(
+            "Invalid table name: contains null bytes or is empty".to_string(),
+        ));
+    }
+
+    // SQLite allows most characters in identifiers when properly quoted
+    // We'll use double quotes and escape any embedded quotes
+    let escaped = name.replace('"', "\"\"");
+    Ok(format!("\"{}\"", escaped))
 }
 
 /// Parse SQLite data type string to internal DataType enum
@@ -771,10 +804,14 @@ impl crate::database::connection_manager::ManagedConnection for SqliteConnection
 impl Drop for SqliteConnection {
     fn drop(&mut self) {
         if let Some(pool) = self.pool.take() {
-            // Close the pool asynchronously when the connection is dropped
-            tokio::spawn(async move {
-                pool.close().await;
-            });
+            // Try to close the pool asynchronously if we're in a tokio runtime context
+            // If not, the pool will be closed when it's dropped
+            if let Ok(handle) = tokio::runtime::Handle::try_current() {
+                handle.spawn(async move {
+                    pool.close().await;
+                });
+            }
+            // If no runtime is available, the pool's own Drop implementation will handle cleanup
         }
     }
 }

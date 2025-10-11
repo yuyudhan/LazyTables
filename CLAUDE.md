@@ -81,7 +81,7 @@ make clean            # Clean build artifacts and target/ directory
 ### Phase 0 - Foundation (MVP)
 - PostgreSQL (full support with all core features)
 
-### Phase 1 - Core Databases  
+### Phase 1 - Core Databases
 - MySQL, MariaDB, SQLite
 - Oracle, DB2, ClickHouse
 - Redis (key-value store support)
@@ -394,3 +394,5 @@ Test organization:
   - Power users who need schema modifications should use SQL directly via the Query Editor
   - Schema view is read-only and comprehensive, showing columns, indexes, foreign keys, constraints, and statistics
   - This design decision reduces complexity and aligns with the tool's core mission as a data viewer/query tool
+  - Keep the markdown content crisp and clean. Don't bloat it with random barbiage. Ensure clarity and focus on the user.
+

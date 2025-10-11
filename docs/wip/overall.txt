@@ -15,8 +15,13 @@ I want you to go through the entire implementation of all the 6 panes and all th
 Can you check throughout the application if we have any code which is not used or any of the code which is just stubbing or any code which is not done properly or there are functions which have been written but not being called properly and not binded properly or there are any feature which are residual remaining somewhere or there are missing features which are supposed to be implemented but have been done only in a stubbed manner.
 
 ====================****====================
+the readme.md seems to be ancient with everything that is old see first of all we have the release as v0.2.1 the version only is wrong all the help that is mentioned is wrong.
+
+can you create the readme file in a manner that is more user friendly so initial part should be on the installations and then go into other things simple installation thing that cargo install the readme.md is kind of the entry point for what the user will see it should be short catchy clear and unnecessary thing which let's say the user does not want to see right then and there should be moved to docs/user/ directory. This docs/user directory can have more files which can just be linked in the readme.md so think properly keep the readme.md updated as per what we have right now and the version that is there so also do it on the release when we do the new release it should get updated so that it reflects the current reality.
 
 ====================****====================
+The version number to be publioshes is <>.
+I want you to create a build for release and publish to crates.io. I have already done the crates log through the terminal command creates login. Update the documentation as need be and add the release notes /change logs / other documentation details which might be needed. Keep things up to date. Keep the markdown content crispy and cleaner. Don't just bloat it with random barbiage. Ensure clarity and focus on the user.
 
 ====================****====================
 

@@ -503,8 +503,11 @@ impl MySqlConnection {
     /// Get metadata for a specific table
     pub async fn get_table_metadata(&self, table_name: &str) -> Result<TableMetadata> {
         if let Some(pool) = &self.pool {
+            // Validate and escape table name
+            let safe_name = validate_mysql_identifier(table_name)?;
+
             // Get row count
-            let count_query = format!("SELECT COUNT(*) FROM `{table_name}`");
+            let count_query = format!("SELECT COUNT(*) FROM {}", safe_name);
             let count_row = sqlx::query(&count_query)
                 .fetch_one(pool)
                 .await
@@ -671,7 +674,9 @@ impl MySqlConnection {
     /// Get the row count for a table
     pub async fn get_table_row_count(&self, table_name: &str) -> Result<usize> {
         if let Some(pool) = &self.pool {
-            let query = format!("SELECT COUNT(*) FROM `{table_name}`");
+            // Validate and escape table name
+            let safe_name = validate_mysql_identifier(table_name)?;
+            let query = format!("SELECT COUNT(*) FROM {}", safe_name);
             let row = sqlx::query(&query).fetch_one(pool).await?;
             let count: i64 = row.get(0);
             Ok(count as usize)
@@ -690,7 +695,7 @@ impl MySqlConnection {
         offset: usize,
     ) -> Result<Vec<Vec<String>>> {
         if let Some(pool) = &self.pool {
-            // Get column names first to maintain order
+            // Get column names first to maintain order using parameterized query
             let columns_query = "SELECT column_name
                 FROM information_schema.columns
                 WHERE table_schema = DATABASE() AND table_name = ?
@@ -710,15 +715,18 @@ impl MySqlConnection {
                 return Ok(Vec::new());
             }
 
-            // Build SELECT query with all columns
+            // Validate and escape table name for the SELECT query
+            let safe_table_name = validate_mysql_identifier(table_name)?;
+
+            // Build SELECT query with all columns - validate each column name too
             let select_list = column_names
                 .iter()
-                .map(|col| format!("`{col}`"))
+                .filter_map(|col| validate_mysql_identifier(col).ok())
                 .collect::<Vec<_>>()
                 .join(", ");
 
             let query =
-                format!("SELECT {select_list} FROM `{table_name}` LIMIT {limit} OFFSET {offset}");
+                format!("SELECT {select_list} FROM {} LIMIT {} OFFSET {}", safe_table_name, limit, offset);
 
             let rows = sqlx::query(&query).fetch_all(pool).await?;
 
@@ -854,6 +862,22 @@ impl MySqlConnection {
             ))
         }
     }
+}
+
+/// Validate and escape MySQL identifiers to prevent SQL injection
+/// MySQL uses backticks for identifiers
+fn validate_mysql_identifier(name: &str) -> Result<String> {
+    // Check for null bytes and other dangerous characters
+    if name.contains('\0') || name.is_empty() {
+        return Err(LazyTablesError::Connection(
+            "Invalid table name: contains null bytes or is empty".to_string(),
+        ));
+    }
+
+    // MySQL allows most characters in identifiers when properly quoted with backticks
+    // We escape any embedded backticks by doubling them
+    let escaped = name.replace('`', "``");
+    Ok(format!("`{}`", escaped))
 }
 
 fn parse_mysql_type(type_str: &str) -> DataType {
@@ -1093,10 +1117,14 @@ impl crate::database::connection_manager::ManagedConnection for MySqlConnection 
 impl Drop for MySqlConnection {
     fn drop(&mut self) {
         if let Some(pool) = self.pool.take() {
-            // Close the pool asynchronously when the connection is dropped
-            tokio::spawn(async move {
-                pool.close().await;
-            });
+            // Try to close the pool asynchronously if we're in a tokio runtime context
+            // If not, the pool will be closed when it's dropped
+            if let Ok(handle) = tokio::runtime::Handle::try_current() {
+                handle.spawn(async move {
+                    pool.close().await;
+                });
+            }
+            // If no runtime is available, the pool's own Drop implementation will handle cleanup
         }
     }
 }
