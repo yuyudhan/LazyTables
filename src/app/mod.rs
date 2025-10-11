@@ -189,36 +189,35 @@ impl App {
                 // Handled by overlay system;
             }
             CommandAction::ExecuteQuery(query) => {
-                // TODO: Execute query through database connection
-                self.state.toast_manager.info(format!("Executing: {query}"));
+                // Note: Query execution is handled directly by key handlers (handle_query_editor_keys)
+                // via execute_query_at_cursor(). This action is kept for command system compatibility
+                // but actual execution happens in the async key handler.
+                self.state.toast_manager.info(format!("Query submitted: {}",
+                    query.lines().next().unwrap_or("").chars().take(50).collect::<String>()));
             }
             CommandAction::ExecuteQueryWithContext {
-                query,
+                query: _,
                 database_type,
                 connection_name,
             } => {
-                // Enhanced query execution with database context
+                // Note: Query execution is handled directly by key handlers (handle_query_editor_keys)
+                // via execute_query_at_cursor(). This action is kept for command system compatibility
+                // but actual execution happens in the async key handler.
                 self.state.toast_manager.info(format!(
-                    "Executing {} query on {}: {}",
-                    database_type.display_name(),
+                    "Query submitted to {} ({})",
                     connection_name,
-                    query
-                        .lines()
-                        .next()
-                        .unwrap_or("")
-                        .chars()
-                        .take(50)
-                        .collect::<String>()
+                    database_type.display_name()
                 ));
-                // TODO: Execute query through specific database adapter
             }
             CommandAction::LoadFile(path) => {
-                // TODO: Load file
-                self.state.toast_manager.info(format!("Loading: {path}"));
+                // Note: File loading is handled directly by the SQL Files pane via load_selected_sql_file().
+                // This action is unused but kept for command system compatibility.
+                self.state.toast_manager.info(format!("Load file: {path}"));
             }
             CommandAction::SaveFile(path) => {
-                // TODO: Save file
-                self.state.toast_manager.info(format!("Saving: {path}"));
+                // Note: File saving is handled directly by the Query Editor command mode (:w command)
+                // via save_sql_file_with_connection(). This action is unused but kept for compatibility.
+                self.state.toast_manager.info(format!("Save file: {path}"));
             }
             CommandAction::Navigate(target) => {
                 use crate::commands::NavigationTarget;
