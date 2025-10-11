@@ -56,8 +56,6 @@ pub enum CommandId {
     LoadQuery,
     NewQuery,
     ClearQuery,
-    FormatQuery,
-    ExplainQuery,
 
     // Table commands
     CreateTable,
@@ -72,44 +70,12 @@ pub enum CommandId {
     // Editing commands
     StartInsertMode,
     ExitInsertMode,
-    StartVisualMode,
-    ExitVisualMode,
-    StartCommandMode,
-    ExitCommandMode,
-    Undo,
-    Redo,
-    Copy,
-    Cut,
-    Paste,
     Delete,
-    SelectAll,
 
     // File commands
     Save,
     SaveAs,
     Open,
-    Close,
-    NewFile,
-
-    // View commands
-    ToggleFullscreen,
-    ZoomIn,
-    ZoomOut,
-    ResetZoom,
-    ToggleLineNumbers,
-    ToggleWordWrap,
-
-    // Search commands
-    Search,
-    SearchNext,
-    SearchPrevious,
-    Replace,
-    ReplaceAll,
-
-    // Settings commands
-    OpenSettings,
-    ReloadConfig,
-    ToggleTheme,
 
     // Custom command for extensions
     Custom(String),
