@@ -1072,6 +1072,17 @@ impl App {
             KeyCode::Char('L') => {
                 self.state.table_viewer_state.next_tab();
             }
+            // 'x' - Close current tab
+            KeyCode::Char('x') => {
+                let table_name = self.state.table_viewer_state.current_tab()
+                    .map(|tab| tab.table_name.clone());
+
+                self.state.table_viewer_state.close_current_tab();
+
+                if let Some(name) = table_name {
+                    self.state.toast_manager.info(format!("Closed tab: {}", name));
+                }
+            }
             // 'g' - First press of gg (jump to top)
             KeyCode::Char('g') => {
                 if self.state.ui.pending_gg_command {

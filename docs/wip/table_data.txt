@@ -4,9 +4,12 @@ DONE:
 In the table data pane, if we have opened multiple tables, we used to have capital S and capital D to move between different panes. So is that still there? Or we have removed it because we want it. Can you see that and confirm to me?
 
 ====================****====================
+DONE:
 In the table data viewing pane, what I am seeing is there is a button called 'T' for toggle. What exactly does it do or was supposed to do which is not doing right now? I see it in the heading 'Help'. Is it even valid till today?
 
 ====================****====================
+DONE:
+Can you look at the table data viewing pane so when I have edited multiples Like I have opened multiple tables and I want to close one table Which shows as multiple tabs. I want to close one tab in the table data viewing Pane, how do I do that? Is that important properly?
 
 ====================****====================
 
