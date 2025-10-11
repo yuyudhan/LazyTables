@@ -21,7 +21,7 @@ can you create the readme file in a manner that is more user friendly so initial
 
 ====================****====================
 The version number to be publioshes is <>.
-I want you to create a build for release and publish to crates.io. I have already done the crates log through the terminal command creates login. Update the documentation as need be and add the release notes /change logs / other documentation details which might be needed. Keep things up to date. Keep the markdown content crispy and cleaner. Don't just bloat it with random barbiage. Ensure clarity and focus on the user.
+I want you to create a build for release and publish to crates.io. I have already done the crates log through the terminal command creates login. Update the documentation as need be and add the release notes /change logs / other documentation details which might be needed. Keep things up to date. Keep the markdown content crispy and cleaner. Don't just bloat it with random verbiage. Ensure clarity and focus on the user. commit all changes you make, and other files if remaining, do --dry run of crates.io as well.
 
 ====================****====================
 
