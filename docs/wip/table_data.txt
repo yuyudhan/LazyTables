@@ -4,6 +4,7 @@ DONE:
 In the table data pane, if we have opened multiple tables, we used to have capital S and capital D to move between different panes. So is that still there? Or we have removed it because we want it. Can you see that and confirm to me?
 
 ====================****====================
+In the table data viewing pane, what I am seeing is there is a button called 'T' for toggle. What exactly does it do or was supposed to do which is not doing right now? I see it in the heading 'Help'. Is it even valid till today?
 
 ====================****====================
 

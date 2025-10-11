@@ -477,7 +477,22 @@ impl HelpSystem {
         ]));
         lines.push(Line::from(vec![
             Span::styled("  🏗️  ", Style::default().fg(Color::Yellow)),
-            Span::raw("Schema View - Shows table structure and metadata"),
+            Span::raw("Schema View - Comprehensive table metadata:"),
+        ]));
+        lines.push(Line::from(vec![
+            Span::raw("      • Columns (types, nullable, primary keys)"),
+        ]));
+        lines.push(Line::from(vec![
+            Span::raw("      • Indexes (type, uniqueness, size)"),
+        ]));
+        lines.push(Line::from(vec![
+            Span::raw("      • Foreign keys (relationships, ON DELETE/UPDATE)"),
+        ]));
+        lines.push(Line::from(vec![
+            Span::raw("      • Constraints (CHECK, UNIQUE, etc.)"),
+        ]));
+        lines.push(Line::from(vec![
+            Span::raw("      • Table statistics (rows, sizes, vacuum/analyze)"),
         ]));
         lines.push(Line::from(""));
     }

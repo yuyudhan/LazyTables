@@ -128,6 +128,18 @@ make clean            # Clean build artifacts and target/ directory
 - ✅ Help system with '?' key
 - ✅ Context-aware help messages and state indicators in all panes
 
+### Enhanced Schema Viewing
+- ✅ Toggle between Data and Schema view with 't' key in Table Viewer
+- ✅ Comprehensive read-only schema display with 5 sections:
+  - **Columns**: Name, type, nullable status, primary key indicators (🔑)
+  - **Indexes**: Index name, type (BTREE/HASH/etc), unique/primary markers, columns, size
+  - **Foreign Keys**: Constraint name, column relationships (col → table(col)), ON DELETE/UPDATE actions
+  - **Constraints**: CHECK, UNIQUE, and other constraints with definitions
+  - **Table Statistics**: Row count, table size, index size, total size, last vacuum/analyze timestamps, owner
+- ✅ Scrollable navigation with j/k, gg/G, Ctrl+d/u
+- ✅ Color-coded information using theme colors for better readability
+- ✅ Graceful handling when metadata is unavailable
+
 ## Key Features to Implement
 
 ### UI Pane Update System (In Progress)
@@ -161,7 +173,7 @@ make clean            # Clean build artifacts and target/ directory
   - Press ESC to exit insert mode and return to normal mode
   - All vim motions available in normal mode (h/j/k/l, w/b/e, 0/$, gg/G, etc.)
   - Visual feedback shows current mode ([INSERT] or [NORMAL])
-- **Forms and Modals** (Connection, Table Creator, etc.):
+- **Forms and Modals** (Connection creation/editing):
   - Direct typing in all text fields - NO insert mode required
   - Tab/Shift+Tab to navigate between fields
   - ESC to cancel and close modal
@@ -309,7 +321,6 @@ Core panes:
 
 Modals and overlays:
 - **Connection Modal**: Two-step connection creation (src/ui/components/connection_modal.rs)
-- **Table Creator**: Interactive table creation form (src/ui/components/table_creator.rs)
 - **Help System**: Context-aware help overlay (src/ui/help.rs)
 - **Debug View**: Live log viewer (src/ui/components/debug_view.rs)
 
@@ -377,3 +388,9 @@ Test organization:
   - Forms/modals accept direct typing - NO insert mode required
   - Key events are routed per-pane via dedicated handler methods
 - When implementing on one functionality if you think you are writing code that might break another functoinality you should double check what will break, avoid or ensure the other functionlity or functionalities are working.
+- **SCHEMA MODIFICATION PHILOSOPHY**: LazyTables focuses on viewing and querying data, NOT schema editing:
+  - Table creation and schema editing features have been intentionally removed (as of 2025-10)
+  - Most users only need to view schema information, not modify it
+  - Power users who need schema modifications should use SQL directly via the Query Editor
+  - Schema view is read-only and comprehensive, showing columns, indexes, foreign keys, constraints, and statistics
+  - This design decision reduces complexity and aligns with the tool's core mission as a data viewer/query tool
