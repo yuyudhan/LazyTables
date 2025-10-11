@@ -1,11 +1,14 @@
 
 ====================****====================
+DONE:
 What is the purpose of the normal mode and query mode? Is it something that we are doing right? Or is there a better way? Because what I feel is, given that for addition of connections, addition of tables and all, we are going to have a different view. Is this the right structure that we are even doing or we can do better? Because I think it is complicating stuff. Can you just validate it for me?
 
 ====================****====================
+DONE:
 I think we have over complicated the management of the state. So all we need is a six pin layout, uh, with tab numbers and pressing that number should take us to that tab. Uh, we, uh, try to implement an insert mode. So this is useful only for the SQL query editor tab. Others are like plain tabs, which should just have key bindings. Let's say I'm in the corrections plane. uh, in that connection, Spain, if I press a, I should be able to add a connection. It should go into a connection edition mode. Uh, when I press E while on a connection, it should go into an edit connection mode. Uh, pressing escape in those modes should take us back to the main mode. Uh, so this is how we want to simplify our overall architecture and how the lazy tables terminal UI application behaves. Uh, so how can we achieve that? What are the areas where we have to work on and what is the plan to simplify the overall architecture as well as how we are managing the, uh, systems, uh, key bindings and all that stuff. Uh, we need normal edit mode only in the SQL editor and nothing else. Rest can be plain key bindings.
 
 ====================****====================
+DONE:
 I want you to go through the entire implementation of all the 6 panes and all the modes and models. Can you identify if there is anything which is essentially blocking in nature and which can freeze the UI? Do it properly. I want you to go through everything and find out everything that might block the UI in any time. Can you have anything blocking and everything should show some kind of loading or responsiveness in the UI whenever it is there? So, can you find such scenarios? Go through everything and then devise a plan how we can fix it. Which elements are there first of all? Let's find out.
 
 ====================****====================

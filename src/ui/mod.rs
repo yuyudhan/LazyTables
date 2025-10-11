@@ -233,6 +233,8 @@ impl UI {
                 state.ui.current_view.is_connection_form(), // Pass edit mode flag
                 state.test_animation_frame,
                 state.test_connection_in_progress,
+                state.test_start_time.map(|start| start.elapsed().as_secs()).unwrap_or(0),
+                state.connection_timeout_seconds,
             );
         }
 

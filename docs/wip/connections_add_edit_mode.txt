@@ -2,6 +2,7 @@
 When the connection testing is happening, when the connection edit or add modal, I also want a key binding to abort the connection testing.
 
 ====================****====================
+DONE:
 When the testing loading is shown I also want to show the timer in the form of n/N where small case n means the number of seconds that have passed and capital N is the total number of seconds for which it will wait.
 
 ====================****====================

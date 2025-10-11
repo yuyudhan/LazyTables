@@ -1,8 +1,31 @@
 # LazyTables
 
+[![Crates.io](https://img.shields.io/crates/v/lazytables.svg)](https://crates.io/crates/lazytables)
+[![License: WTFPL](https://img.shields.io/badge/License-WTFPL-brightgreen.svg)](http://www.wtfpl.net/about/)
+![Status: Beta](https://img.shields.io/badge/status-beta-yellow)
+
 **"Because life's too short for clicking around in database GUIs"**
 
 A fast, terminal-based SQL database viewer and editor designed for developers who value keyboard-driven workflows. Built with Rust and featuring vim motions throughout, LazyTables provides an intuitive interface for database management without ever leaving your terminal.
+
+## 🚧 Beta Status (v0.2.0-beta.1)
+
+LazyTables is currently in **beta**. The core features are stable and ready for daily use, but we're seeking feedback before the v0.2.0 stable release.
+
+**What works:**
+- ✅ All three database types (PostgreSQL, MySQL, SQLite)
+- ✅ Fully async architecture (no UI blocking)
+- ✅ Vim command mode and SQL autocomplete
+- ✅ Numbered pane navigation
+- ✅ Connection management with animated loading
+- ✅ 82 tests passing
+
+**What we're polishing:**
+- ⏳ Some advanced features in progress
+- ⏳ Additional testing on edge cases
+- ⏳ Performance optimizations
+
+[Report issues](https://github.com/yuyudhan/LazyTables/issues) | [Read beta notes](docs/release_notes/v0.2.0-beta.1.md) | [See roadmap](#roadmap-to-stable-v020)
 
 ## Why LazyTables?
 
@@ -365,13 +388,55 @@ make format  # Format code with rustfmt
 make clean   # Clean build artifacts
 ```
 
+## Known Limitations (Beta)
+
+As a beta release, some features are still being polished:
+
+### In Progress
+- Some file I/O operations being converted to async
+- Database version info queries for some databases
+- Page scrolling (Ctrl+d/u) in some panes
+- Minor clippy warnings being addressed
+
+### Planned for Stable
+- Table and column name autocomplete (keywords work now)
+- More comprehensive error messages
+- Additional integration tests
+- Performance benchmarks
+
+**These limitations don't affect daily use**, but we're actively working on them. [See detailed list](docs/release_notes/v0.2.0-beta.1.md#known-limitations)
+
+## Roadmap to Stable v0.2.0
+
+We're targeting **late October 2025** for the stable release. Here's our plan:
+
+### Week 1-2: Bug Fixes (Current)
+- ✅ Core beta release published
+- 🔄 Addressing reported bugs
+- 🔄 Completing async file I/O
+- 🔄 Fixing clippy warnings
+
+### Week 3-4: Polish
+- ⏳ Enhanced error messages
+- ⏳ Additional integration tests
+- ⏳ Performance optimization
+- ⏳ Security audit
+
+### Stable Release
+- ⏳ All beta issues resolved
+- ⏳ External testing complete
+- ⏳ Documentation finalized
+- ⏳ Performance benchmarks published
+
+**Help us get there faster:** [Contribute](#contributing) | [Report bugs](https://github.com/yuyudhan/LazyTables/issues) | [Join discussions](https://github.com/yuyudhan/LazyTables/discussions)
+
 ## Contributing
 
-We welcome contributions! Please see our [development guide](docs/dev/README.md) for details on:
-- Architecture overview
-- Coding standards
-- Testing procedures
-- How to submit pull requests
+We welcome contributions, especially during beta! Please see:
+- **[CONTRIBUTING.md](CONTRIBUTING.md)** - Beta testing guide and contribution guidelines
+- **[docs/dev/README.md](docs/dev/README.md)** - Technical documentation and architecture
+- **Bug reports** - Use [GitHub Issues](https://github.com/yuyudhan/LazyTables/issues)
+- **Feature requests** - Start a [Discussion](https://github.com/yuyudhan/LazyTables/discussions)
 
 ## Support
 

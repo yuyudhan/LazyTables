@@ -890,6 +890,8 @@ pub fn render_connection_modal(
     is_edit_mode: bool,
     test_animation_frame: u8,
     test_in_progress: bool,
+    test_elapsed_seconds: u64,
+    test_timeout_seconds: u64,
 ) {
     // First render the overlay background for the entire screen
     render_modal_overlay(f, area);
@@ -941,10 +943,10 @@ pub fn render_connection_modal(
     render_modal_header_with_hints(f, modal_state, main_chunks[0]);
 
     // Render unified form
-    render_unified_form(f, modal_state, main_chunks[1], test_animation_frame, test_in_progress);
+    render_unified_form(f, modal_state, main_chunks[1], test_animation_frame, test_in_progress, test_elapsed_seconds, test_timeout_seconds);
 
     // Render error/status area only
-    render_modal_status(f, modal_state, main_chunks[2]);
+    render_modal_status(f, modal_state, main_chunks[2], test_animation_frame, test_in_progress, test_elapsed_seconds, test_timeout_seconds);
 }
 
 /// Render the modal header with navigation and keystroke hints
@@ -1024,6 +1026,8 @@ fn render_unified_form(
     area: Rect,
     test_animation_frame: u8,
     test_in_progress: bool,
+    test_elapsed_seconds: u64,
+    test_timeout_seconds: u64,
 ) {
     // Create layout for instruction and form fields
     let chunks = Layout::default()
@@ -1057,7 +1061,7 @@ fn render_unified_form(
     f.render_widget(instruction_paragraph, chunks[0]);
 
     // Form fields
-    render_form_fields(f, modal_state, chunks[1], test_animation_frame, test_in_progress);
+    render_form_fields(f, modal_state, chunks[1], test_animation_frame, test_in_progress, test_elapsed_seconds, test_timeout_seconds);
 }
 
 /// Render the form fields
@@ -1067,6 +1071,8 @@ fn render_form_fields(
     area: Rect,
     test_animation_frame: u8,
     test_in_progress: bool,
+    test_elapsed_seconds: u64,
+    test_timeout_seconds: u64,
 ) {
     // Count how many fields we need to display
     let field_count = if modal_state.using_connection_string {
@@ -1294,7 +1300,7 @@ fn render_form_fields(
     );
 
     // Render button bar (from main_layout, guaranteed at bottom)
-    render_button_bar(f, modal_state, main_layout[2], test_animation_frame, test_in_progress);
+    render_button_bar(f, modal_state, main_layout[2], test_animation_frame, test_in_progress, test_elapsed_seconds, test_timeout_seconds);
 }
 
 
@@ -1404,8 +1410,10 @@ fn render_button_bar(
     f: &mut Frame,
     modal_state: &ConnectionModalState,
     area: Rect,
-    test_animation_frame: u8,
-    test_in_progress: bool,
+    _test_animation_frame: u8,
+    _test_in_progress: bool,
+    _test_elapsed_seconds: u64,
+    _test_timeout_seconds: u64,
 ) {
     // Three buttons side by side with spacing
     let button_chunks = Layout::default()
@@ -1439,18 +1447,8 @@ fn render_button_bar(
         Style::default().fg(Color::Rgb(135, 206, 250)) // Light sky blue
     };
 
-    // Show animated dots if testing is in progress
-    let test_label = if test_in_progress {
-        let dots = match test_animation_frame {
-            0 => "•",
-            1 => "••",
-            2 => "•••",
-            _ => "•",
-        };
-        format!("Test {}", dots)
-    } else {
-        "Test (t)".to_string()
-    };
+    // Button label (timer moved to bottom status message)
+    let test_label = "Test (t)".to_string();
 
     let test_btn = Paragraph::new(test_label)
         .block(test_block)
@@ -1509,16 +1507,32 @@ fn render_button_bar(
 
 
 /// Render only status/error messages (no buttons)
-fn render_modal_status(f: &mut Frame, modal_state: &ConnectionModalState, area: Rect) {
+fn render_modal_status(
+    f: &mut Frame,
+    modal_state: &ConnectionModalState,
+    area: Rect,
+    test_animation_frame: u8,
+    _test_in_progress: bool,
+    test_elapsed_seconds: u64,
+    test_timeout_seconds: u64,
+) {
     // Render test status or error message
     if let Some(test_status) = &modal_state.test_status {
         let (message, style) = match test_status {
-            TestConnectionStatus::Testing => (
-                "🔄 Testing connection...".to_string(),
-                Style::default()
-                    .fg(Color::Yellow)
-                    .add_modifier(Modifier::BOLD | Modifier::RAPID_BLINK),
-            ),
+            TestConnectionStatus::Testing => {
+                let dots = match test_animation_frame {
+                    0 => "•",
+                    1 => "••",
+                    2 => "•••",
+                    _ => "•",
+                };
+                (
+                    format!("🔄 Testing connection {} {}/{}s", dots, test_elapsed_seconds, test_timeout_seconds),
+                    Style::default()
+                        .fg(Color::Yellow)
+                        .add_modifier(Modifier::BOLD),
+                )
+            },
             TestConnectionStatus::Success(msg) => (
                 format!("✅ {msg}"),
                 Style::default()

@@ -1,4 +1,5 @@
 ====================****====================
+DONE:
 when a connection attempt is happening it shows connecting dot dot dot and the timer I should have a key binding there which should abort the connection attempt
 
 ====================****====================
