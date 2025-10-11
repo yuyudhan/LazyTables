@@ -23,10 +23,6 @@ impl Default for AppView {
 pub enum OverlayView {
     /// Connection form (Add or Edit)
     ConnectionForm(ConnectionFormMode),
-    /// Table creator
-    TableCreator,
-    /// Table editor
-    TableEditor,
     /// Debug view (logs and diagnostics)
     DebugView,
     /// Help overlay
@@ -93,16 +89,6 @@ impl AppView {
         matches!(self, Self::Overlay(OverlayView::ConnectionForm(_)))
     }
 
-    /// Check if in table creator overlay
-    pub fn is_table_creator(&self) -> bool {
-        matches!(self, Self::Overlay(OverlayView::TableCreator))
-    }
-
-    /// Check if in table editor overlay
-    pub fn is_table_editor(&self) -> bool {
-        matches!(self, Self::Overlay(OverlayView::TableEditor))
-    }
-
     /// Check if in debug view overlay
     pub fn is_debug_view(&self) -> bool {
         matches!(self, Self::Overlay(OverlayView::DebugView))
@@ -120,8 +106,6 @@ impl OverlayView {
         match self {
             Self::ConnectionForm(ConnectionFormMode::Add) => "Add Connection",
             Self::ConnectionForm(ConnectionFormMode::Edit(_)) => "Edit Connection",
-            Self::TableCreator => "Create Table",
-            Self::TableEditor => "Edit Table",
             Self::DebugView => "Debug View",
             Self::Help => "Help",
         }

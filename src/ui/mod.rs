@@ -242,24 +242,6 @@ impl UI {
             );
         }
 
-        // Draw table creator if active
-        if state.ui.current_view.is_table_creator() {
-            crate::ui::components::render_table_creator(
-                frame,
-                &mut state.table_creator_state,
-                self.center_modal(frame.area(), 90, 80),
-            );
-        }
-
-        // Draw table editor if active
-        if state.ui.current_view.is_table_editor() {
-            crate::ui::components::render_table_editor(
-                frame,
-                &mut state.table_editor_state,
-                self.center_modal(frame.area(), 90, 80),
-            );
-        }
-
         // Draw connection mode if active (full-screen overlay)
         if let Some(OverlayView::ConnectionForm(mode_type)) = state.ui.current_view.overlay() {
             if let Some(connection_mode) = &state.connection_mode {
@@ -836,16 +818,6 @@ impl UI {
                 area,
                 &self.theme,
                 is_focused,
-            );
-            return;
-        }
-
-        // Check if table creator is active
-        if state.ui.current_view.is_table_creator() {
-            crate::ui::components::render_table_creator(
-                frame,
-                &mut state.table_creator_state,
-                area,
             );
             return;
         }

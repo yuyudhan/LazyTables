@@ -58,7 +58,6 @@ pub enum CommandId {
     ClearQuery,
 
     // Table commands
-    CreateTable,
     DropTable,
     TruncateTable,
     RefreshTables,
@@ -141,7 +140,6 @@ pub enum CommandAction {
 pub enum ModalType {
     Help,
     Connection,
-    TableCreator,
     Settings,
     Confirmation(String),
 }

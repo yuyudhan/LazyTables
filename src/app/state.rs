@@ -2,11 +2,11 @@
 
 use crate::{
     config::Config,
-    database::{AppStateDb, ConnectionConfig, ConnectionManager, ConnectionStatus, DatabaseType},
+    database::{AppStateDb, ConnectionConfig, ConnectionManager, ConnectionStatus},
     state::{ui::UIState, DatabaseState},
     ui::components::{
-        ConnectionModalState, ConnectionMode, DebugView, QueryEditor, TableCreatorState,
-        TableEditorState, TableViewerState, ToastManager,
+        ConnectionModalState, ConnectionMode, DebugView, QueryEditor, TableViewerState,
+        ToastManager,
     },
 };
 
@@ -36,10 +36,6 @@ pub struct AppState {
     pub query_content: String,
     /// List of saved SQL files for current project
     pub saved_sql_files: Vec<String>,
-    /// Table creator state
-    pub table_creator_state: TableCreatorState,
-    /// Table editor state
-    pub table_editor_state: TableEditorState,
     /// Table viewer state
     pub table_viewer_state: TableViewerState,
     /// Toast notifications manager
@@ -94,8 +90,6 @@ impl AppState {
             connection_modal_state: ConnectionModalState::new(),
             query_content: String::new(),
             saved_sql_files,
-            table_creator_state: TableCreatorState::new(),
-            table_editor_state: TableEditorState::new("table".to_string()),
             table_viewer_state: TableViewerState::new(),
             toast_manager: ToastManager::new(),
             query_editor: QueryEditor::new(),
@@ -1660,228 +1654,6 @@ impl AppState {
         }
     }
 
-    /// Open table creator view
-    pub fn open_table_creator(&mut self) {
-        crate::log_info!("Opening table creator view");
-        self.ui.show_overlay(OverlayView::TableCreator);
-        self.table_creator_state = TableCreatorState::new();
-        crate::log_debug!("Table creator state initialized");
-    }
-
-    /// Close table creator view
-    pub fn close_table_creator(&mut self) {
-        crate::log_info!("Closing table creator view");
-        self.ui.return_to_main();
-        self.table_creator_state.clear();
-        crate::log_debug!("Table creator state cleared");
-    }
-
-    /// Open table editor view
-    pub async fn open_table_editor(&mut self) {
-        if let Some(table_name) = self.ui.get_selected_table_name() {
-            crate::log_info!("Opening table editor for table '{}'", table_name);
-            self.ui.show_overlay(OverlayView::TableEditor);
-            self.table_editor_state = TableEditorState::new(table_name.clone());
-
-            // Load table schema from database
-            if let Err(e) = self.load_table_schema_for_editor(&table_name).await {
-                crate::log_error!(
-                    "Failed to load table schema for editor (table '{}'): {}",
-                    table_name,
-                    e
-                );
-                self.table_editor_state.error_message =
-                    Some(format!("Failed to load table schema: {e}"));
-            } else {
-                crate::log_debug!(
-                    "Successfully loaded table schema for editor (table '{}')",
-                    table_name
-                );
-            }
-        } else {
-            crate::log_warn!("Attempted to open table editor but no table is selected");
-        }
-    }
-
-    /// Close table editor view
-    pub fn close_table_editor(&mut self) {
-        crate::log_info!("Closing table editor view");
-        self.ui.return_to_main();
-        self.table_editor_state.clear();
-        crate::log_debug!("Table editor state cleared");
-    }
-
-    /// Load table schema for the editor
-    async fn load_table_schema_for_editor(&mut self, table_name: &str) -> Result<(), String> {
-        // Get the current connection
-        if let Some(connection) = self
-            .db
-            .connections
-            .connections
-            .get(self.ui.selected_connection)
-            .cloned()
-        {
-            match &connection.status {
-                ConnectionStatus::Connected => {
-                    // Load table schema based on database type
-                    match connection.database_type {
-                        DatabaseType::PostgreSQL => {
-                            self.db
-                                .load_table_editor_from_database(
-                                    &connection,
-                                    table_name,
-                                    &mut self.table_editor_state,
-                                )
-                                .await
-                        }
-                        _ => Err(format!(
-                            "Database type {} not yet supported for table editing",
-                            connection.database_type.display_name()
-                        )),
-                    }
-                }
-                _ => Err("No active database connection".to_string()),
-            }
-        } else {
-            Err("No connection selected".to_string())
-        }
-    }
-
-    /// Apply table edits from table editor state
-    pub async fn apply_table_edits_from_editor(&mut self) -> Result<(), String> {
-        // Generate ALTER TABLE SQL statements
-        let sql_statements = self.table_editor_state.generate_alter_table_sql()?;
-
-        // Get the current connection
-        if let Some(connection) = self
-            .db
-            .connections
-            .connections
-            .get(self.ui.selected_connection)
-            .cloned()
-        {
-            match &connection.status {
-                ConnectionStatus::Connected => {
-                    // Execute the ALTER TABLE statements
-                    for sql in &sql_statements {
-                        self.execute_alter_table_sql(&connection, sql).await?;
-                    }
-
-                    // Refresh tables list
-                    self.connect_to_selected_database().await;
-
-                    // Close table editor
-                    self.close_table_editor();
-
-                    Ok(())
-                }
-                _ => Err("No active database connection".to_string()),
-            }
-        } else {
-            Err("No connection selected".to_string())
-        }
-    }
-
-    /// Execute ALTER TABLE SQL on PostgreSQL
-    async fn execute_alter_table_sql(
-        &self,
-        connection: &ConnectionConfig,
-        _sql: &str,
-    ) -> Result<(), String> {
-        match connection.database_type {
-            DatabaseType::PostgreSQL => {
-                use crate::database::postgres::PostgresConnection;
-                use crate::database::Connection;
-
-                let mut pg_connection = PostgresConnection::new(connection.clone());
-                pg_connection
-                    .connect()
-                    .await
-                    .map_err(|e| format!("Connection failed: {e}"))?;
-                //
-                //                 pg_connection
-                //                     .execute_sql(sql)
-                //                     .await
-                //                     .map_err(|e| format!("Failed to execute ALTER TABLE: {e}"))?;
-
-                let _ = pg_connection.disconnect().await;
-
-                Ok(())
-            }
-            _ => Err(format!(
-                "Database type {} not yet supported",
-                connection.database_type.display_name()
-            )),
-        }
-    }
-
-    /// Create table from table creator state
-    pub async fn create_table_from_creator(&mut self) -> Result<(), String> {
-        // Generate SQL
-        let sql = self.table_creator_state.generate_create_table_sql()?;
-
-        // Get the current connection
-        if let Some(connection) = self
-            .db
-            .connections
-            .connections
-            .get(self.ui.selected_connection)
-            .cloned()
-        {
-            match &connection.status {
-                ConnectionStatus::Connected => {
-                    // Execute the CREATE TABLE statement
-                    self.execute_create_table_sql(&connection, &sql).await?;
-
-                    // Refresh tables list
-                    self.connect_to_selected_database().await;
-
-                    // Close table creator
-                    self.close_table_creator();
-
-                    Ok(())
-                }
-                _ => Err("No active database connection".to_string()),
-            }
-        } else {
-            Err("No connection selected".to_string())
-        }
-    }
-
-    /// Execute CREATE TABLE SQL on PostgreSQL
-    async fn execute_create_table_sql(
-        &self,
-        connection: &ConnectionConfig,
-        _sql: &str,
-    ) -> Result<(), String> {
-        match connection.database_type {
-            DatabaseType::PostgreSQL => {
-                use crate::database::postgres::PostgresConnection;
-                use crate::database::Connection;
-
-                let mut pg_connection = PostgresConnection::new(connection.clone());
-                pg_connection
-                    .connect()
-                    .await
-                    .map_err(|e| format!("Connection failed: {e}"))?;
-
-                //                 // Execute the CREATE TABLE statement
-                //                 pg_connection
-                //                     .execute_sql(sql)
-                //                     .await
-                //                     .map_err(|e| format!("Failed to create table: {e}"))?;
-
-                let _ = pg_connection.disconnect().await;
-
-                Ok(())
-            }
-            _ => Err(format!(
-                "Database type {} not yet supported",
-                connection.database_type.display_name()
-            )),
-        }
-    }
-
     /// Open a table for viewing
     pub async fn open_table_for_viewing(&mut self) {
         crate::log_info!("Attempting to open table for viewing");
@@ -2319,8 +2091,6 @@ impl Default for AppState {
             connection_modal_state: ConnectionModalState::new(),
             query_content: String::new(),
             saved_sql_files,
-            table_creator_state: TableCreatorState::new(),
-            table_editor_state: TableEditorState::new("table".to_string()),
             table_viewer_state: TableViewerState::new(),
             toast_manager: ToastManager::new(),
             query_editor: QueryEditor::new(),
