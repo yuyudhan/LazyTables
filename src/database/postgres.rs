@@ -363,7 +363,6 @@ impl PostgresConnection {
     }
 
     /// List all databases accessible to the user
-    #[allow(dead_code)]
     pub async fn list_databases(&self) -> Result<Vec<String>> {
         if let Some(pool) = &self.pool {
             let rows = sqlx::query("SELECT datname FROM pg_database WHERE datistemplate = false")

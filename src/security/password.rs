@@ -8,7 +8,6 @@ use argon2::{password_hash::rand_core::RngCore, Argon2};
 use base64::{engine::general_purpose::STANDARD as BASE64, Engine};
 use serde::{Deserialize, Serialize};
 use std::env;
-use zeroize::Zeroize;
 
 /// Password source - environment variable or encrypted storage
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -176,26 +175,6 @@ impl PasswordManager {
     }
 }
 
-/// Secure string that zeros memory on drop
-pub struct SecureString(String);
-
-impl SecureString {
-    #[allow(dead_code)]
-    pub fn new(s: String) -> Self {
-        SecureString(s)
-    }
-
-    #[allow(dead_code)]
-    pub fn as_str(&self) -> &str {
-        &self.0
-    }
-}
-
-impl Drop for SecureString {
-    fn drop(&mut self) {
-        self.0.zeroize();
-    }
-}
 
 #[cfg(test)]
 mod tests {

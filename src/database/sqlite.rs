@@ -355,7 +355,6 @@ impl SqliteConnection {
     }
 
     /// List all databases (SQLite doesn't have multiple databases)
-    #[allow(dead_code)]
     pub async fn list_databases(&self) -> Result<Vec<String>> {
         // SQLite doesn't have multiple databases in the same connection
         // Return the current database name
