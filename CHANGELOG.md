@@ -7,6 +7,47 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.2.1] - 2025-10-11
+
+Stable release of v0.2.0-beta.1 with all async improvements and UX enhancements.
+
+### Added
+- **Vim-style command mode** in SQL query editor (`:w` to save, `:q` to quit, `:wq` to save and quit)
+- **SQL autocomplete** with keyword suggestions and context-aware completions
+- **Numbered pane navigation** - Press 1-6 to jump directly to any pane
+- **Animated loading indicators** with timer display for connection attempts
+- **Table browser with collapsible groups** for better navigation
+- **Tab navigation in table viewer** using Shift+H/L to switch between open tables
+- **Non-blocking database connections** with visual feedback during connection attempts
+- **Async file I/O infrastructure** with timeout protection (5-second default)
+
+### Changed
+- **Fully async architecture** - All database and file operations now non-blocking
+- **Unified view hierarchy system** for better state management
+- **Event-driven overlay routing** for improved modal and overlay handling
+- **Connection modal UX improvements** with step-by-step guidance
+- **Help system** updated with numbered navigation and new features
+
+### Fixed
+- Tab key behavior in SQL editor insert mode (no longer switches panes during text editing)
+- Async runtime panics in database and file operations
+- Connection testing UI responsiveness (no longer freezes during testing)
+- Table navigation and scrolling edge cases
+- Various UI blocking operations converted to async
+- Clippy warnings for CI compliance
+
+### Technical
+- Migrated all command file operations to async I/O
+- Converted ConnectionStorage to fully async operations
+- Refactored application initialization to async architecture
+- Added comprehensive timeout protection for all I/O operations
+- Improved error handling with better user feedback
+
+### Documentation
+- Updated development notes and project guidelines
+- Added comprehensive UI blocking fixes documentation
+- Enhanced work-in-progress planning documents
+
 ## [0.2.0-beta.1] - 2025-10-11
 
 ### Added
@@ -136,6 +177,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## Version History
 
+- **0.2.1** - Stable release with async architecture and major UX improvements
 - **0.2.0-beta.1** - Major async refactor and UX improvements (Beta Release)
 - **0.1.7** - cargo-binstall compatibility
 - **0.1.6** - Documentation excellence
@@ -143,7 +185,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **0.1.4** - Debug view and connection management
 - **0.1.3** - First stable release
 
-[Unreleased]: https://github.com/yuyudhan/LazyTables/compare/v0.2.0-beta.1...HEAD
+[Unreleased]: https://github.com/yuyudhan/LazyTables/compare/v0.2.1...HEAD
+[0.2.1]: https://github.com/yuyudhan/LazyTables/compare/v0.1.7...v0.2.1
 [0.2.0-beta.1]: https://github.com/yuyudhan/LazyTables/compare/v0.1.7...v0.2.0-beta.1
 [0.1.7]: https://github.com/yuyudhan/LazyTables/compare/v0.1.6...v0.1.7
 [0.1.6]: https://github.com/yuyudhan/LazyTables/compare/v0.1.5...v0.1.6
