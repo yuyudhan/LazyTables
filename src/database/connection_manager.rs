@@ -71,6 +71,19 @@ impl ConnectionManager {
                 Connection::connect(&mut pg_conn).await?;
                 Box::new(pg_conn)
             }
+            crate::database::DatabaseType::MySQL | crate::database::DatabaseType::MariaDB => {
+                let mut mysql_conn = crate::database::mysql::MySqlConnection::new(config.clone());
+                // Establish the connection
+                Connection::connect(&mut mysql_conn).await?;
+                Box::new(mysql_conn)
+            }
+            crate::database::DatabaseType::SQLite => {
+                let mut sqlite_conn =
+                    crate::database::sqlite::SqliteConnection::new(config.clone());
+                // Establish the connection
+                Connection::connect(&mut sqlite_conn).await?;
+                Box::new(sqlite_conn)
+            }
             _ => {
                 return Err(LazyTablesError::Connection(format!(
                     "Database type {} not supported yet",

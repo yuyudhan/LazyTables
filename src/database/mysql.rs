@@ -9,6 +9,7 @@ use sqlx::mysql::{MySqlPool, MySqlPoolOptions};
 use sqlx::{Column, Row};
 
 /// MySQL database connection implementation
+#[derive(Debug)]
 pub struct MySqlConnection {
     config: ConnectionConfig,
     pool: Option<MySqlPool>,
@@ -89,23 +90,7 @@ impl Connection for MySqlConnection {
     }
 
     async fn list_database_objects(&self) -> Result<crate::database::DatabaseObjectList> {
-        // MySQL adapter doesn't have list_database_objects yet, implement basic version
-        let tables = MySqlConnection::list_tables(self).await?;
-        let mut result = crate::database::DatabaseObjectList::default();
-
-        for table_name in tables {
-            let obj = crate::database::DatabaseObject {
-                name: table_name,
-                schema: Some("default".to_string()),
-                object_type: crate::database::DatabaseObjectType::Table,
-                row_count: None,
-                size_bytes: None,
-                comment: None,
-            };
-            result.tables.push(obj);
-        }
-        result.total_count = result.tables.len();
-        Ok(result)
+        MySqlConnection::list_database_objects(self).await
     }
 
     async fn get_table_metadata(&self, table_name: &str) -> Result<crate::database::TableMetadata> {
@@ -429,6 +414,85 @@ impl MySqlConnection {
             let tables = rows.iter().map(|row| row.get::<String, _>(0)).collect();
 
             Ok(tables)
+        } else {
+            Err(LazyTablesError::Connection(
+                "No active connection".to_string(),
+            ))
+        }
+    }
+
+    /// List all database objects (tables, views) with comprehensive metadata
+    pub async fn list_database_objects(&self) -> Result<crate::database::DatabaseObjectList> {
+        use crate::database::{DatabaseObject, DatabaseObjectList, DatabaseObjectType};
+
+        if let Some(pool) = &self.pool {
+            let mut result = DatabaseObjectList::default();
+
+            // Query for tables and views with comprehensive metadata
+            let query = "
+                SELECT
+                    t.table_name,
+                    t.table_type,
+                    t.table_comment,
+                    t.table_rows,
+                    t.data_length + t.index_length AS total_size_bytes
+                FROM information_schema.tables t
+                WHERE t.table_schema = DATABASE()
+                    AND t.table_type IN ('BASE TABLE', 'VIEW')
+                ORDER BY t.table_type, t.table_name
+            ";
+
+            match sqlx::query(query).fetch_all(pool).await {
+                Ok(rows) => {
+                    for row in rows {
+                        let name: String = row.get("table_name");
+                        let table_type: String = row.get("table_type");
+                        let comment: Option<String> = row.get("table_comment");
+                        let row_count: Option<i64> = row.get("table_rows");
+                        let size_bytes: Option<i64> = row.get("total_size_bytes");
+
+                        // Convert MySQL table types to our enum
+                        let object_type = match table_type.as_str() {
+                            "BASE TABLE" => DatabaseObjectType::Table,
+                            "VIEW" => DatabaseObjectType::View,
+                            _ => continue,
+                        };
+
+                        // Filter out empty comments
+                        let comment = comment.filter(|c| !c.is_empty());
+
+                        let obj = DatabaseObject {
+                            name,
+                            schema: Some(self.config.database.clone().unwrap_or_else(|| "default".to_string())),
+                            object_type: object_type.clone(),
+                            row_count,
+                            size_bytes,
+                            comment,
+                        };
+
+                        // Sort into appropriate lists
+                        match object_type {
+                            DatabaseObjectType::Table => result.tables.push(obj),
+                            DatabaseObjectType::View => result.views.push(obj),
+                            _ => {}
+                        }
+                    }
+
+                    result.total_count = result.tables.len() + result.views.len();
+                }
+                Err(e) => {
+                    // Check for permission errors
+                    let error_msg = e.to_string();
+                    if error_msg.contains("access denied") || error_msg.contains("permission") {
+                        result.error =
+                            Some("Insufficient permissions to list database objects".to_string());
+                    } else {
+                        result.error = Some(format!("Failed to list objects: {}", e));
+                    }
+                }
+            }
+
+            Ok(result)
         } else {
             Err(LazyTablesError::Connection(
                 "No active connection".to_string(),
@@ -986,5 +1050,53 @@ mod tests {
         assert!(keywords.contains(&"AUTO_INCREMENT".to_string()));
         assert!(functions.contains(&"COUNT".to_string()));
         assert!(functions.contains(&"JSON_EXTRACT".to_string()));
+    }
+}
+
+/// Implement ManagedConnection trait for MySqlConnection to work with ConnectionManager
+#[async_trait::async_trait]
+impl crate::database::connection_manager::ManagedConnection for MySqlConnection {
+    async fn execute_raw_query(&self, query: &str) -> Result<(Vec<String>, Vec<Vec<String>>)> {
+        MySqlConnection::execute_raw_query(self, query).await
+    }
+
+    async fn get_table_data(
+        &self,
+        table_name: &str,
+        limit: usize,
+        offset: usize,
+    ) -> Result<Vec<Vec<String>>> {
+        MySqlConnection::get_table_data(self, table_name, limit, offset).await
+    }
+
+    async fn get_table_columns(
+        &self,
+        table_name: &str,
+    ) -> Result<Vec<crate::database::TableColumn>> {
+        MySqlConnection::get_table_columns(self, table_name).await
+    }
+
+    async fn get_table_metadata(&self, table_name: &str) -> Result<crate::database::TableMetadata> {
+        MySqlConnection::get_table_metadata(self, table_name).await
+    }
+
+    async fn list_database_objects(&self) -> Result<crate::database::DatabaseObjectList> {
+        MySqlConnection::list_database_objects(self).await
+    }
+
+    fn is_connected(&self) -> bool {
+        Connection::is_connected(self)
+    }
+}
+
+/// Implement Drop trait to ensure clean connection cleanup
+impl Drop for MySqlConnection {
+    fn drop(&mut self) {
+        if let Some(pool) = self.pool.take() {
+            // Close the pool asynchronously when the connection is dropped
+            tokio::spawn(async move {
+                pool.close().await;
+            });
+        }
     }
 }

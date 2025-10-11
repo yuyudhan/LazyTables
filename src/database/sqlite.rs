@@ -10,6 +10,7 @@ use sqlx::{Column, Row};
 use std::path::Path;
 
 /// SQLite database connection implementation
+#[derive(Debug)]
 pub struct SqliteConnection {
     config: ConnectionConfig,
     pool: Option<SqlitePool>,
@@ -91,23 +92,7 @@ impl Connection for SqliteConnection {
     }
 
     async fn list_database_objects(&self) -> Result<crate::database::DatabaseObjectList> {
-        // SQLite basic implementation - convert tables to database objects
-        let tables = SqliteConnection::list_tables(self).await?;
-        let mut result = crate::database::DatabaseObjectList::default();
-
-        for table_name in tables {
-            let obj = crate::database::DatabaseObject {
-                name: table_name,
-                schema: Some("main".to_string()),
-                object_type: crate::database::DatabaseObjectType::Table,
-                row_count: None,
-                size_bytes: None,
-                comment: None,
-            };
-            result.tables.push(obj);
-        }
-        result.total_count = result.tables.len();
-        Ok(result)
+        SqliteConnection::list_database_objects(self).await
     }
 
     async fn get_table_metadata(&self, table_name: &str) -> Result<crate::database::TableMetadata> {
@@ -377,8 +362,8 @@ impl SqliteConnection {
     pub async fn list_tables(&self) -> Result<Vec<String>> {
         if let Some(pool) = &self.pool {
             let rows = sqlx::query(
-                "SELECT name FROM sqlite_master 
-                 WHERE type='table' 
+                "SELECT name FROM sqlite_master
+                 WHERE type='table'
                  AND name NOT LIKE 'sqlite_%'
                  ORDER BY name",
             )
@@ -392,6 +377,98 @@ impl SqliteConnection {
                 .collect();
 
             Ok(tables)
+        } else {
+            Err(LazyTablesError::Connection(
+                "No active connection".to_string(),
+            ))
+        }
+    }
+
+    /// List all database objects (tables, views) with metadata
+    pub async fn list_database_objects(&self) -> Result<crate::database::DatabaseObjectList> {
+        use crate::database::{DatabaseObject, DatabaseObjectList, DatabaseObjectType};
+
+        if let Some(pool) = &self.pool {
+            let mut result = DatabaseObjectList::default();
+
+            // Query for tables and views from sqlite_master
+            let query = "
+                SELECT
+                    name,
+                    type,
+                    sql
+                FROM sqlite_master
+                WHERE type IN ('table', 'view')
+                    AND name NOT LIKE 'sqlite_%'
+                ORDER BY type, name
+            ";
+
+            match sqlx::query(query).fetch_all(pool).await {
+                Ok(rows) => {
+                    for row in rows {
+                        let name: String = row.get("name");
+                        let obj_type: String = row.get("type");
+                        let _sql: Option<String> = row.get("sql");
+
+                        // Convert SQLite types to our enum
+                        let object_type = match obj_type.as_str() {
+                            "table" => DatabaseObjectType::Table,
+                            "view" => DatabaseObjectType::View,
+                            _ => continue,
+                        };
+
+                        // Try to get row count (only for tables, not views)
+                        let row_count = if object_type == DatabaseObjectType::Table {
+                            let count_query = format!("SELECT COUNT(*) as cnt FROM \"{}\"", name);
+                            match sqlx::query(&count_query).fetch_one(pool).await {
+                                Ok(count_row) => {
+                                    let count: i64 = count_row.get("cnt");
+                                    Some(count)
+                                }
+                                Err(_) => None,
+                            }
+                        } else {
+                            None
+                        };
+
+                        // Try to get approximate size using dbstat (if available)
+                        let size_bytes = if object_type == DatabaseObjectType::Table {
+                            let size_query = format!(
+                                "SELECT SUM(pageno) * (SELECT page_size FROM pragma_page_size()) as size
+                                 FROM dbstat WHERE name = ?");
+                            match sqlx::query(&size_query).bind(&name).fetch_one(pool).await {
+                                Ok(size_row) => size_row.get::<Option<i64>, _>("size"),
+                                Err(_) => None,
+                            }
+                        } else {
+                            None
+                        };
+
+                        let obj = DatabaseObject {
+                            name,
+                            schema: Some("main".to_string()),
+                            object_type: object_type.clone(),
+                            row_count,
+                            size_bytes,
+                            comment: None, // SQLite doesn't have native table comments
+                        };
+
+                        // Sort into appropriate lists
+                        match object_type {
+                            DatabaseObjectType::Table => result.tables.push(obj),
+                            DatabaseObjectType::View => result.views.push(obj),
+                            _ => {}
+                        }
+                    }
+
+                    result.total_count = result.tables.len() + result.views.len();
+                }
+                Err(e) => {
+                    result.error = Some(format!("Failed to list objects: {}", e));
+                }
+            }
+
+            Ok(result)
         } else {
             Err(LazyTablesError::Connection(
                 "No active connection".to_string(),
@@ -651,5 +728,53 @@ fn parse_sqlite_type(type_str: &str) -> DataType {
     } else {
         // Default to text for unknown types (SQLite's default behavior)
         DataType::Text
+    }
+}
+
+/// Implement ManagedConnection trait for SqliteConnection to work with ConnectionManager
+#[async_trait::async_trait]
+impl crate::database::connection_manager::ManagedConnection for SqliteConnection {
+    async fn execute_raw_query(&self, query: &str) -> Result<(Vec<String>, Vec<Vec<String>>)> {
+        SqliteConnection::execute_raw_query(self, query).await
+    }
+
+    async fn get_table_data(
+        &self,
+        table_name: &str,
+        limit: usize,
+        offset: usize,
+    ) -> Result<Vec<Vec<String>>> {
+        SqliteConnection::get_table_data(self, table_name, limit, offset).await
+    }
+
+    async fn get_table_columns(
+        &self,
+        table_name: &str,
+    ) -> Result<Vec<crate::database::TableColumn>> {
+        SqliteConnection::get_table_columns(self, table_name).await
+    }
+
+    async fn get_table_metadata(&self, table_name: &str) -> Result<crate::database::TableMetadata> {
+        SqliteConnection::get_table_metadata(self, table_name).await
+    }
+
+    async fn list_database_objects(&self) -> Result<crate::database::DatabaseObjectList> {
+        SqliteConnection::list_database_objects(self).await
+    }
+
+    fn is_connected(&self) -> bool {
+        Connection::is_connected(self)
+    }
+}
+
+/// Implement Drop trait to ensure clean connection cleanup
+impl Drop for SqliteConnection {
+    fn drop(&mut self) {
+        if let Some(pool) = self.pool.take() {
+            // Close the pool asynchronously when the connection is dropped
+            tokio::spawn(async move {
+                pool.close().await;
+            });
+        }
     }
 }

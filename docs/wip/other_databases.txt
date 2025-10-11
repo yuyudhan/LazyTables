@@ -1,0 +1,4 @@
+
+====================****====================
+I want you to go through the database connection part and the database adopters so till now I have focused on Postgres but like I told earlier we should support MariaDB, MySQL and SQLite as well so while I have tested with Postgres the application works fine but one thing that I see as a problem that I have not tested MySQL, MariaDB or SQLite so can you check the code and see if the code for these other three databases also is working fine and we have a system which can extend to these four databases as well as other databases in the future if need be. The core idea is that things should work properly so kindly validate this for me.
+
