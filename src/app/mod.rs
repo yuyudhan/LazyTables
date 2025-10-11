@@ -975,6 +975,24 @@ impl App {
                     tab.start_edit();
                 }
             }
+            // Ctrl+d - Page down (must come before plain 'd')
+            KeyCode::Char('d') if key.modifiers == KeyModifiers::CONTROL => {
+                if let Some(tab) = self.state.table_viewer_state.current_tab_mut() {
+                    if tab.view_mode == crate::ui::components::table_viewer::TableViewMode::Schema {
+                        tab.page_down_schema();
+                    } else {
+                        // In data view, page down through data pages
+                        if tab.page_down() {
+                            let tab_idx = self.state.table_viewer_state.active_tab;
+                            if let Err(e) = self.state.load_table_data(tab_idx).await {
+                                self.state
+                                    .toast_manager
+                                    .error(format!("Failed to load page: {e}"));
+                            }
+                        }
+                    }
+                }
+            }
             // 'd' - Delete current row
             KeyCode::Char('d') => {
                 // Trigger delete confirmation
@@ -1015,6 +1033,24 @@ impl App {
                     self.state.toast_manager.success("Table data refreshed");
                 }
             }
+            // Ctrl+u - Page up
+            KeyCode::Char('u') if key.modifiers == KeyModifiers::CONTROL => {
+                if let Some(tab) = self.state.table_viewer_state.current_tab_mut() {
+                    if tab.view_mode == crate::ui::components::table_viewer::TableViewMode::Schema {
+                        tab.page_up_schema();
+                    } else {
+                        // In data view, page up through data pages
+                        if tab.page_up() {
+                            let tab_idx = self.state.table_viewer_state.active_tab;
+                            if let Err(e) = self.state.load_table_data(tab_idx).await {
+                                self.state
+                                    .toast_manager
+                                    .error(format!("Failed to load page: {e}"));
+                            }
+                        }
+                    }
+                }
+            }
             // h/j/k/l - Navigate cells
             KeyCode::Char('h') | KeyCode::Left => {
                 self.state.move_left();
@@ -1035,6 +1071,37 @@ impl App {
             // 'L' - Switch to next tab
             KeyCode::Char('L') => {
                 self.state.table_viewer_state.next_tab();
+            }
+            // 'g' - First press of gg (jump to top)
+            KeyCode::Char('g') => {
+                if self.state.ui.pending_gg_command {
+                    // Second 'g' press - jump to top
+                    if let Some(tab) = self.state.table_viewer_state.current_tab_mut() {
+                        if tab.view_mode
+                            == crate::ui::components::table_viewer::TableViewMode::Schema
+                        {
+                            tab.jump_to_top_schema();
+                        } else {
+                            tab.jump_to_first();
+                        }
+                    }
+                    self.state.ui.pending_gg_command = false;
+                } else {
+                    // First 'g' press - set pending
+                    self.state.ui.pending_gg_command = true;
+                }
+            }
+            // 'G' - Jump to bottom
+            KeyCode::Char('G') => {
+                if let Some(tab) = self.state.table_viewer_state.current_tab_mut() {
+                    if tab.view_mode == crate::ui::components::table_viewer::TableViewMode::Schema
+                    {
+                        tab.jump_to_bottom_schema();
+                    } else {
+                        tab.jump_to_last();
+                    }
+                }
+                self.state.ui.cancel_pending_gg();
             }
             _ => {}
         }

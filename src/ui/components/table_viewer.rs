@@ -269,19 +269,38 @@ impl TableTab {
 
     /// Move selection up
     pub fn move_up(&mut self) {
-        if self.selected_row > 0 {
-            self.selected_row -= 1;
-            // Auto-scroll if selection goes beyond viewport
-            self.ensure_selection_visible();
+        match self.view_mode {
+            TableViewMode::Schema => {
+                // In schema view, scroll up the content
+                self.scroll_offset_y = self.scroll_offset_y.saturating_sub(1);
+            }
+            TableViewMode::Data => {
+                // In data view, move cell selection up
+                if self.selected_row > 0 {
+                    self.selected_row -= 1;
+                    // Auto-scroll if selection goes beyond viewport
+                    self.ensure_selection_visible();
+                }
+            }
         }
     }
 
     /// Move selection down
     pub fn move_down(&mut self) {
-        if self.selected_row < self.rows.len().saturating_sub(1) {
-            self.selected_row += 1;
-            // Auto-scroll if selection goes beyond viewport
-            self.ensure_selection_visible();
+        match self.view_mode {
+            TableViewMode::Schema => {
+                // In schema view, scroll down the content
+                // Note: We don't have a max scroll limit here, but the rendering will handle it
+                self.scroll_offset_y += 1;
+            }
+            TableViewMode::Data => {
+                // In data view, move cell selection down
+                if self.selected_row < self.rows.len().saturating_sub(1) {
+                    self.selected_row += 1;
+                    // Auto-scroll if selection goes beyond viewport
+                    self.ensure_selection_visible();
+                }
+            }
         }
     }
 
@@ -335,6 +354,28 @@ impl TableTab {
     /// Jump to last column
     pub fn jump_to_last_col(&mut self) {
         self.selected_col = self.columns.len().saturating_sub(1);
+    }
+
+    /// Page down in schema view (scroll down by multiple lines)
+    pub fn page_down_schema(&mut self) {
+        self.scroll_offset_y += 10;
+    }
+
+    /// Page up in schema view (scroll up by multiple lines)
+    pub fn page_up_schema(&mut self) {
+        self.scroll_offset_y = self.scroll_offset_y.saturating_sub(10);
+    }
+
+    /// Jump to top of schema view
+    pub fn jump_to_top_schema(&mut self) {
+        self.scroll_offset_y = 0;
+    }
+
+    /// Jump to bottom of schema view
+    /// Note: Since we don't know the exact max scroll position here,
+    /// we'll set it to a large value and let the rendering clip it
+    pub fn jump_to_bottom_schema(&mut self) {
+        self.scroll_offset_y = 1000; // Large value, will be clipped by rendering
     }
 
     /// Ensure the selected column is visible within the horizontal viewport
