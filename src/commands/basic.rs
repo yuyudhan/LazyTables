@@ -59,8 +59,9 @@ pub struct HelpCommand;
 impl Command for HelpCommand {
     fn execute(&self, context: &mut CommandContext) -> Result<CommandResult> {
         use crate::app::state::HelpMode;
+        use crate::state::view::OverlayView;
 
-        // Toggle help based on current pane
+        // Set help mode based on current pane
         context.state.ui.help_mode = match context.state.ui.focused_pane {
             crate::app::FocusedPane::Connections => HelpMode::Connections,
             crate::app::FocusedPane::Tables => HelpMode::Tables,
@@ -69,6 +70,9 @@ impl Command for HelpCommand {
             crate::app::FocusedPane::QueryWindow => HelpMode::QueryWindow,
             crate::app::FocusedPane::SqlFiles => HelpMode::SqlFiles,
         };
+
+        // Set current view to Help overlay to enable proper event routing
+        context.state.ui.show_overlay(OverlayView::Help);
 
         // Reset help modal navigation state
         context.state.ui.reset_help_modal_state();
@@ -103,7 +107,9 @@ impl Command for ToggleHelpCommand {
         use crate::app::state::HelpMode;
 
         if context.state.ui.help_mode != HelpMode::None {
+            // Close help modal - reset both help_mode and current_view
             context.state.ui.help_mode = HelpMode::None;
+            context.state.ui.return_to_main();
             Ok(CommandResult::SuccessWithMessage(
                 "Help overlay closed".to_string(),
             ))

@@ -13,7 +13,7 @@ use std::time::Duration;
 
 pub mod state;
 
-pub use state::{AppState, AppView, ConnectionFormMode, FocusedPane, OverlayView, TextInputMode};
+pub use state::{AppState, AppView, ConnectionFormMode, FocusedPane, HelpMode, OverlayView, TextInputMode};
 
 /// Connection event sent from background tasks to main event loop
 #[derive(Debug)]
@@ -367,8 +367,14 @@ impl App {
 
     /// Handle overlay keys (connection form, table creator/editor, debug view)
     async fn handle_overlay_keys(&mut self, key: KeyEvent) -> Result<()> {
-        // ESC always closes overlay and returns to main
-        if key.code == KeyCode::Esc {
+        // ESC closes overlay and returns to main, EXCEPT for Help overlay
+        // Help overlay only closes with '?' key, not ESC
+        if key.code == KeyCode::Esc
+            && !matches!(
+                self.state.ui.current_view,
+                AppView::Overlay(OverlayView::Help)
+            )
+        {
             self.state.ui.return_to_main();
             return Ok(());
         }
@@ -431,23 +437,32 @@ impl App {
     /// Handle help overlay keys
     fn handle_help_keys(&mut self, key: KeyEvent) -> Result<()> {
         match key.code {
+            // Close help modal with '?' key only (ESC is disabled for help modal)
+            KeyCode::Char('?') => {
+                self.state.ui.help_mode = HelpMode::None;
+                self.state.ui.return_to_main();
+            }
+            // Switch between left and right help panes
             KeyCode::Left | KeyCode::Right | KeyCode::Char('h') | KeyCode::Char('l') => {
                 self.state.ui.toggle_help_pane_focus();
             }
+            KeyCode::Tab => {
+                self.state.ui.toggle_help_pane_focus();
+            }
+            // Scroll up in focused help pane
             KeyCode::Up | KeyCode::Char('k') => {
                 self.state.ui.help_scroll_up();
             }
+            // Scroll down in focused help pane
             KeyCode::Down | KeyCode::Char('j') => {
                 self.state.ui.help_scroll_down(100);
             }
+            // Page navigation
             KeyCode::PageUp => {
                 self.state.ui.help_page_up(10);
             }
             KeyCode::PageDown => {
                 self.state.ui.help_page_down(100, 10);
-            }
-            KeyCode::Tab => {
-                self.state.ui.toggle_help_pane_focus();
             }
             _ => {}
         }
