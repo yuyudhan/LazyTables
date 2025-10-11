@@ -1,11 +1,14 @@
 
 ====================****====================
+DONE:
 I want to look at the schema viewing and editing feature that we have in the current application. So in the table data viewing pane, we see an option that by clicking on T or pressing T it will toggle the data view or the schema view. Now when I am in the schema view, am I having all the functionalities implemented to support schema editing or new schema creation of a table? Can you guide me if this is present or how it is, where are we right now?
 
 ====================****====================
+DONE:
 Let's think again. Is schema editing feature a must have feature for my terminal UI application or should we just limit it to schema viewing only? Because I feel that schema editing is going to be too complex and doing it on a terminal UI might not be the best idea. However, I also feel that if we give that one additional feature then the user will be able to use it as a whole budget application and not depend on anything else. What do you think? Let's think together and tell me.
 
 ====================****====================
+DONE:
 In the table data pane, when I have pressed smallcase T, I went into the schema viewing mode and not the table data viewing / editing mode. In the table schema viewing mode, it says I should use J and K to scroll up and down but at the J and K doesn't seem to be working. Can you check why it is not working?
 
 ====================****====================
