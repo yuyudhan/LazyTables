@@ -1,0 +1,29 @@
+
+====================****====================
+DONE:
+help modal there are two things one first of all pressing escape or question mark both should trigger the closing of the modal once it has been opened the opening is triggered by pressing question mark now when I should press the pane sorry when I press tab key it should switch the pane and J and K keys should work in the help panes on the left side we have the focused pane specific help that comes on the right side we have the general help that comes can you also make sure that the entire help is compatible with each of the six panes that we have the pane number one two three four five six which is connection details table listing table details table data viewer SQL files and SQL query editor so all these panes corresponding help command should be properly present but first of all I can see that pressing J and K does not scroll in the help modal secondly I can see that pressing tab does not switch the panes within the help modal why is that can you verify and then suggest a fix and then fix it give me a plan and make a fix so that This is your work that you have to do.
+
+====================****====================
+Check the help  modal it says press i to enter edit mode in forms, from what I remember this is not how it is now. [Image #1] Check if this help aligns with what is there today? Also validate if there is some thing more wrongly written, or there is something missing in the help modal. verify properly.
+
+====================****====================
+DONE:
+I don't want excape to close the help modal, pressing ? again is fine, remove that feature as well as in the help, also I see help in the modal as well, that as well as the main help modal should not say excape. I also see page up and page down in the help modal that says faster scrolling, is it functional?
+
+====================****====================
+
+====================****====================
+
+====================****====================
+
+====================****====================
+
+====================****====================
+
+====================****====================
+
+====================****====================
+
+====================****====================
+
+

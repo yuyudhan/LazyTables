@@ -12,6 +12,7 @@ DONE:
 I want you to go through the entire implementation of all the 6 panes and all the modes and models. Can you identify if there is anything which is essentially blocking in nature and which can freeze the UI? Do it properly. I want you to go through everything and find out everything that might block the UI in any time. Can you have anything blocking and everything should show some kind of loading or responsiveness in the UI whenever it is there? So, can you find such scenarios? Go through everything and then devise a plan how we can fix it. Which elements are there first of all? Let's find out.
 
 ====================****====================
+Can you check throughout the application if we have any code which is not used or any of the code which is just stubbing or any code which is not done properly or there are functions which have been written but not being called properly and not binded properly or there are any feature which are residual remaining somewhere or there are missing features which are supposed to be implemented but have been done only in a stubbed manner.
 
 ====================****====================
 
