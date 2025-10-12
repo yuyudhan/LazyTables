@@ -15,6 +15,7 @@ Can you look at the table data viewing pane so when I have edited multiples Like
 table data pane i think we have many shortcuts for example dd2 delete the row can you check if this particular winding as well as other windings are they working and is there any error in them or any missing.
 
 ====================****====================
+In the table data pane let's say I want to edit a field which is numerical if I press a key which is a pane number when I am editing the field what happens is that instead of entering the key it takes me to the pane number as an example if I want to change to into three if I press three after clearing two it takes me to the pane number three why is this happening how to fix it it should not break any other functionality
 
 ====================****====================
 
