@@ -11,6 +11,7 @@ DONE:
 Can you go through the connections pane implementation? This is the pane which I am talking about. This is the one which lists all the connections and allows us to connect to those connections. Can you check the implementation how it has been done and have we made it a good user experience or do you have any suggestions for us to implement together?
 
 ====================****====================
+Can you see when we are trying to connect to any database or we are trying to test the connection in the database in the connection add/edit model. Are we handling the errors that might come from the databases and are we showing the right messages to the users? Can you confirm we have to implement so that the user exactly knows what is happening and why the connection might have not connected?
 
 ====================****====================
 

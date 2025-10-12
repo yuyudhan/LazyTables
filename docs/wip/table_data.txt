@@ -12,6 +12,7 @@ DONE:
 Can you look at the table data viewing pane so when I have edited multiples Like I have opened multiple tables and I want to close one table Which shows as multiple tabs. I want to close one tab in the table data viewing Pane, how do I do that? Is that important properly?
 
 ====================****====================
+table data pane i think we have many shortcuts for example dd2 delete the row can you check if this particular winding as well as other windings are they working and is there any error in them or any missing.
 
 ====================****====================
 

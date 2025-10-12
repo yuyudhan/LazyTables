@@ -1,5 +1,8 @@
 
 ====================****====================
+So we have multiple panes. I just start the application. I see that the pane 5 and 6 have a square bracket message called disabled. What I want the application to have is when the connection is not established all the panes 2, 3 and 4 should also be marked as disabled. When a connection is connected then the table tables/views pane will get enabled and only the connection pane and the table/view pane which is the pane number 1 and 2 get enabled. When I choose a table only then the panes 3 and 4 which is table details and query results pane should get enabled. Before that these should also show as disabled. So make this enabling/disabling across these 6 panes that we have in a proper flow and structure to provide a better user experience to the users. The behavior of enablement and disablement of the pane number 5 and 6 which is the SQL files pane and the SQL file edit pane which is the SQL query editor pane, pane number 5 is fine.
+
+====================****====================
 DONE:
 What is the purpose of the normal mode and query mode? Is it something that we are doing right? Or is there a better way? Because what I feel is, given that for addition of connections, addition of tables and all, we are going to have a different view. Is this the right structure that we are even doing or we can do better? Because I think it is complicating stuff. Can you just validate it for me?
 
