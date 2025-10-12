@@ -387,7 +387,7 @@ Test organization:
   - ONLY the SQL Query Editor has vim-style insert mode (managed by QueryEditor component)
   - Forms/modals accept direct typing - NO insert mode required
   - Key events are routed per-pane via dedicated handler methods
-- When implementing on one functionality if you think you are writing code that might break another functoinality you should double check what will break, avoid or ensure the other functionlity or functionalities are working.
+- When implementing on one functionality if you think you are writing code that might break another functionality you should double check what will break, avoid or ensure the other functionlity or functionalities are working.
 - **SCHEMA MODIFICATION PHILOSOPHY**: LazyTables focuses on viewing and querying data, NOT schema editing:
   - Table creation and schema editing features have been intentionally removed (as of 2025-10)
   - Most users only need to view schema information, not modify it
