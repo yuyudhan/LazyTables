@@ -59,6 +59,8 @@ pub struct App {
     test_connection_events_rx: tokio::sync::mpsc::UnboundedReceiver<TestConnectionEvent>,
     /// Channel sender for test connection events (cloned for background tasks)
     test_connection_events_tx: tokio::sync::mpsc::UnboundedSender<TestConnectionEvent>,
+    /// Task handle for ongoing test connection (for abort capability)
+    test_connection_task_handle: Option<tokio::task::JoinHandle<()>>,
 }
 
 impl App {
@@ -88,6 +90,7 @@ impl App {
             connection_events_tx,
             test_connection_events_rx,
             test_connection_events_tx,
+            test_connection_task_handle: None,
         })
     }
 
@@ -1700,6 +1703,15 @@ impl App {
         use crate::ui::components::{ConnectionField, PasswordStorageType};
 
         match key.code {
+            // PRIORITY 0: Abort test connection (Ctrl+C - highest priority)
+            KeyCode::Char('c')
+                if key.modifiers.contains(KeyModifiers::CONTROL)
+                    && self.state.test_connection_in_progress =>
+            {
+                self.abort_test_connection();
+                return Ok(());
+            }
+
             // PRIORITY 1: Global shortcuts (work from any field EXCEPT text input fields)
             KeyCode::Char('t')
                 if !key.modifiers.contains(KeyModifiers::CONTROL)
@@ -2069,6 +2081,7 @@ impl App {
                         )));
                     self.state.test_connection_in_progress = false;
                     self.state.test_start_time = None;
+                    self.test_connection_task_handle = None;
                     self.state.toast_manager.error("Test connection timeout");
                     return Ok(());
                 }
@@ -2098,6 +2111,7 @@ impl App {
                 // Clear in-progress flag and start time
                 self.state.test_connection_in_progress = false;
                 self.state.test_start_time = None;
+                self.test_connection_task_handle = None;
             }
         }
 
@@ -2155,8 +2169,8 @@ impl App {
         // Clone sender for background task
         let tx = self.test_connection_events_tx.clone();
 
-        // Spawn background task to test connection
-        tokio::spawn(async move {
+        // Spawn background task to test connection and store handle for abort capability
+        let handle = tokio::spawn(async move {
             use crate::database::{Connection, DatabaseType};
 
             let result = match config.database_type {
@@ -2215,5 +2229,35 @@ impl App {
 
             let _ = tx.send(event);
         });
+
+        // Store task handle for abort capability
+        self.test_connection_task_handle = Some(handle);
+    }
+
+    /// Abort ongoing test connection
+    fn abort_test_connection(&mut self) {
+        use crate::ui::components::TestConnectionStatus;
+
+        // Only abort if test is actually in progress
+        if !self.state.test_connection_in_progress {
+            return;
+        }
+
+        // Abort the background task if it exists
+        if let Some(handle) = self.test_connection_task_handle.take() {
+            handle.abort();
+        }
+
+        // Update status to show test was aborted
+        self.state.connection_modal_state.test_status =
+            Some(TestConnectionStatus::Failed("Test aborted by user".to_string()));
+
+        // Clear all test-related state
+        self.state.test_connection_in_progress = false;
+        self.state.test_start_time = None;
+        self.state.test_animation_frame = 0;
+
+        // Notify user
+        self.state.toast_manager.warning("Connection test aborted");
     }
 }

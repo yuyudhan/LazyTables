@@ -943,7 +943,7 @@ pub fn render_connection_modal(
         .split(inner_area);
 
     // Render header with keystroke hints
-    render_modal_header_with_hints(f, modal_state, main_chunks[0]);
+    render_modal_header_with_hints(f, modal_state, main_chunks[0], test_in_progress);
 
     // Render unified form
     render_unified_form(
@@ -969,7 +969,12 @@ pub fn render_connection_modal(
 }
 
 /// Render the modal header with navigation and keystroke hints
-fn render_modal_header_with_hints(f: &mut Frame, _modal_state: &ConnectionModalState, area: Rect) {
+fn render_modal_header_with_hints(
+    f: &mut Frame,
+    _modal_state: &ConnectionModalState,
+    area: Rect,
+    test_in_progress: bool,
+) {
     // Split header into two lines
     let header_chunks = Layout::default()
         .direction(Direction::Vertical)
@@ -1008,28 +1013,40 @@ fn render_modal_header_with_hints(f: &mut Frame, _modal_state: &ConnectionModalS
 
     f.render_widget(nav_paragraph, header_chunks[0]);
 
-    // Action hints
-    let action_hints = vec![Line::from(vec![
-        Span::styled(
-            "t",
-            Style::default()
-                .fg(Color::Blue)
-                .add_modifier(Modifier::BOLD),
-        ),
-        Span::styled(" - Test  •  ", Style::default().fg(Color::Gray)),
-        Span::styled(
-            "s",
-            Style::default()
-                .fg(Color::Green)
-                .add_modifier(Modifier::BOLD),
-        ),
-        Span::styled(" - Save  •  ", Style::default().fg(Color::Gray)),
-        Span::styled(
-            "c",
-            Style::default().fg(Color::Red).add_modifier(Modifier::BOLD),
-        ),
-        Span::styled(" - Cancel", Style::default().fg(Color::Gray)),
-    ])];
+    // Action hints - show different hints when test is in progress
+    let action_hints = if test_in_progress {
+        vec![Line::from(vec![
+            Span::styled(
+                "Ctrl+C",
+                Style::default()
+                    .fg(Color::Red)
+                    .add_modifier(Modifier::BOLD),
+            ),
+            Span::styled(" - Abort Test", Style::default().fg(Color::Gray)),
+        ])]
+    } else {
+        vec![Line::from(vec![
+            Span::styled(
+                "t",
+                Style::default()
+                    .fg(Color::Blue)
+                    .add_modifier(Modifier::BOLD),
+            ),
+            Span::styled(" - Test  •  ", Style::default().fg(Color::Gray)),
+            Span::styled(
+                "s",
+                Style::default()
+                    .fg(Color::Green)
+                    .add_modifier(Modifier::BOLD),
+            ),
+            Span::styled(" - Save  •  ", Style::default().fg(Color::Gray)),
+            Span::styled(
+                "c",
+                Style::default().fg(Color::Red).add_modifier(Modifier::BOLD),
+            ),
+            Span::styled(" - Cancel", Style::default().fg(Color::Gray)),
+        ])]
+    };
 
     let hints_paragraph = Paragraph::new(action_hints)
         .style(Style::default().fg(Color::Rgb(205, 214, 244)))
