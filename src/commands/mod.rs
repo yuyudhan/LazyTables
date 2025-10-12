@@ -368,6 +368,7 @@ impl CommandRegistry {
 
         // Register connection commands
         self.register(Box::new(connection::ConnectCommand));
+        self.register(Box::new(connection::DisconnectCommand));
         self.register(Box::new(connection::AddConnectionCommand));
         self.register(Box::new(connection::TestConnectionCommand));
 

@@ -800,6 +800,20 @@ impl App {
             KeyCode::Char('r') => {
                 self.state.toast_manager.info("Connections refreshed");
             }
+            // 'x' - Disconnect from current database
+            KeyCode::Char('x') => {
+                let selected = self.state.ui.selected_connection;
+                if let Some(connection) = self.state.db.connections.connections.get(selected).cloned() {
+                    let connection_id = connection.id.clone();
+                    let connection_name = connection.name.clone();
+
+                    // Disconnect from the database
+                    let _ = self.state.connection_manager.disconnect(&connection_id).await;
+                    self.state.disconnect_from_database().await;
+
+                    self.state.toast_manager.info(format!("Disconnected from {}", connection_name));
+                }
+            }
             // '/' - Enter search mode
             KeyCode::Char('/') => {
                 self.state.ui.enter_connections_search();
