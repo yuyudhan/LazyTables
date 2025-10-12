@@ -12,7 +12,7 @@ use ratatui::{
     layout::{Alignment, Constraint, Rect},
     style::{Color, Modifier, Style},
     text::{Line, Span},
-    widgets::{Block, Borders, List, ListItem, Paragraph, Row, Table, Wrap},
+    widgets::{Block, Borders, List, ListItem, Paragraph, Wrap},
     Frame,
 };
 
@@ -934,40 +934,33 @@ impl UI {
             return;
         }
 
-        // Pane is enabled - show placeholder or actual table data
-        {
-            // Show actual table data (sample data for now)
-            let header = Row::new(vec!["id", "name", "email", "created"])
-                .style(Style::default().fg(self.theme.get_color("header_fg")))
-                .height(1);
+        // Pane is enabled but no table opened yet - show empty state
+        let empty_state_message = vec![
+            Line::from(""),
+            Line::from(""),
+            Line::from(vec![Span::styled(
+                "📋 No table selected",
+                Style::default()
+                    .fg(self.theme.get_color("text_muted"))
+                    .add_modifier(Modifier::BOLD),
+            )]),
+            Line::from(""),
+            Line::from(vec![Span::styled(
+                "Navigate to Tables pane (press 2) and press Enter on a table to view data",
+                Style::default().fg(self.theme.get_color("text_muted")),
+            )]),
+        ];
 
-            let rows = vec![
-                Row::new(vec!["1", "John", "john@example.com", "2024-01-15"]),
-                Row::new(vec!["2", "Jane", "jane@example.com", "2024-01-16"]),
-                Row::new(vec!["3", "Bob", "bob@example.com", "2024-01-17"]),
-                Row::new(vec!["4", "Alice", "alice@example.com", "2024-01-18"]),
-                Row::new(vec!["5", "Eve", "eve@example.com", "2024-01-19"]),
-            ];
+        let empty_state = Paragraph::new(empty_state_message)
+            .block(
+                Block::default()
+                    .title(" [4] Query Results ")
+                    .borders(Borders::ALL)
+                    .border_style(border_style),
+            )
+            .alignment(Alignment::Center);
 
-            let widths = [
-                Constraint::Length(5),
-                Constraint::Length(15),
-                Constraint::Length(25),
-                Constraint::Length(12),
-            ];
-
-            let table = Table::new(rows, widths)
-                .header(header)
-                .block(
-                    Block::default()
-                        .title(" [4] Query Results ")
-                        .borders(Borders::ALL)
-                        .border_style(border_style),
-                )
-                .row_highlight_style(Style::default().bg(self.theme.get_color("selection_bg")));
-
-            frame.render_widget(table, area);
-        }
+        frame.render_widget(empty_state, area);
     }
 
     /// Draw the SQL files browser pane
