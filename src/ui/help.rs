@@ -461,7 +461,7 @@ impl HelpSystem {
                 .add_modifier(Modifier::BOLD | Modifier::UNDERLINED),
         )]));
         Self::add_command(lines, "x", "Close current tab");
-        Self::add_command(lines, "S/D", "Switch to previous/next tab");
+        Self::add_command(lines, "H/L", "Switch to previous/next tab");
         lines.push(Line::from(""));
 
         // Status Information

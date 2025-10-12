@@ -5,7 +5,7 @@ use ratatui::{
     layout::{Alignment, Constraint, Direction, Layout, Rect},
     style::{Modifier, Style, Stylize},
     text::{Line, Span},
-    widgets::{Block, Borders, Cell as TableCell, Paragraph, Row, Table, Tabs, Wrap},
+    widgets::{Block, Borders, Cell as TableCell, Clear, Paragraph, Row, Table, Tabs, Wrap},
     Frame,
 };
 use std::collections::HashMap;
@@ -753,7 +753,7 @@ fn render_delete_confirmation(
     area: Rect,
     theme: &Theme,
 ) {
-    // No full-screen overlay - just render the modal
+    use ratatui::style::Color;
 
     // Create a compact centered modal
     let modal_width = 50u16.min(area.width - 4);
@@ -768,6 +768,12 @@ fn render_delete_confirmation(
         height: modal_height,
     };
 
+    // Clear the area behind the modal for better visibility
+    f.render_widget(Clear, modal_area);
+
+    // Use a solid, darker background for better visibility
+    let solid_bg = Color::Rgb(20, 20, 30); // Dark blue-gray
+
     // Create the modal content with proper spacing
     let inner_block = Block::default()
         .borders(Borders::ALL)
@@ -778,7 +784,7 @@ fn render_delete_confirmation(
                 .fg(theme.get_color("danger"))
                 .add_modifier(Modifier::BOLD),
         )
-        .style(Style::default().bg(theme.get_color("modal_background")));
+        .style(Style::default().bg(solid_bg));
 
     f.render_widget(inner_block, modal_area);
 
@@ -796,56 +802,59 @@ fn render_delete_confirmation(
         Line::from(vec![
             Span::styled(
                 "Delete row ",
-                Style::default().fg(theme.get_color("text_primary")),
+                Style::default().fg(Color::White).bg(solid_bg),
             ),
             Span::styled(
                 format!("#{}", confirmation.row_index + 1),
                 Style::default()
-                    .fg(theme.get_color("primary_highlight"))
+                    .fg(Color::Cyan)
+                    .bg(solid_bg)
                     .add_modifier(Modifier::BOLD),
             ),
             Span::styled(
                 " from table ",
-                Style::default().fg(theme.get_color("text_primary")),
+                Style::default().fg(Color::White).bg(solid_bg),
             ),
             Span::styled(
                 format!("'{}'", confirmation.table_name),
                 Style::default()
-                    .fg(theme.get_color("secondary_highlight"))
+                    .fg(Color::Yellow)
+                    .bg(solid_bg)
                     .add_modifier(Modifier::BOLD),
             ),
-            Span::styled("?", Style::default().fg(theme.get_color("text_primary"))),
+            Span::styled("?", Style::default().fg(Color::White).bg(solid_bg)),
         ]),
         Line::from(""),
         Line::from("─────────────────")
-            .fg(theme.get_color("border_muted"))
+            .fg(Color::Gray)
+            .bg(solid_bg)
             .centered(),
         Line::from(vec![
             Span::styled(
                 "[Y/Enter] ",
                 Style::default()
-                    .fg(theme.get_color("success"))
+                    .fg(Color::Green)
+                    .bg(solid_bg)
                     .add_modifier(Modifier::BOLD),
             ),
             Span::styled(
                 "Confirm  ",
-                Style::default().fg(theme.get_color("text_secondary")),
+                Style::default().fg(Color::White).bg(solid_bg),
             ),
             Span::styled(
                 "[N/Esc] ",
                 Style::default()
-                    .fg(theme.get_color("danger"))
+                    .fg(Color::Red)
+                    .bg(solid_bg)
                     .add_modifier(Modifier::BOLD),
             ),
-            Span::styled(
-                "Cancel",
-                Style::default().fg(theme.get_color("text_secondary")),
-            ),
+            Span::styled("Cancel", Style::default().fg(Color::White).bg(solid_bg)),
         ]),
     ];
 
     let paragraph = Paragraph::new(lines)
         .alignment(Alignment::Center)
+        .style(Style::default().bg(solid_bg))
         .wrap(Wrap { trim: false });
 
     f.render_widget(paragraph, inner_area);
@@ -1513,7 +1522,7 @@ fn render_help(f: &mut Frame, area: Rect, theme: &Theme) {
                     .fg(theme.get_color("primary_highlight"))
                     .add_modifier(Modifier::BOLD),
             ),
-            Span::raw("Ctrl+D - Page down | Ctrl+U - Page up | n/p - Next/Previous page"),
+            Span::raw("Ctrl+D - Page down | Ctrl+U - Page up"),
         ]),
         Line::from(vec![
             Span::styled(
