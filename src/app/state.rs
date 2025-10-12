@@ -131,42 +131,69 @@ impl AppState {
     pub fn cycle_focus_forward(&mut self) {
         let sql_panes_enabled = self.are_sql_panes_enabled();
         let query_editor_enabled = self.is_query_editor_enabled();
-        self.ui
-            .cycle_focus_forward(sql_panes_enabled, query_editor_enabled);
+        let tables_enabled = self.is_tables_pane_enabled();
+        let details_enabled = self.is_details_pane_enabled();
+        let query_results_enabled = self.is_query_results_pane_enabled();
+        self.ui.cycle_focus_forward(
+            sql_panes_enabled,
+            query_editor_enabled,
+            tables_enabled,
+            details_enabled,
+            query_results_enabled,
+        );
     }
 
     /// Cycle focus to the previous pane
     pub fn cycle_focus_backward(&mut self) {
         let sql_panes_enabled = self.are_sql_panes_enabled();
         let query_editor_enabled = self.is_query_editor_enabled();
-        self.ui
-            .cycle_focus_backward(sql_panes_enabled, query_editor_enabled);
+        let tables_enabled = self.is_tables_pane_enabled();
+        let details_enabled = self.is_details_pane_enabled();
+        let query_results_enabled = self.is_query_results_pane_enabled();
+        self.ui.cycle_focus_backward(
+            sql_panes_enabled,
+            query_editor_enabled,
+            tables_enabled,
+            details_enabled,
+            query_results_enabled,
+        );
     }
 
     /// Move focus left (Ctrl+h)
     pub fn move_focus_left(&mut self) {
         let sql_panes_enabled = self.are_sql_panes_enabled();
         let query_editor_enabled = self.is_query_editor_enabled();
+        let details_enabled = self.is_details_pane_enabled();
         self.ui
-            .move_focus_left(sql_panes_enabled, query_editor_enabled);
+            .move_focus_left(sql_panes_enabled, query_editor_enabled, details_enabled);
     }
 
     /// Move focus down (Ctrl+j)
     pub fn move_focus_down(&mut self) {
-        self.ui.move_focus_down();
+        let tables_enabled = self.is_tables_pane_enabled();
+        let details_enabled = self.is_details_pane_enabled();
+        let query_editor_enabled = self.is_query_editor_enabled();
+        self.ui
+            .move_focus_down(tables_enabled, details_enabled, query_editor_enabled);
     }
 
     /// Move focus up (Ctrl+k)
     pub fn move_focus_up(&mut self) {
-        self.ui.move_focus_up();
+        let tables_enabled = self.is_tables_pane_enabled();
+        let details_enabled = self.is_details_pane_enabled();
+        self.ui.move_focus_up(tables_enabled, details_enabled);
     }
 
     /// Move focus right (Ctrl+l)
     pub fn move_focus_right(&mut self) {
         let sql_panes_enabled = self.are_sql_panes_enabled();
         let query_editor_enabled = self.is_query_editor_enabled();
-        self.ui
-            .move_focus_right(sql_panes_enabled, query_editor_enabled);
+        let query_results_enabled = self.is_query_results_pane_enabled();
+        self.ui.move_focus_right(
+            sql_panes_enabled,
+            query_editor_enabled,
+            query_results_enabled,
+        );
     }
 
     /// Move selection up based on current focus
@@ -1845,6 +1872,49 @@ impl AppState {
     /// Returns true only if there is an active connected connection AND a SQL file is selected
     pub fn is_query_editor_enabled(&self) -> bool {
         self.are_sql_panes_enabled() && self.ui.current_sql_file.is_some()
+    }
+
+    /// Check if Tables pane should be enabled
+    /// Returns true only if there is an active connected connection
+    pub fn is_tables_pane_enabled(&self) -> bool {
+        self.db
+            .connections
+            .connections
+            .get(self.ui.selected_connection)
+            .map(|conn| conn.is_connected())
+            .unwrap_or(false)
+    }
+
+    /// Check if Details pane should be enabled
+    /// Returns true only if there is an active connection AND a table is selected
+    pub fn is_details_pane_enabled(&self) -> bool {
+        let has_connection = self
+            .db
+            .connections
+            .connections
+            .get(self.ui.selected_connection)
+            .map(|conn| conn.is_connected())
+            .unwrap_or(false);
+
+        let has_selected_table = self.ui.get_selected_table_name().is_some();
+
+        has_connection && has_selected_table
+    }
+
+    /// Check if Query Results pane should be enabled
+    /// Returns true only if there is an active connection AND a table is selected
+    pub fn is_query_results_pane_enabled(&self) -> bool {
+        let has_connection = self
+            .db
+            .connections
+            .connections
+            .get(self.ui.selected_connection)
+            .map(|conn| conn.is_connected())
+            .unwrap_or(false);
+
+        let has_selected_table = self.ui.get_selected_table_name().is_some();
+
+        has_connection && has_selected_table
     }
 
     /// Reset the query editor to initial state (clear content, cursor position, etc.)

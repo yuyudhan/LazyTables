@@ -17,22 +17,18 @@ pub fn render_tables_pane(
     theme: &crate::ui::theme::Theme,
 ) {
     let is_focused = state.ui.focused_pane == crate::app::FocusedPane::Tables;
-    let border_style = if is_focused {
+    let is_enabled = state.is_tables_pane_enabled();
+
+    let border_style = if !is_enabled {
+        Style::default().fg(Color::DarkGray)
+    } else if is_focused {
         Style::default().fg(theme.get_color("active_border"))
     } else {
         Style::default().fg(theme.get_color("border"))
     };
 
-    // Check if there's an active connection
-    let has_active_connection = state
-        .db
-        .connections
-        .connections
-        .iter()
-        .any(|conn| conn.is_connected());
-
     // Get items using the new unified selection system
-    let items: Vec<ListItem> = if !has_active_connection {
+    let items: Vec<ListItem> = if !is_enabled {
         get_no_connection_message(is_focused)
     } else if state.ui.selectable_table_items.is_empty() {
         get_no_tables_message(state)
@@ -43,7 +39,11 @@ pub fn render_tables_pane(
     };
 
     // Build adaptive title with object counts and schema info
-    let title = get_adaptive_title(&state.db.database_objects, &state.db, &state.ui);
+    let title = if !is_enabled {
+        " [2] Tables/Views [DISABLED] ".to_string()
+    } else {
+        get_adaptive_title(&state.db.database_objects, &state.db, &state.ui)
+    };
 
     let tables = List::new(items)
         .block(

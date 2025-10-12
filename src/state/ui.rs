@@ -424,26 +424,44 @@ impl UIState {
     }
 
     /// Cycle focus to the next pane (connection-aware)
-    pub fn cycle_focus_forward(&mut self, sql_panes_enabled: bool, query_editor_enabled: bool) {
+    pub fn cycle_focus_forward(
+        &mut self,
+        sql_panes_enabled: bool,
+        query_editor_enabled: bool,
+        tables_enabled: bool,
+        details_enabled: bool,
+        query_results_enabled: bool,
+    ) {
         let mut new_pane = self.focused_pane.next();
+        let start_pane = new_pane;
+        let mut iterations = 0;
+        let max_iterations = 10; // Safety limit
 
         // Skip disabled panes
-        if !sql_panes_enabled {
-            while matches!(new_pane, FocusedPane::QueryWindow | FocusedPane::SqlFiles) {
-                new_pane = new_pane.next();
-                // Prevent infinite loop if we end up back where we started
-                if new_pane == self.focused_pane {
-                    break;
-                }
+        loop {
+            iterations += 1;
+            if iterations > max_iterations {
+                break;
             }
-        } else if !query_editor_enabled {
-            // SQL files enabled, but query editor disabled
-            while matches!(new_pane, FocusedPane::QueryWindow) {
-                new_pane = new_pane.next();
-                // Prevent infinite loop if we end up back where we started
-                if new_pane == self.focused_pane {
-                    break;
-                }
+
+            let should_skip = match new_pane {
+                FocusedPane::Tables => !tables_enabled,
+                FocusedPane::Details => !details_enabled,
+                FocusedPane::TabularOutput => !query_results_enabled,
+                FocusedPane::QueryWindow => !query_editor_enabled,
+                FocusedPane::SqlFiles => !sql_panes_enabled,
+                FocusedPane::Connections => false, // Always enabled
+            };
+
+            if !should_skip {
+                break;
+            }
+
+            new_pane = new_pane.next();
+            if new_pane == start_pane {
+                // Cycled back to start, use current pane instead
+                new_pane = self.focused_pane;
+                break;
             }
         }
 
@@ -451,26 +469,44 @@ impl UIState {
     }
 
     /// Cycle focus to the previous pane (connection-aware)
-    pub fn cycle_focus_backward(&mut self, sql_panes_enabled: bool, query_editor_enabled: bool) {
+    pub fn cycle_focus_backward(
+        &mut self,
+        sql_panes_enabled: bool,
+        query_editor_enabled: bool,
+        tables_enabled: bool,
+        details_enabled: bool,
+        query_results_enabled: bool,
+    ) {
         let mut new_pane = self.focused_pane.previous();
+        let start_pane = new_pane;
+        let mut iterations = 0;
+        let max_iterations = 10; // Safety limit
 
         // Skip disabled panes
-        if !sql_panes_enabled {
-            while matches!(new_pane, FocusedPane::QueryWindow | FocusedPane::SqlFiles) {
-                new_pane = new_pane.previous();
-                // Prevent infinite loop if we end up back where we started
-                if new_pane == self.focused_pane {
-                    break;
-                }
+        loop {
+            iterations += 1;
+            if iterations > max_iterations {
+                break;
             }
-        } else if !query_editor_enabled {
-            // SQL files enabled, but query editor disabled
-            while matches!(new_pane, FocusedPane::QueryWindow) {
-                new_pane = new_pane.previous();
-                // Prevent infinite loop if we end up back where we started
-                if new_pane == self.focused_pane {
-                    break;
-                }
+
+            let should_skip = match new_pane {
+                FocusedPane::Tables => !tables_enabled,
+                FocusedPane::Details => !details_enabled,
+                FocusedPane::TabularOutput => !query_results_enabled,
+                FocusedPane::QueryWindow => !query_editor_enabled,
+                FocusedPane::SqlFiles => !sql_panes_enabled,
+                FocusedPane::Connections => false, // Always enabled
+            };
+
+            if !should_skip {
+                break;
+            }
+
+            new_pane = new_pane.previous();
+            if new_pane == start_pane {
+                // Cycled back to start, use current pane instead
+                new_pane = self.focused_pane;
+                break;
             }
         }
 
@@ -478,33 +514,40 @@ impl UIState {
     }
 
     /// Move focus left (Ctrl+h) (connection-aware)
-    pub fn move_focus_left(&mut self, sql_panes_enabled: bool, query_editor_enabled: bool) {
+    pub fn move_focus_left(
+        &mut self,
+        _sql_panes_enabled: bool,
+        query_editor_enabled: bool,
+        details_enabled: bool,
+    ) {
         let new_pane = match self.focused_pane {
             FocusedPane::TabularOutput => {
-                // Smart selection: go to the last focused left pane
-                match self.last_left_pane {
-                    FocusedPane::Connections | FocusedPane::Tables | FocusedPane::Details => {
-                        self.last_left_pane
+                // Try to go to Details if enabled, otherwise Tables, otherwise Connections
+                if details_enabled {
+                    FocusedPane::Details
+                } else {
+                    // Smart selection: go to the last focused left pane if enabled
+                    match self.last_left_pane {
+                        FocusedPane::Connections => FocusedPane::Connections,
+                        FocusedPane::Tables => FocusedPane::Tables,
+                        FocusedPane::Details if details_enabled => FocusedPane::Details,
+                        _ => FocusedPane::Connections, // Default to connections (always enabled)
                     }
-                    _ => FocusedPane::Tables, // Default to middle pane
                 }
             }
             FocusedPane::QueryWindow => {
-                if query_editor_enabled {
+                if details_enabled {
                     FocusedPane::Details
                 } else {
-                    // Query editor disabled, go to tabular output instead
+                    // Details disabled, go to tabular output instead
                     FocusedPane::TabularOutput
                 }
             }
             FocusedPane::SqlFiles => {
                 if query_editor_enabled {
                     FocusedPane::QueryWindow
-                } else if sql_panes_enabled {
-                    // Query editor disabled but files enabled, go to tabular output
-                    FocusedPane::TabularOutput
                 } else {
-                    // SQL panes disabled, go to tabular output instead
+                    // Query editor disabled, go to tabular output
                     FocusedPane::TabularOutput
                 }
             }
@@ -515,12 +558,35 @@ impl UIState {
         self.update_focus(new_pane);
     }
 
-    /// Move focus down (Ctrl+j)
-    pub fn move_focus_down(&mut self) {
+    /// Move focus down (Ctrl+j) (connection-aware)
+    pub fn move_focus_down(
+        &mut self,
+        tables_enabled: bool,
+        details_enabled: bool,
+        query_editor_enabled: bool,
+    ) {
         let new_pane = match self.focused_pane {
-            FocusedPane::Connections => FocusedPane::Tables,
-            FocusedPane::Tables => FocusedPane::Details,
-            FocusedPane::TabularOutput => FocusedPane::QueryWindow,
+            FocusedPane::Connections => {
+                if tables_enabled {
+                    FocusedPane::Tables
+                } else {
+                    self.focused_pane // Stay in place
+                }
+            }
+            FocusedPane::Tables => {
+                if details_enabled {
+                    FocusedPane::Details
+                } else {
+                    self.focused_pane // Stay in place
+                }
+            }
+            FocusedPane::TabularOutput => {
+                if query_editor_enabled {
+                    FocusedPane::QueryWindow
+                } else {
+                    self.focused_pane // Stay in place
+                }
+            }
             // Bottom panes don't have anything below
             _ => self.focused_pane,
         };
@@ -528,11 +594,17 @@ impl UIState {
         self.update_focus(new_pane);
     }
 
-    /// Move focus up (Ctrl+k)
-    pub fn move_focus_up(&mut self) {
+    /// Move focus up (Ctrl+k) (connection-aware)
+    pub fn move_focus_up(&mut self, tables_enabled: bool, _details_enabled: bool) {
         let new_pane = match self.focused_pane {
             FocusedPane::Tables => FocusedPane::Connections,
-            FocusedPane::Details => FocusedPane::Tables,
+            FocusedPane::Details => {
+                if tables_enabled {
+                    FocusedPane::Tables
+                } else {
+                    FocusedPane::Connections // Skip to connections if tables disabled
+                }
+            }
             FocusedPane::QueryWindow => FocusedPane::TabularOutput,
             FocusedPane::SqlFiles => FocusedPane::TabularOutput,
             // Top panes don't have anything above
@@ -543,18 +615,31 @@ impl UIState {
     }
 
     /// Move focus right (Ctrl+l) (connection-aware)
-    pub fn move_focus_right(&mut self, sql_panes_enabled: bool, query_editor_enabled: bool) {
+    pub fn move_focus_right(
+        &mut self,
+        sql_panes_enabled: bool,
+        query_editor_enabled: bool,
+        query_results_enabled: bool,
+    ) {
         let new_pane = match self.focused_pane {
-            FocusedPane::Connections => FocusedPane::TabularOutput,
-            FocusedPane::Tables => FocusedPane::TabularOutput,
+            FocusedPane::Connections | FocusedPane::Tables => {
+                if query_results_enabled {
+                    FocusedPane::TabularOutput
+                } else {
+                    self.focused_pane // Stay in place if query results disabled
+                }
+            }
             FocusedPane::Details => {
                 if query_editor_enabled {
                     FocusedPane::QueryWindow
                 } else if sql_panes_enabled {
                     // SQL files enabled but query editor disabled, go to files
                     FocusedPane::SqlFiles
+                } else if query_results_enabled {
+                    // SQL panes disabled, go to query results
+                    FocusedPane::TabularOutput
                 } else {
-                    // SQL panes disabled, stay in place
+                    // Nothing to go to, stay in place
                     self.focused_pane
                 }
             }

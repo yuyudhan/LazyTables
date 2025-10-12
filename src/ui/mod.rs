@@ -461,34 +461,75 @@ impl UI {
     /// Draw the enhanced table details pane with comprehensive metadata
     fn draw_details_pane(&self, frame: &mut Frame, area: Rect, state: &mut AppState) {
         let is_focused = state.ui.focused_pane == FocusedPane::Details;
-        let border_style = if is_focused {
+        let is_enabled = state.is_details_pane_enabled();
+
+        let border_style = if !is_enabled {
+            Style::default().fg(Color::DarkGray)
+        } else if is_focused {
             Style::default().fg(self.theme.get_color("active_border"))
         } else {
             Style::default().fg(self.theme.get_color("border"))
         };
 
-        // Check if there's an active connection
-        let has_active_connection = state
-            .db
-            .connections
-            .connections
-            .iter()
-            .any(|conn| conn.is_connected());
+        // If pane is disabled, show disabled state message
+        if !is_enabled {
+            let has_connection = state
+                .db
+                .connections
+                .connections
+                .get(state.ui.selected_connection)
+                .map(|conn| conn.is_connected())
+                .unwrap_or(false);
 
-        let details_text = if !has_active_connection {
-            vec![
-                Line::from(""),
-                Line::from(vec![Span::styled(
-                    "No database connected",
-                    Style::default().fg(Color::Gray),
-                )]),
-                Line::from(""),
-                Line::from(vec![Span::styled(
-                    "Connect to database first",
-                    Style::default().fg(Color::Gray),
-                )]),
-            ]
-        } else if state.db.tables.is_empty() {
+            let disabled_message = if !has_connection {
+                // No connection
+                vec![
+                    Line::from(""),
+                    Line::from(vec![Span::styled(
+                        "🔒 Connect to a database first",
+                        Style::default()
+                            .fg(Color::DarkGray)
+                            .add_modifier(Modifier::BOLD),
+                    )]),
+                    Line::from(""),
+                    Line::from(vec![Span::styled(
+                        "Select a connection and press Enter to connect",
+                        Style::default().fg(Color::DarkGray),
+                    )]),
+                ]
+            } else {
+                // Connected but no table selected
+                vec![
+                    Line::from(""),
+                    Line::from(vec![Span::styled(
+                        "📋 Select a table to view details",
+                        Style::default()
+                            .fg(Color::DarkGray)
+                            .add_modifier(Modifier::BOLD),
+                    )]),
+                    Line::from(""),
+                    Line::from(vec![Span::styled(
+                        "Navigate to Tables pane and press Enter on a table",
+                        Style::default().fg(Color::DarkGray),
+                    )]),
+                ]
+            };
+
+            let disabled_block = Block::default()
+                .title(" [3] Table Details [DISABLED] ")
+                .borders(Borders::ALL)
+                .border_style(border_style);
+
+            let paragraph = Paragraph::new(disabled_message)
+                .block(disabled_block)
+                .alignment(ratatui::layout::Alignment::Center);
+
+            frame.render_widget(paragraph, area);
+            return;
+        }
+
+        // Pane is enabled - show normal content
+        let details_text = if state.db.tables.is_empty() {
             vec![
                 Line::from(""),
                 Line::from(vec![Span::styled(
@@ -823,49 +864,66 @@ impl UI {
         }
 
         let is_focused = state.ui.focused_pane == FocusedPane::TabularOutput;
-        let border_style = if is_focused {
+        let is_enabled = state.is_query_results_pane_enabled();
+
+        let border_style = if !is_enabled {
+            Style::default().fg(Color::DarkGray)
+        } else if is_focused {
             Style::default().fg(self.theme.get_color("active_border"))
         } else {
             Style::default().fg(self.theme.get_color("border"))
         };
 
-        // Check if there's an active connection and table selected
-        let has_active_connection = state
-            .db
-            .connections
-            .connections
-            .iter()
-            .any(|conn| conn.is_connected());
+        // If pane is disabled, show disabled state
+        if !is_enabled {
+            let has_connection = state
+                .db
+                .connections
+                .connections
+                .get(state.ui.selected_connection)
+                .map(|conn| conn.is_connected())
+                .unwrap_or(false);
 
-        // For now, we'll assume no table is selected until database integration is complete
-        let has_selected_table = false;
+            let disabled_message = if !has_connection {
+                // No connection
+                vec![
+                    Line::from(""),
+                    Line::from(""),
+                    Line::from(vec![Span::styled(
+                        "🔒 Connect to a database first",
+                        Style::default()
+                            .fg(Color::DarkGray)
+                            .add_modifier(Modifier::BOLD),
+                    )]),
+                    Line::from(""),
+                    Line::from(vec![Span::styled(
+                        "Select a connection and press Enter to connect",
+                        Style::default().fg(Color::DarkGray),
+                    )]),
+                ]
+            } else {
+                // Connected but no table selected
+                vec![
+                    Line::from(""),
+                    Line::from(""),
+                    Line::from(vec![Span::styled(
+                        "📋 Select a table to view query results",
+                        Style::default()
+                            .fg(Color::DarkGray)
+                            .add_modifier(Modifier::BOLD),
+                    )]),
+                    Line::from(""),
+                    Line::from(vec![Span::styled(
+                        "Navigate to Tables pane and press Enter on a table",
+                        Style::default().fg(Color::DarkGray),
+                    )]),
+                ]
+            };
 
-        if !has_active_connection {
-            // Show "no connection" message
-            let message = vec![
-                Line::from(""),
-                Line::from(""),
-                Line::from(vec![Span::styled(
-                    "No database connection active",
-                    Style::default()
-                        .fg(Color::Gray)
-                        .add_modifier(Modifier::BOLD),
-                )]),
-                Line::from(""),
-                Line::from(vec![Span::styled(
-                    "Connect to a database from the Connections pane",
-                    Style::default().fg(Color::Gray),
-                )]),
-                Line::from(vec![Span::styled(
-                    "Press 'c' to focus connections, then Enter to connect",
-                    Style::default().fg(Color::Gray),
-                )]),
-            ];
-
-            let placeholder = Paragraph::new(message)
+            let placeholder = Paragraph::new(disabled_message)
                 .block(
                     Block::default()
-                        .title(" [4] Query Results ")
+                        .title(" [4] Query Results [DISABLED] ")
                         .borders(Borders::ALL)
                         .border_style(border_style),
                 )
@@ -873,40 +931,11 @@ impl UI {
                 .alignment(Alignment::Center);
 
             frame.render_widget(placeholder, area);
-        } else if !has_selected_table {
-            // Show "no table selected" message
-            let message = vec![
-                Line::from(""),
-                Line::from(""),
-                Line::from(vec![Span::styled(
-                    "No table selected",
-                    Style::default()
-                        .fg(Color::Gray)
-                        .add_modifier(Modifier::BOLD),
-                )]),
-                Line::from(""),
-                Line::from(vec![Span::styled(
-                    "Select a table from the Tables pane to view its data",
-                    Style::default().fg(Color::Gray),
-                )]),
-                Line::from(vec![Span::styled(
-                    "Or execute a query from the SQL editor below",
-                    Style::default().fg(Color::Gray),
-                )]),
-            ];
+            return;
+        }
 
-            let placeholder = Paragraph::new(message)
-                .block(
-                    Block::default()
-                        .title(" [4] Query Results ")
-                        .borders(Borders::ALL)
-                        .border_style(border_style),
-                )
-                .style(Style::default().fg(self.theme.get_color("text")))
-                .alignment(Alignment::Center);
-
-            frame.render_widget(placeholder, area);
-        } else {
+        // Pane is enabled - show placeholder or actual table data
+        {
             // Show actual table data (sample data for now)
             let header = Row::new(vec!["id", "name", "email", "created"])
                 .style(Style::default().fg(self.theme.get_color("header_fg")))

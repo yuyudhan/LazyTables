@@ -287,8 +287,21 @@ impl App {
             // Number keys 1-6 for direct pane navigation (only in main view)
             (KeyModifiers::NONE, KeyCode::Char(c @ '1'..='6')) if self.state.ui.is_in_main() => {
                 if let Some(pane) = FocusedPane::from_number(c.to_digit(10).unwrap() as u8) {
-                    self.state.ui.focused_pane = pane;
-                    self.state.ui.cancel_pending_gg();
+                    // Check if the target pane is enabled before navigating to it
+                    let is_enabled = match pane {
+                        FocusedPane::Connections => true, // Always enabled
+                        FocusedPane::Tables => self.state.is_tables_pane_enabled(),
+                        FocusedPane::Details => self.state.is_details_pane_enabled(),
+                        FocusedPane::TabularOutput => self.state.is_query_results_pane_enabled(),
+                        FocusedPane::QueryWindow => self.state.is_query_editor_enabled(),
+                        FocusedPane::SqlFiles => self.state.are_sql_panes_enabled(),
+                    };
+
+                    if is_enabled {
+                        self.state.ui.focused_pane = pane;
+                        self.state.ui.cancel_pending_gg();
+                    }
+                    // If disabled, do nothing (stay in current pane)
                 }
                 Ok(Some(()))
             }
@@ -993,14 +1006,57 @@ impl App {
                     }
                 }
             }
-            // 'd' - Delete current row
+            // 'd' - Delete current row (double-tap within 500ms)
             KeyCode::Char('d') => {
-                // Trigger delete confirmation
-                if let Some(_tab) = self.state.table_viewer_state.current_tab() {
-                    // Build delete confirmation - implementation simplified for now
-                    self.state
-                        .toast_manager
-                        .info("Delete row: Press 'dd' to confirm");
+                let now = std::time::Instant::now();
+                let should_delete = if let Some(last_press) = self.state.table_viewer_state.last_d_press {
+                    // Check if within 500ms window
+                    now.duration_since(last_press).as_millis() < 500
+                } else {
+                    false
+                };
+
+                if should_delete {
+                    // Double-tap detected - prepare delete confirmation
+                    if let Some(confirmation) = self.state.table_viewer_state.prepare_delete_confirmation() {
+                        self.state.table_viewer_state.delete_confirmation = Some(confirmation);
+                    } else {
+                        self.state.toast_manager.error("Cannot delete row: no primary key found");
+                    }
+                    // Reset the last press
+                    self.state.table_viewer_state.last_d_press = None;
+                } else {
+                    // First 'd' press - record timestamp
+                    self.state.table_viewer_state.last_d_press = Some(now);
+                    self.state.toast_manager.info("Press 'd' again to delete row");
+                }
+            }
+            // 'y' - Copy current row (double-tap within 500ms)
+            KeyCode::Char('y') => {
+                let now = std::time::Instant::now();
+                let should_copy = if let Some(last_press) = self.state.table_viewer_state.last_y_press {
+                    // Check if within 500ms window
+                    now.duration_since(last_press).as_millis() < 500
+                } else {
+                    false
+                };
+
+                if should_copy {
+                    // Double-tap detected - copy row to clipboard
+                    match self.state.table_viewer_state.copy_row_csv() {
+                        Ok(()) => {
+                            self.state.toast_manager.success("Row copied to clipboard (CSV format)");
+                        }
+                        Err(e) => {
+                            self.state.toast_manager.error(format!("Failed to copy row: {e}"));
+                        }
+                    }
+                    // Reset the last press
+                    self.state.table_viewer_state.last_y_press = None;
+                } else {
+                    // First 'y' press - record timestamp
+                    self.state.table_viewer_state.last_y_press = Some(now);
+                    self.state.toast_manager.info("Press 'y' again to copy row");
                 }
             }
             // '/' - Enter search mode
@@ -1022,8 +1078,8 @@ impl App {
                         .info(format!("Switched to {} view", mode));
                 }
             }
-            // Ctrl+r - Refresh table data
-            KeyCode::Char('r') if key.modifiers == KeyModifiers::CONTROL => {
+            // 'r' - Refresh table data (works with or without Ctrl)
+            KeyCode::Char('r') => {
                 let tab_idx = self.state.table_viewer_state.active_tab;
                 if let Err(e) = self.state.load_table_data(tab_idx).await {
                     self.state
@@ -1113,6 +1169,22 @@ impl App {
                     }
                 }
                 self.state.ui.cancel_pending_gg();
+            }
+            // '0' - Jump to first column (only in data view)
+            KeyCode::Char('0') => {
+                if let Some(tab) = self.state.table_viewer_state.current_tab_mut() {
+                    if tab.view_mode == crate::ui::components::table_viewer::TableViewMode::Data {
+                        tab.jump_to_first_col();
+                    }
+                }
+            }
+            // '$' - Jump to last column (only in data view)
+            KeyCode::Char('$') => {
+                if let Some(tab) = self.state.table_viewer_state.current_tab_mut() {
+                    if tab.view_mode == crate::ui::components::table_viewer::TableViewMode::Data {
+                        tab.jump_to_last_col();
+                    }
+                }
             }
             _ => {}
         }
