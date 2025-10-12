@@ -35,7 +35,7 @@ pub fn render_tables_pane(
     } else {
         // Use filtered items if search is active, otherwise use all items
         let display_items = state.ui.get_display_table_items();
-        get_selectable_items_list(display_items, is_focused, &state.ui)
+        get_selectable_items_list(display_items, is_focused, is_enabled, &state.ui)
     };
 
     // Build adaptive title with object counts and schema info
@@ -114,6 +114,7 @@ fn get_no_tables_message(state: &AppState) -> Vec<ListItem<'static>> {
 fn get_selectable_items_list(
     selectable_items: &[crate::state::ui::SelectableTableItem],
     _is_focused: bool,
+    is_enabled: bool,
     ui_state: &crate::state::ui::UIState,
 ) -> Vec<ListItem<'static>> {
     let mut items = Vec::new();
@@ -124,16 +125,26 @@ fn get_selectable_items_list(
             items.push(ListItem::new(""));
         } else if item.is_selectable {
             // Selectable table/view item
+            let text_color = if is_enabled {
+                Color::White
+            } else {
+                Color::DarkGray
+            };
             items.push(ListItem::new(Line::from(vec![Span::styled(
                 item.display_name.clone(),
-                Style::default().fg(Color::White),
+                Style::default().fg(text_color),
             )])));
         } else {
             // Group header
+            let header_color = if is_enabled {
+                Color::Cyan
+            } else {
+                Color::DarkGray
+            };
             items.push(ListItem::new(Line::from(vec![Span::styled(
                 item.display_name.clone(),
                 Style::default()
-                    .fg(Color::Cyan)
+                    .fg(header_color)
                     .add_modifier(Modifier::BOLD),
             )])));
         }
@@ -253,7 +264,7 @@ mod tests {
     #[test]
     fn test_get_selectable_items_list_empty() {
         let ui_state = crate::state::ui::UIState::new();
-        let items = get_selectable_items_list(&[], false, &ui_state);
+        let items = get_selectable_items_list(&[], false, true, &ui_state);
         assert!(items.is_empty());
     }
 
@@ -278,7 +289,7 @@ mod tests {
         ];
 
         let ui_state = crate::state::ui::UIState::new();
-        let items = get_selectable_items_list(&selectable_items, false, &ui_state);
+        let items = get_selectable_items_list(&selectable_items, false, true, &ui_state);
 
         // Should have 3 items (header + 2 tables) without navigation help
         assert_eq!(items.len(), 3);
@@ -295,7 +306,7 @@ mod tests {
         )];
 
         let ui_state = crate::state::ui::UIState::new();
-        let items = get_selectable_items_list(&selectable_items, true, &ui_state);
+        let items = get_selectable_items_list(&selectable_items, true, true, &ui_state);
 
         // Should have just the table item (no help text is shown in pane anymore)
         assert_eq!(items.len(), 1);
