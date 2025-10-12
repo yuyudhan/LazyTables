@@ -288,7 +288,19 @@ impl App {
                 Ok(Some(()))
             }
             // Number keys 1-6 for direct pane navigation (only in main view)
+            // BUT NOT when editing a table cell - numbers should go into the edit buffer
             (KeyModifiers::NONE, KeyCode::Char(c @ '1'..='6')) if self.state.ui.is_in_main() => {
+                // Check if we're in table viewer edit mode
+                let in_table_edit_mode = self.state.ui.focused_pane == FocusedPane::TabularOutput
+                    && self.state.table_viewer_state.current_tab()
+                        .map(|tab| tab.in_edit_mode)
+                        .unwrap_or(false);
+
+                // Don't intercept number keys if in edit mode - let them pass through
+                if in_table_edit_mode {
+                    return Ok(None); // Not handled, will be passed to table viewer edit handler
+                }
+
                 if let Some(pane) = FocusedPane::from_number(c.to_digit(10).unwrap() as u8) {
                     // Check if the target pane is enabled before navigating to it
                     let is_enabled = match pane {
