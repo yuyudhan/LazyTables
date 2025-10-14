@@ -1,0 +1,11 @@
+# Cross.toml - Configuration for cross-compilation with Docker
+
+[build]
+# Force using Docker for all cross-compilation
+default-target = "x86_64-unknown-linux-gnu"
+
+[target.x86_64-unknown-linux-gnu]
+image = "ghcr.io/cross-rs/x86_64-unknown-linux-gnu:latest"
+
+[target.aarch64-unknown-linux-gnu]
+image = "ghcr.io/cross-rs/aarch64-unknown-linux-gnu:latest"
