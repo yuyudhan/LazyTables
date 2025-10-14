@@ -1,0 +1,69 @@
+
+
+  Recommended Refactoring Plan
+
+  Phase 1: Split Event Handlers
+  (src/app/mod.rs)
+
+  Create src/app/handlers/ directory with:
+  src/app/handlers/
+  ├── mod.rs (handler routing)
+  ├── connections.rs
+  (handle_connections_keys,
+  handle_table_delete_confirmation_keys)
+  ├── tables.rs (handle_tables_keys)
+  ├── details.rs (handle_details_keys)
+  ├── query_results.rs
+  (handle_query_results_keys,
+  handle_table_viewer_edit_mode,
+  handle_table_viewer_search_mode)
+  ├── sql_files.rs (handle_sql_files_keys,
+  handle_sql_files_search_mode,
+  handle_sql_files_rename_mode,
+  handle_sql_files_create_mode)
+  ├── query_editor.rs
+  (handle_query_editor_keys)
+  ├── overlays.rs (handle_overlay_keys,
+  handle_help_keys, handle_debug_view_keys,
+  handle_confirmation_modal_keys)
+  └── global.rs (handle_global_keys)
+
+  Phase 2: Split State Operations
+  (src/app/state.rs)
+
+  Create src/app/state/ directory with:
+  src/app/state/
+  ├── mod.rs (core AppState struct)
+  ├── navigation.rs (cycle_focus_*,
+  move_focus_*, move_*)
+  ├── connections.rs (connection_*,
+  get_selected_connection*, disconnect_*)
+  ├── tables.rs (table_*,
+  update_table_selection)
+  ├── sql_files.rs (sql file operations,
+  load_*, get_selected_sql_file)
+  ├── modals.rs (modal open/close
+  operations)
+  └── query.rs (query editor operations,
+  insert_char_at_cursor, etc.)
+
+  Phase 3: Split UI State (src/state/ui.rs)
+
+  Create src/state/ui/ directory with:
+  src/state/ui/
+  ├── mod.rs (core UIState struct)
+  ├── selection.rs (SelectableTableItem,
+  selection logic)
+  ├── search.rs (search functionality)
+  ├── lists.rs (list state management)
+  └── persistence.rs (save/load operations)
+
+  Phase 4: Split Large Components (Optional)
+
+  - connection_modal.rs: Split into form
+  logic, validation, and rendering
+  - table_viewer.rs: Split into state
+  management, editing, and rendering
+  - query_editor.rs: Split into editor
+  state, command mode, and rendering
+
