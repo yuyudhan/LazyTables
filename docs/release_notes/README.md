@@ -4,23 +4,36 @@ This directory contains detailed release notes for all versions of LazyTables.
 
 ## Latest Release
 
-### [v0.2.0-beta.1](v0.2.0-beta.1.md) - 2025-10-11 🚧 BETA
-**Async Architecture & Major UX Improvements**
+### [v0.2.3](v0.2.3.md) - 2025-10-14 ✅ STABLE
+**Bug Fixes & Code Refactoring**
 
-Major architectural refactor with fully async operations, vim command mode, SQL autocomplete, and numbered pane navigation. Beta release seeking user feedback before stable v0.2.0.
+Maintenance release with critical bug fixes, major code refactoring for improved maintainability, and enhanced user experience features.
 
 **Highlights:**
-- 🚀 Fully async architecture (no UI blocking)
-- ⌨️ Vim command mode (`:w`, `:q`, `:wq`)
-- 💡 SQL autocomplete with keyword suggestions
-- 🔢 Numbered pane navigation (press 1-6)
-- ⏱️ Animated loading indicators with timers
-- 📊 Enhanced table browser with collapsible groups
-- 🔄 Improved tab navigation (Shift+H/L)
+- 🐛 Fixed critical number key input bug during cell editing
+- 🏗️ Major code refactoring (~2000 lines into dedicated modules)
+- 🔌 Database disconnect functionality (press 'x')
+- 🛑 Abort connection tests with Ctrl+C
+- 📊 Enhanced schema viewing with comprehensive metadata
+- ✨ Improved visual feedback and empty states
 
 ---
 
-## Stable Releases
+## Recent Stable Releases
+
+### [v0.2.2](v0.2.2.md) - 2025-10-12
+**Bug Fixes & Navigation Enhancements**
+
+Critical fixes for SQLite connections and enhanced vim-style navigation with page scrolling and jump commands.
+
+### [v0.2.1](v0.2.1.md) - 2025-10-11
+**Async Architecture & UX Improvements**
+
+Stable release of v0.2.0-beta.1 with fully async operations, vim command mode, SQL autocomplete, and numbered pane navigation.
+
+---
+
+## Earlier Stable Releases
 
 ### [v0.1.7](v0.1.7.md) - 2025-09-27
 **cargo-binstall Compatibility**
@@ -79,9 +92,15 @@ Initial stable release with secure credential management and SQL file organizati
 ## Version Timeline
 
 ```
-v0.2.0-beta.1 (2025-10-11) ← LATEST (BETA)
+v0.2.3 (2025-10-14) ← LATEST STABLE
     ↑
-v0.1.7 (2025-09-27) ← LATEST STABLE
+v0.2.2 (2025-10-12)
+    ↑
+v0.2.1 (2025-10-11)
+    ↑
+v0.2.0-beta.1 (2025-10-11) ← BETA
+    ↑
+v0.1.7 (2025-09-27)
     ↑
 v0.1.6 (2025-09-27)
     ↑
@@ -96,11 +115,11 @@ v0.1.3 (2025-08-15) ← FIRST STABLE
 
 ### Stable Releases
 Production-ready versions recommended for daily use:
-- v0.1.3, v0.1.4, v0.1.6, v0.1.7
+- v0.2.3, v0.2.2, v0.2.1, v0.1.7, v0.1.6, v0.1.4, v0.1.3
 
 ### Beta Releases
 Feature-complete but seeking feedback before stable:
-- v0.2.0-beta.1 (current)
+- v0.2.0-beta.1
 
 ### Technical Releases
 Version bumps for testing purposes:
@@ -109,15 +128,13 @@ Version bumps for testing purposes:
 ## How to Choose a Version
 
 ### For Production Use
-Use **v0.1.7** (latest stable):
+Use **v0.2.3** (latest stable):
+```bash
+cargo install lazytables
+```
+or
 ```bash
 cargo binstall lazytables
-```
-
-### For Testing New Features
-Use **v0.2.0-beta.1** (latest beta):
-```bash
-cargo binstall lazytables --version 0.2.0-beta.1
 ```
 
 ### For Development
