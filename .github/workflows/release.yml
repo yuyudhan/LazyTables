@@ -73,19 +73,26 @@ jobs:
       
       - name: Package binary
         run: |
-          cd target/${{ matrix.target }}/release
-          # Create cargo-binstall compatible archive name format
-          tar czf ../../../lazytables-${{ github.ref_name }}-${{ matrix.target }}.tar.gz lazytables
-          cd ../../../
-          shasum -a 256 lazytables-${{ github.ref_name }}-${{ matrix.target }}.tar.gz > lazytables-${{ github.ref_name }}-${{ matrix.target }}.tar.gz.sha256
+          # Extract version from tag (removes 'v' prefix)
+          VERSION=${{ github.ref_name }}
+          VERSION=${VERSION#v}
+
+          # Create cargo-binstall compatible archive with correct structure
+          mkdir -p package
+          cp target/${{ matrix.target }}/release/lazytables package/
+          cd package
+          tar czf ../lazytables-v${VERSION}-${{ matrix.target }}.tar.gz lazytables
+          cd ..
+          shasum -a 256 lazytables-v${VERSION}-${{ matrix.target }}.tar.gz > lazytables-v${VERSION}-${{ matrix.target }}.tar.gz.sha256
+          rm -rf package
       
       - name: Upload artifacts
         uses: actions/upload-artifact@v4
         with:
           name: ${{ matrix.target }}
           path: |
-            lazytables-${{ github.ref_name }}-${{ matrix.target }}.tar.gz
-            lazytables-${{ github.ref_name }}-${{ matrix.target }}.tar.gz.sha256
+            lazytables-v*-${{ matrix.target }}.tar.gz
+            lazytables-v*-${{ matrix.target }}.tar.gz.sha256
   
   release:
     name: Create Release
