@@ -7,6 +7,57 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.2.3] - 2025-10-14
+
+Major bug fixes, code refactoring, and user experience improvements.
+
+### Added
+- **Database disconnect functionality** - Press 'x' in Connections pane to disconnect from active database
+- **Connection test abort capability** - Press Ctrl+C during connection testing to abort ongoing test
+- **Enhanced schema viewing** with comprehensive metadata display including:
+  - Columns with primary key indicators (🔑)
+  - Indexes with type, uniqueness, and size information
+  - Foreign keys with ON DELETE/UPDATE actions
+  - Table constraints (CHECK, UNIQUE, etc.)
+  - Table statistics (row count, sizes, vacuum/analyze timestamps)
+- **Toggle between Data and Schema views** using 't' key in table viewer
+- **Informative empty states** in query results pane when no data is available
+- **Progressive pane enablement** - panes are only enabled when relevant data is available
+
+### Changed
+- **Major code refactoring** - Event handlers reorganized into dedicated modules for better maintainability:
+  - `src/app/handlers/global.rs` - Global key bindings
+  - `src/app/handlers/connections.rs` - Connection pane handlers
+  - `src/app/handlers/tables.rs` - Tables pane handlers
+  - `src/app/handlers/query_results.rs` - Query results handlers
+  - `src/app/handlers/query_editor.rs` - SQL editor handlers
+  - `src/app/handlers/sql_files.rs` - SQL files browser handlers
+  - `src/app/handlers/overlays.rs` - Modal and overlay handlers
+- **Improved visual feedback** for disabled panes with dimmed borders and informative messages
+- **Enhanced delete confirmation modal** with better visibility using solid background colors
+- **Streamlined documentation** with clearer structure and focused content
+- **Schema modification philosophy** - Removed table creation and schema editing features to focus on data viewing and querying
+
+### Fixed
+- **Critical: Number key input blocked during cell editing** - Number keys 1-6 now work correctly when editing numerical fields in table cells
+- **Help modal keyboard navigation** - Fixed event routing for proper help system interaction
+- **SQLite connection URL format** - Corrected database connection string format for SQLite
+- **Security improvements** in database adapters with better error handling
+
+### Technical
+- Reduced `src/app/mod.rs` from ~2600 lines to ~600 lines by modularizing event handlers
+- Improved code organization with clear separation of concerns
+- Added state refactoring planning documentation
+- Enhanced error handling in database adapters (PostgreSQL, MySQL, MariaDB, SQLite)
+- Removed orphaned and unimplemented code for better maintainability
+
+### Documentation
+- Updated development notes with completed work items
+- Documented enhanced schema viewing capabilities
+- Added design philosophy regarding schema modifications
+- Improved help text accuracy across all panes
+- Enhanced WIP documentation with audit checklist
+
 ## [0.2.1] - 2025-10-11
 
 Stable release of v0.2.0-beta.1 with all async improvements and UX enhancements.
@@ -177,6 +228,7 @@ Stable release of v0.2.0-beta.1 with all async improvements and UX enhancements.
 
 ## Version History
 
+- **0.2.3** - Bug fixes, code refactoring, and UX improvements
 - **0.2.1** - Stable release with async architecture and major UX improvements
 - **0.2.0-beta.1** - Major async refactor and UX improvements (Beta Release)
 - **0.1.7** - cargo-binstall compatibility
@@ -185,7 +237,8 @@ Stable release of v0.2.0-beta.1 with all async improvements and UX enhancements.
 - **0.1.4** - Debug view and connection management
 - **0.1.3** - First stable release
 
-[Unreleased]: https://github.com/yuyudhan/LazyTables/compare/v0.2.1...HEAD
+[Unreleased]: https://github.com/yuyudhan/LazyTables/compare/v0.2.3...HEAD
+[0.2.3]: https://github.com/yuyudhan/LazyTables/compare/v0.2.1...v0.2.3
 [0.2.1]: https://github.com/yuyudhan/LazyTables/compare/v0.1.7...v0.2.1
 [0.2.0-beta.1]: https://github.com/yuyudhan/LazyTables/compare/v0.1.7...v0.2.0-beta.1
 [0.1.7]: https://github.com/yuyudhan/LazyTables/compare/v0.1.6...v0.1.7

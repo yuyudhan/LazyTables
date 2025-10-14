@@ -395,4 +395,4 @@ Test organization:
   - Schema view is read-only and comprehensive, showing columns, indexes, foreign keys, constraints, and statistics
   - This design decision reduces complexity and aligns with the tool's core mission as a data viewer/query tool
   - Keep the markdown content crisp and clean. Don't bloat it with random verbiage. Ensure clarity and focus on the user.
-
+- When releasing new versions create the changelog and release notes etc properly for that version.

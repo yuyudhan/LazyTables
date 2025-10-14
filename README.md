@@ -67,6 +67,26 @@ Navigate: `1-6` for direct pane access, `Tab`/`Shift+Tab` to cycle.
 
 ---
 
+## 🎉 What's New in v0.2.3
+
+**Released:** October 14, 2025
+
+### 🐛 Critical Bug Fix
+- **Fixed number key input during cell editing** - Number keys 1-6 now work correctly when editing numerical fields
+
+### ✨ New Features
+- **Database disconnect** - Press `x` to disconnect from active database
+- **Abort connection tests** - Press `Ctrl+C` to abort ongoing connection tests
+- **Enhanced schema viewing** - Comprehensive metadata: columns, indexes, foreign keys, constraints, statistics
+
+### 🏗️ Code Quality
+- Major refactoring: reorganized ~2000 lines into dedicated handler modules
+- Improved maintainability and code organization
+
+📖 [Full Release Notes](docs/releases/v0.2.3.md) | [Changelog](CHANGELOG.md)
+
+---
+
 ## 🗄️ Supported Databases
 
 | Database | Status | Icon |
