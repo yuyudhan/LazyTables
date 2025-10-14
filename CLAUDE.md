@@ -396,3 +396,4 @@ Test organization:
   - This design decision reduces complexity and aligns with the tool's core mission as a data viewer/query tool
   - Keep the markdown content crisp and clean. Don't bloat it with random verbiage. Ensure clarity and focus on the user.
 - When releasing new versions create the changelog and release notes etc properly for that version.
+- Always run the @scripts/create-release-files.sh to create the release files when creating the builds.
