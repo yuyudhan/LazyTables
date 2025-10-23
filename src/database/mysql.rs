@@ -42,6 +42,95 @@ impl MySqlConnection {
             Ok(format!("mysql://{username}@{host}:{port}/{database}"))
         }
     }
+
+    /// Parse SQLx error into structured ConnectionError with helpful suggestions
+    pub fn parse_connection_error(&self, error: &sqlx::Error) -> crate::core::error::ConnectionError {
+        use crate::core::error::{ConnectionError, ConnectionErrorType};
+
+        let error_str = error.to_string();
+        let error_lower = error_str.to_lowercase();
+
+        // Extract MySQL error number if available
+        let error_code = if let sqlx::Error::Database(ref db_err) = error {
+            db_err.code().map(|c| c.to_string())
+        } else {
+            None
+        };
+
+        // Classify error and provide user-friendly message based on MySQL error codes
+        if error_lower.contains("connection refused") || error_lower.contains("can't connect") {
+            ConnectionError::new(
+                ConnectionErrorType::Network,
+                format!("Cannot reach MySQL server at {}:{}", self.config.host, self.config.port),
+                error_str,
+            )
+            .with_suggestion(format!("Check if MySQL is running on {}:{}", self.config.host, self.config.port))
+            .with_suggestion("Verify the host address and port number (default: 3306)")
+            .with_suggestion("Check firewall settings allow connections to MySQL")
+            .with_suggestion("If using Docker, ensure the container is running and ports are exposed")
+        } else if error_lower.contains("access denied")
+            || error_lower.contains("authentication")
+            || error_code.as_deref() == Some("1045") {
+            ConnectionError::new(
+                ConnectionErrorType::Authentication,
+                format!("Access denied for user '{}'", self.config.username),
+                error_str,
+            )
+            .with_error_code(error_code.unwrap_or_else(|| "1045".to_string()))
+            .with_suggestion("Verify the username and password are correct")
+            .with_suggestion("Check user privileges with: SELECT user, host FROM mysql.user;")
+            .with_suggestion("Grant access with: GRANT ALL ON database.* TO 'user'@'host';")
+        } else if error_lower.contains("unknown database") || error_code.as_deref() == Some("1049") {
+            let db_name = self.config.database.as_deref().unwrap_or("mysql");
+            ConnectionError::new(
+                ConnectionErrorType::DatabaseNotFound,
+                format!("Database '{}' does not exist", db_name),
+                error_str,
+            )
+            .with_error_code(error_code.unwrap_or_else(|| "1049".to_string()))
+            .with_suggestion(format!("Check if database '{}' exists", db_name))
+            .with_suggestion("List databases with: SHOW DATABASES;")
+            .with_suggestion(format!("Create database with: CREATE DATABASE {};", db_name))
+        } else if error_lower.contains("ssl") || error_lower.contains("tls") {
+            ConnectionError::new(
+                ConnectionErrorType::SslConfiguration,
+                "SSL/TLS configuration error",
+                error_str,
+            )
+            .with_suggestion("Check SSL mode in connection settings")
+            .with_suggestion("Verify MySQL server SSL configuration")
+            .with_suggestion("Check if SSL is required: SHOW VARIABLES LIKE '%ssl%';")
+        } else if error_lower.contains("timeout") || error_lower.contains("timed out") {
+            ConnectionError::new(
+                ConnectionErrorType::Network,
+                "Connection attempt timed out",
+                error_str,
+            )
+            .with_suggestion("Check network connectivity to the MySQL server")
+            .with_suggestion("Verify MySQL is listening on the correct interface")
+            .with_suggestion("Check wait_timeout and connect_timeout settings")
+        } else if error_lower.contains("too many connections") || error_code.as_deref() == Some("1040") {
+            ConnectionError::new(
+                ConnectionErrorType::ServerError,
+                "MySQL server has too many connections",
+                error_str,
+            )
+            .with_error_code(error_code.unwrap_or_else(|| "1040".to_string()))
+            .with_suggestion("Close unused connections")
+            .with_suggestion("Increase max_connections in my.cnf")
+            .with_suggestion("Check current connections: SHOW PROCESSLIST;")
+        } else {
+            // Generic unknown error
+            ConnectionError::new(
+                ConnectionErrorType::Unknown,
+                "Failed to connect to MySQL",
+                error_str,
+            )
+            .with_suggestion("Check MySQL error log for more details")
+            .with_suggestion("Verify all connection parameters are correct")
+            .with_suggestion("Try connecting with mysql CLI to verify credentials")
+        }
+    }
 }
 
 #[async_trait]

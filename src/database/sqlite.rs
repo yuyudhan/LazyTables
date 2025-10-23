@@ -36,6 +36,86 @@ impl SqliteConnection {
 
         format!("sqlite://{db_path}")
     }
+
+    /// Parse SQLx error into structured ConnectionError with helpful suggestions
+    pub fn parse_connection_error(&self, error: &sqlx::Error) -> crate::core::error::ConnectionError {
+        use crate::core::error::{ConnectionError, ConnectionErrorType};
+
+        let error_str = error.to_string();
+        let error_lower = error_str.to_lowercase();
+        let db_path = self.config.database.as_deref().unwrap_or(":memory:");
+
+        // Classify error and provide user-friendly message
+        if error_lower.contains("unable to open database")
+            || error_lower.contains("no such file or directory") {
+            ConnectionError::new(
+                ConnectionErrorType::Configuration,
+                format!("Cannot open SQLite database at '{}'", db_path),
+                error_str,
+            )
+            .with_suggestion(format!("Check if the path '{}' exists and is accessible", db_path))
+            .with_suggestion("Verify the directory permissions allow read/write access")
+            .with_suggestion("Ensure the parent directory exists")
+            .with_suggestion("Check if the file path is correct (absolute or relative)")
+        } else if error_lower.contains("readonly") || error_lower.contains("read-only") {
+            ConnectionError::new(
+                ConnectionErrorType::Configuration,
+                format!("Database file '{}' is read-only", db_path),
+                error_str,
+            )
+            .with_suggestion("Check file permissions on the database file")
+            .with_suggestion("Ensure you have write permissions to the database directory")
+            .with_suggestion("Verify the database file is not locked by another process")
+        } else if error_lower.contains("disk") && error_lower.contains("full") {
+            ConnectionError::new(
+                ConnectionErrorType::ServerError,
+                "Disk is full - cannot create or write to database",
+                error_str,
+            )
+            .with_suggestion("Free up disk space")
+            .with_suggestion("Move the database to a location with more space")
+            .with_suggestion("Check disk usage with: df -h")
+        } else if error_lower.contains("database is locked") || error_lower.contains("locked") {
+            ConnectionError::new(
+                ConnectionErrorType::ServerError,
+                "Database file is locked by another process",
+                error_str,
+            )
+            .with_suggestion("Close other applications that may be using the database")
+            .with_suggestion("Check for processes holding locks: lsof | grep .db")
+            .with_suggestion("Wait a moment and try again")
+            .with_suggestion("If persistent, restart the application")
+        } else if error_lower.contains("not a database") || error_lower.contains("malformed") {
+            ConnectionError::new(
+                ConnectionErrorType::Configuration,
+                format!("File '{}' is not a valid SQLite database", db_path),
+                error_str,
+            )
+            .with_suggestion("Verify the file is a valid SQLite database")
+            .with_suggestion("Check if the file is corrupted")
+            .with_suggestion("Try opening with sqlite3 CLI to verify")
+            .with_suggestion("Restore from backup if available")
+        } else if error_lower.contains("permission denied") {
+            ConnectionError::new(
+                ConnectionErrorType::Configuration,
+                format!("Permission denied accessing '{}'", db_path),
+                error_str,
+            )
+            .with_suggestion("Check file permissions on the database file and directory")
+            .with_suggestion("Ensure your user has read/write access")
+            .with_suggestion("On Unix/Linux, use: chmod 644 <file>")
+        } else {
+            // Generic unknown error
+            ConnectionError::new(
+                ConnectionErrorType::Unknown,
+                "Failed to connect to SQLite database",
+                error_str,
+            )
+            .with_suggestion("Verify the database file path is correct")
+            .with_suggestion("Check if the database file is corrupted")
+            .with_suggestion("Try opening with sqlite3 CLI to diagnose")
+        }
+    }
 }
 
 #[async_trait]

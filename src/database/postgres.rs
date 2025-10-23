@@ -44,6 +44,97 @@ impl PostgresConnection {
             Ok(format!("postgresql://{username}@{host}:{port}/{database}"))
         }
     }
+
+    /// Parse SQLx error into structured ConnectionError with helpful suggestions
+    pub fn parse_connection_error(&self, error: &sqlx::Error) -> crate::core::error::ConnectionError {
+        use crate::core::error::{ConnectionError, ConnectionErrorType};
+
+        let error_str = error.to_string();
+        let error_lower = error_str.to_lowercase();
+
+        // Extract database-specific error code if available
+        let error_code = if let sqlx::Error::Database(ref db_err) = error {
+            db_err.code().map(|c| c.to_string())
+        } else {
+            None
+        };
+
+        // Classify error and provide user-friendly message
+        if error_lower.contains("connection refused") || error_lower.contains("could not connect to server") {
+            ConnectionError::new(
+                ConnectionErrorType::Network,
+                format!("Cannot reach PostgreSQL server at {}:{}", self.config.host, self.config.port),
+                error_str,
+            )
+            .with_suggestion(format!("Check if PostgreSQL is running on {}:{}", self.config.host, self.config.port))
+            .with_suggestion("Verify the host address and port number are correct")
+            .with_suggestion("Check firewall settings allow connections to PostgreSQL")
+            .with_suggestion("If using Docker, ensure the container is running and ports are exposed")
+        } else if error_lower.contains("password authentication failed")
+            || error_lower.contains("authentication failed")
+            || error_code.as_deref() == Some("28P01") {
+            ConnectionError::new(
+                ConnectionErrorType::Authentication,
+                format!("Authentication failed for user '{}'", self.config.username),
+                error_str,
+            )
+            .with_error_code(error_code.unwrap_or_else(|| "28P01".to_string()))
+            .with_suggestion("Verify the username and password are correct")
+            .with_suggestion("Check if the user exists in PostgreSQL (try: \\du in psql)")
+            .with_suggestion("Verify pg_hba.conf allows password authentication")
+        } else if error_lower.contains("database") && error_lower.contains("does not exist")
+            || error_code.as_deref() == Some("3D000") {
+            let db_name = self.config.database.as_deref().unwrap_or("postgres");
+            ConnectionError::new(
+                ConnectionErrorType::DatabaseNotFound,
+                format!("Database '{}' does not exist", db_name),
+                error_str,
+            )
+            .with_error_code(error_code.unwrap_or_else(|| "3D000".to_string()))
+            .with_suggestion(format!("Check if database '{}' exists", db_name))
+            .with_suggestion("List databases with: SELECT datname FROM pg_database;")
+            .with_suggestion(format!("Create database with: CREATE DATABASE {};", db_name))
+        } else if error_lower.contains("ssl") || error_lower.contains("tls") {
+            ConnectionError::new(
+                ConnectionErrorType::SslConfiguration,
+                "SSL/TLS configuration error",
+                error_str,
+            )
+            .with_suggestion("Check SSL mode in connection settings")
+            .with_suggestion("Verify PostgreSQL server SSL configuration")
+            .with_suggestion("If SSL is not required, try 'Disable' or 'Prefer' SSL mode")
+        } else if error_lower.contains("timeout") || error_lower.contains("timed out") {
+            ConnectionError::new(
+                ConnectionErrorType::Network,
+                "Connection attempt timed out",
+                error_str,
+            )
+            .with_suggestion("Check network connectivity to the PostgreSQL server")
+            .with_suggestion("Verify PostgreSQL is listening on the correct interface")
+            .with_suggestion("Increase connection timeout if the server is slow to respond")
+        } else if error_lower.contains("too many connections")
+            || error_code.as_deref() == Some("53300") {
+            ConnectionError::new(
+                ConnectionErrorType::ServerError,
+                "PostgreSQL server has too many connections",
+                error_str,
+            )
+            .with_error_code(error_code.unwrap_or_else(|| "53300".to_string()))
+            .with_suggestion("Close unused connections")
+            .with_suggestion("Increase max_connections in postgresql.conf")
+            .with_suggestion("Check for connection leaks in applications")
+        } else {
+            // Generic unknown error
+            ConnectionError::new(
+                ConnectionErrorType::Unknown,
+                "Failed to connect to PostgreSQL",
+                error_str,
+            )
+            .with_suggestion("Check PostgreSQL server logs for more details")
+            .with_suggestion("Verify all connection parameters are correct")
+            .with_suggestion("Try connecting with psql to verify credentials")
+        }
+    }
 }
 
 #[async_trait]
