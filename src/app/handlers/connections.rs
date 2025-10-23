@@ -554,6 +554,7 @@ async fn test_connection_from_modal(app: &mut App) {
     // Spawn background task to test connection and store handle for abort capability
     let handle = tokio::spawn(async move {
         use crate::database::{Connection, DatabaseType};
+        use crate::core::error::LazyTablesError;
 
         let result = match config.database_type {
             DatabaseType::PostgreSQL => {
@@ -561,13 +562,22 @@ async fn test_connection_from_modal(app: &mut App) {
                 let mut conn = PostgresConnection::new(config);
 
                 match conn.connect().await {
-                    Ok(()) => conn
-                        .test_connection()
-                        .await
-                        .map(|_| "Connection successful!".to_string()),
-                    Err(e) => Err(crate::core::error::LazyTablesError::Connection(format!(
-                        "Connection failed: {e}"
-                    ))),
+                    Ok(()) => {
+                        // Connection succeeded, now test it
+                        conn.test_connection()
+                            .await
+                            .map(|_| "Connection successful!".to_string())
+                    }
+                    Err(e) => {
+                        // Parse error into structured ConnectionError
+                        if let LazyTablesError::Database(ref sqlx_err) = e {
+                            Err(LazyTablesError::ConnectionFailed(
+                                conn.parse_connection_error(sqlx_err),
+                            ))
+                        } else {
+                            Err(e)
+                        }
+                    }
                 }
             }
             DatabaseType::MySQL | DatabaseType::MariaDB => {
@@ -575,13 +585,22 @@ async fn test_connection_from_modal(app: &mut App) {
                 let mut conn = MySqlConnection::new(config);
 
                 match conn.connect().await {
-                    Ok(()) => conn
-                        .test_connection()
-                        .await
-                        .map(|_| "Connection successful!".to_string()),
-                    Err(e) => Err(crate::core::error::LazyTablesError::Connection(format!(
-                        "Connection failed: {e}"
-                    ))),
+                    Ok(()) => {
+                        // Connection succeeded, now test it
+                        conn.test_connection()
+                            .await
+                            .map(|_| "Connection successful!".to_string())
+                    }
+                    Err(e) => {
+                        // Parse error into structured ConnectionError
+                        if let LazyTablesError::Database(ref sqlx_err) = e {
+                            Err(LazyTablesError::ConnectionFailed(
+                                conn.parse_connection_error(sqlx_err),
+                            ))
+                        } else {
+                            Err(e)
+                        }
+                    }
                 }
             }
             DatabaseType::SQLite => {
@@ -589,24 +608,43 @@ async fn test_connection_from_modal(app: &mut App) {
                 let mut conn = SqliteConnection::new(config);
 
                 match conn.connect().await {
-                    Ok(()) => conn
-                        .test_connection()
-                        .await
-                        .map(|_| "Connection successful!".to_string()),
-                    Err(e) => Err(crate::core::error::LazyTablesError::Connection(format!(
-                        "Connection failed: {e}"
-                    ))),
+                    Ok(()) => {
+                        // Connection succeeded, now test it
+                        conn.test_connection()
+                            .await
+                            .map(|_| "Connection successful!".to_string())
+                    }
+                    Err(e) => {
+                        // Parse error into structured ConnectionError
+                        if let LazyTablesError::Database(ref sqlx_err) = e {
+                            Err(LazyTablesError::ConnectionFailed(
+                                conn.parse_connection_error(sqlx_err),
+                            ))
+                        } else {
+                            Err(e)
+                        }
+                    }
                 }
             }
-            _ => Err(crate::core::error::LazyTablesError::Connection(
+            _ => Err(LazyTablesError::Connection(
                 "Database type not yet supported".to_string(),
             )),
         };
 
-        // Send result back to main loop
+        // Send result back to main loop with properly formatted errors
         let event = match result {
             Ok(msg) => TestConnectionEvent::Success(msg),
-            Err(e) => TestConnectionEvent::Failed(e.to_string()),
+            Err(e) => {
+                // Format error for display
+                let error_message = match &e {
+                    LazyTablesError::ConnectionFailed(conn_err) => {
+                        // Use our structured error's formatted display
+                        conn_err.format_for_display()
+                    }
+                    _ => e.to_string(),
+                };
+                TestConnectionEvent::Failed(error_message)
+            }
         };
 
         let _ = tx.send(event);

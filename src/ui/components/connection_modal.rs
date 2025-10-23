@@ -938,7 +938,7 @@ pub fn render_connection_modal(
         .constraints([
             Constraint::Length(2), // Header with keystroke hints (more compact)
             Constraint::Min(0),    // Form fields
-            Constraint::Length(1), // Error/status message area only
+            Constraint::Length(8), // Error/status message area (expanded for multi-line errors)
         ])
         .split(inner_area);
 
@@ -1558,7 +1558,7 @@ fn render_modal_status(
 ) {
     // Render test status or error message
     if let Some(test_status) = &modal_state.test_status {
-        let (message, style) = match test_status {
+        match test_status {
             TestConnectionStatus::Testing => {
                 let dots = match test_animation_frame {
                     0 => "•",
@@ -1566,31 +1566,94 @@ fn render_modal_status(
                     2 => "•••",
                     _ => "•",
                 };
-                (
-                    format!(
-                        "🔄 Testing connection {} {}/{}s",
-                        dots, test_elapsed_seconds, test_timeout_seconds
-                    ),
-                    Style::default()
-                        .fg(Color::Yellow)
-                        .add_modifier(Modifier::BOLD),
-                )
+                let message = format!(
+                    "🔄 Testing connection {} {}/{}s",
+                    dots, test_elapsed_seconds, test_timeout_seconds
+                );
+                let status_paragraph = Paragraph::new(message)
+                    .style(
+                        Style::default()
+                            .fg(Color::Yellow)
+                            .add_modifier(Modifier::BOLD),
+                    )
+                    .alignment(Alignment::Center);
+                f.render_widget(status_paragraph, area);
             }
-            TestConnectionStatus::Success(msg) => (
-                format!("✅ {msg}"),
-                Style::default()
-                    .fg(Color::Green)
-                    .add_modifier(Modifier::BOLD),
-            ),
-            TestConnectionStatus::Failed(msg) => (
-                format!("❌ {msg}"),
-                Style::default().fg(Color::Red).add_modifier(Modifier::BOLD),
-            ),
-        };
-        let status_paragraph = Paragraph::new(message)
-            .style(style)
-            .alignment(Alignment::Center);
-        f.render_widget(status_paragraph, area);
+            TestConnectionStatus::Success(msg) => {
+                let message = format!("✅ {msg}");
+                let status_paragraph = Paragraph::new(message)
+                    .style(
+                        Style::default()
+                            .fg(Color::Green)
+                            .add_modifier(Modifier::BOLD),
+                    )
+                    .alignment(Alignment::Center);
+                f.render_widget(status_paragraph, area);
+            }
+            TestConnectionStatus::Failed(msg) => {
+                // Parse multi-line error message into separate lines
+                let lines: Vec<Line> = msg
+                    .lines()
+                    .map(|line| {
+                        let trimmed = line.trim();
+
+                        // Apply different colors based on content
+                        if trimmed.starts_with("Network Error")
+                            || trimmed.starts_with("Authentication Error")
+                            || trimmed.starts_with("Database Not Found")
+                            || trimmed.starts_with("Configuration Error")
+                            || trimmed.starts_with("SSL Configuration Error")
+                            || trimmed.starts_with("Database Server Error")
+                            || trimmed.starts_with("Unknown Error")
+                        {
+                            // Error category header - red and bold
+                            Line::from(Span::styled(
+                                format!("❌ {}", trimmed),
+                                Style::default().fg(Color::Red).add_modifier(Modifier::BOLD),
+                            ))
+                        } else if trimmed.starts_with("Details:") {
+                            // Details section - gray
+                            Line::from(Span::styled(
+                                trimmed,
+                                Style::default().fg(Color::Gray),
+                            ))
+                        } else if trimmed.starts_with("Error Code:") {
+                            // Error code - cyan
+                            Line::from(Span::styled(
+                                trimmed,
+                                Style::default().fg(Color::Cyan),
+                            ))
+                        } else if trimmed.starts_with("Try the following:") {
+                            // Suggestions header - yellow
+                            Line::from(Span::styled(
+                                trimmed,
+                                Style::default()
+                                    .fg(Color::Yellow)
+                                    .add_modifier(Modifier::BOLD),
+                            ))
+                        } else if trimmed.starts_with(char::is_numeric) {
+                            // Numbered suggestion - white
+                            Line::from(Span::styled(
+                                format!("  {}", trimmed),
+                                Style::default().fg(Color::White),
+                            ))
+                        } else if !trimmed.is_empty() {
+                            // Regular text - light gray
+                            Line::from(Span::styled(
+                                trimmed,
+                                Style::default().fg(Color::Rgb(200, 200, 200)),
+                            ))
+                        } else {
+                            // Empty line
+                            Line::from("")
+                        }
+                    })
+                    .collect();
+
+                let error_paragraph = Paragraph::new(lines).alignment(Alignment::Left);
+                f.render_widget(error_paragraph, area);
+            }
+        }
     } else if let Some(error) = &modal_state.error_message {
         let error_paragraph = Paragraph::new(format!("❗ {error}"))
             .style(Style::default().fg(Color::Red).add_modifier(Modifier::BOLD))
