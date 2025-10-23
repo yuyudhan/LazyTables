@@ -196,3 +196,30 @@ pub(crate) async fn handle_table_delete_confirmation(app: &mut App, key: KeyEven
     }
     Ok(())
 }
+
+/// Handle set NULL confirmation keys
+pub(crate) async fn handle_set_null_confirmation(app: &mut App, key: KeyEvent) -> Result<()> {
+    if let Some(confirmation) = &app.state.table_viewer_state.set_null_confirmation {
+        match key.code {
+            KeyCode::Enter | KeyCode::Char('y') | KeyCode::Char('Y') => {
+                let confirmation = confirmation.clone();
+                if let Err(e) = app.state.set_cell_to_null(confirmation).await {
+                    app.state
+                        .toast_manager
+                        .error(format!("Failed to set NULL: {e}"));
+                } else {
+                    app.state.toast_manager.success("Cell set to NULL successfully");
+                    let tab_idx = app.state.table_viewer_state.active_tab;
+                    let _ = app.state.load_table_data(tab_idx).await;
+                }
+                app.state.table_viewer_state.set_null_confirmation = None;
+            }
+            KeyCode::Esc | KeyCode::Char('n') | KeyCode::Char('N') => {
+                app.state.table_viewer_state.set_null_confirmation = None;
+                app.state.toast_manager.info("Set NULL cancelled");
+            }
+            _ => {}
+        }
+    }
+    Ok(())
+}

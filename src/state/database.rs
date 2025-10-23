@@ -6,7 +6,7 @@ use crate::{
         ConnectionConfig, ConnectionStatus, DatabaseObjectList, DatabaseType, TableMetadata,
     },
     ui::components::{
-        table_viewer::{CellUpdate, ColumnInfo, DeleteConfirmation},
+        table_viewer::{CellUpdate, ColumnInfo, DeleteConfirmation, SetNullConfirmation},
         TableViewerState,
     },
 };
@@ -351,6 +351,41 @@ impl DatabaseState {
         }
     }
 
+    /// Set a cell to NULL in the database using persistent ConnectionManager
+    pub async fn set_cell_to_null(
+        &mut self,
+        confirmation: SetNullConfirmation,
+        selected_connection: usize,
+        connection_manager: &crate::database::ConnectionManager,
+    ) -> Result<(), String> {
+        // Get the current connection
+        if let Some(connection) = self
+            .connections
+            .connections
+            .get(selected_connection)
+            .cloned()
+        {
+            match &connection.status {
+                ConnectionStatus::Connected => {
+                    // Set NULL based on database type
+                    match connection.database_type {
+                        DatabaseType::PostgreSQL => {
+                            self.set_postgres_cell_to_null(&connection, confirmation, connection_manager)
+                                .await
+                        }
+                        _ => Err(format!(
+                            "Database type {} not yet supported for setting NULL",
+                            connection.database_type.display_name()
+                        )),
+                    }
+                }
+                _ => Err("No active database connection".to_string()),
+            }
+        } else {
+            Err("No connection selected".to_string())
+        }
+    }
+
     /// Delete a row in PostgreSQL using persistent ConnectionManager
     async fn delete_postgres_row(
         &self,
@@ -385,6 +420,45 @@ impl DatabaseState {
             .execute_raw_query(&connection.id, &sql)
             .await
             .map_err(|e| format!("Failed to delete row: {e}"))?;
+
+        Ok(())
+    }
+
+    /// Set a cell to NULL in PostgreSQL using persistent ConnectionManager
+    async fn set_postgres_cell_to_null(
+        &self,
+        connection: &ConnectionConfig,
+        confirmation: SetNullConfirmation,
+        connection_manager: &crate::database::ConnectionManager,
+    ) -> Result<(), String> {
+        // Ensure we have a persistent connection
+        connection_manager
+            .connect(connection)
+            .await
+            .map_err(|e| format!("Failed to ensure connection: {e}"))?;
+
+        // Build UPDATE SQL to set NULL
+        let mut where_clauses = Vec::new();
+        for (pk_col, pk_val) in &confirmation.primary_key_values {
+            where_clauses.push(format!("{pk_col} = '{pk_val}'"));
+        }
+
+        if where_clauses.is_empty() {
+            return Err("Cannot update cell without primary key".to_string());
+        }
+
+        let sql = format!(
+            "UPDATE {} SET {} = NULL WHERE {}",
+            confirmation.table_name,
+            confirmation.column_name,
+            where_clauses.join(" AND ")
+        );
+
+        // Execute the update query using persistent connection
+        connection_manager
+            .execute_raw_query(&connection.id, &sql)
+            .await
+            .map_err(|e| format!("Failed to set cell to NULL: {e}"))?;
 
         Ok(())
     }

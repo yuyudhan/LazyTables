@@ -1826,6 +1826,20 @@ impl AppState {
             .await
     }
 
+    /// Set a cell to NULL in the database
+    pub async fn set_cell_to_null(
+        &mut self,
+        confirmation: crate::ui::components::table_viewer::SetNullConfirmation,
+    ) -> Result<(), String> {
+        self.db
+            .set_cell_to_null(
+                confirmation,
+                self.ui.selected_connection,
+                &self.connection_manager,
+            )
+            .await
+    }
+
     /// Reload current table tab data
     pub async fn reload_current_table_tab(&mut self) -> Result<(), String> {
         if let Some(tab_idx) = self

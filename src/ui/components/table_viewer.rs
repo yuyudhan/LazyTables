@@ -533,6 +533,7 @@ pub struct TableViewerState {
     pub active_tab: usize,
     pub show_help: bool,
     pub delete_confirmation: Option<DeleteConfirmation>,
+    pub set_null_confirmation: Option<SetNullConfirmation>,
     pub last_d_press: Option<std::time::Instant>,
     pub last_y_press: Option<std::time::Instant>,
 }
@@ -545,6 +546,18 @@ pub struct DeleteConfirmation {
     pub primary_key_values: Vec<(String, String)>,
 }
 
+/// Set NULL confirmation dialog state
+#[derive(Debug, Clone)]
+pub struct SetNullConfirmation {
+    pub row_index: usize,
+    pub col_index: usize,
+    pub table_name: String,
+    pub column_name: String,
+    pub is_nullable: bool,
+    pub current_value: String,
+    pub primary_key_values: Vec<(String, String)>,
+}
+
 impl TableViewerState {
     pub fn new() -> Self {
         Self {
@@ -552,6 +565,7 @@ impl TableViewerState {
             active_tab: 0,
             show_help: false,
             delete_confirmation: None,
+            set_null_confirmation: None,
             last_d_press: None,
             last_y_press: None,
         }
@@ -654,6 +668,29 @@ impl TableViewerState {
         }
     }
 
+    /// Copy current cell to clipboard (raw value)
+    pub fn copy_cell(&self) -> Result<(), String> {
+        if let Some(tab) = self.current_tab() {
+            if tab.rows.is_empty() {
+                return Err("No data in table".to_string());
+            }
+
+            // Get the current cell value (including any modifications)
+            let cell_value = tab.get_cell_value(tab.selected_row, tab.selected_col);
+
+            // Copy to clipboard
+            let mut clipboard = arboard::Clipboard::new()
+                .map_err(|e| format!("Failed to access clipboard: {e}"))?;
+            clipboard
+                .set_text(cell_value)
+                .map_err(|e| format!("Failed to copy to clipboard: {e}"))?;
+
+            Ok(())
+        } else {
+            Err("No table open".to_string())
+        }
+    }
+
     /// Prepare delete confirmation for current row
     pub fn prepare_delete_confirmation(&mut self) -> Option<DeleteConfirmation> {
         if let Some(tab) = self.current_tab() {
@@ -678,6 +715,55 @@ impl TableViewerState {
                 Some(DeleteConfirmation {
                     row_index: tab.selected_row,
                     table_name: tab.table_name.clone(),
+                    primary_key_values,
+                })
+            } else {
+                None
+            }
+        } else {
+            None
+        }
+    }
+
+    /// Prepare set NULL confirmation for current cell
+    pub fn prepare_set_null_confirmation(&mut self) -> Option<SetNullConfirmation> {
+        if let Some(tab) = self.current_tab() {
+            if tab.selected_row < tab.rows.len() && tab.selected_col < tab.columns.len() {
+                // Get the column info
+                let column = &tab.columns[tab.selected_col];
+
+                // Check if column is nullable
+                if !column.is_nullable {
+                    return None;
+                }
+
+                // Get current cell value
+                let current_value = tab.get_cell_value(tab.selected_row, tab.selected_col);
+
+                // Get primary key values for the row
+                let mut primary_key_values = Vec::new();
+                for &pk_idx in &tab.primary_key_columns {
+                    if let Some(pk_col) = tab.columns.get(pk_idx) {
+                        if let Some(row) = tab.rows.get(tab.selected_row) {
+                            if let Some(value) = row.get(pk_idx) {
+                                primary_key_values.push((pk_col.name.clone(), value.clone()));
+                            }
+                        }
+                    }
+                }
+
+                if primary_key_values.is_empty() {
+                    // Can't update without primary key
+                    return None;
+                }
+
+                Some(SetNullConfirmation {
+                    row_index: tab.selected_row,
+                    col_index: tab.selected_col,
+                    table_name: tab.table_name.clone(),
+                    column_name: column.name.clone(),
+                    is_nullable: column.is_nullable,
+                    current_value,
                     primary_key_values,
                 })
             } else {
@@ -744,6 +830,11 @@ pub fn render_table_viewer(
     // Render delete confirmation dialog if active
     if let Some(confirmation) = &state.delete_confirmation {
         render_delete_confirmation(f, confirmation, f.area(), theme);
+    }
+
+    // Render set NULL confirmation dialog if active
+    if let Some(confirmation) = &state.set_null_confirmation {
+        render_set_null_confirmation(f, confirmation, f.area(), theme);
     }
 }
 
@@ -823,6 +914,136 @@ fn render_delete_confirmation(
                     .add_modifier(Modifier::BOLD),
             ),
             Span::styled("?", Style::default().fg(Color::White).bg(solid_bg)),
+        ]),
+        Line::from(""),
+        Line::from("─────────────────")
+            .fg(Color::Gray)
+            .bg(solid_bg)
+            .centered(),
+        Line::from(vec![
+            Span::styled(
+                "[Y/Enter] ",
+                Style::default()
+                    .fg(Color::Green)
+                    .bg(solid_bg)
+                    .add_modifier(Modifier::BOLD),
+            ),
+            Span::styled(
+                "Confirm  ",
+                Style::default().fg(Color::White).bg(solid_bg),
+            ),
+            Span::styled(
+                "[N/Esc] ",
+                Style::default()
+                    .fg(Color::Red)
+                    .bg(solid_bg)
+                    .add_modifier(Modifier::BOLD),
+            ),
+            Span::styled("Cancel", Style::default().fg(Color::White).bg(solid_bg)),
+        ]),
+    ];
+
+    let paragraph = Paragraph::new(lines)
+        .alignment(Alignment::Center)
+        .style(Style::default().bg(solid_bg))
+        .wrap(Wrap { trim: false });
+
+    f.render_widget(paragraph, inner_area);
+}
+
+fn render_set_null_confirmation(
+    f: &mut Frame,
+    confirmation: &SetNullConfirmation,
+    area: Rect,
+    theme: &Theme,
+) {
+    use ratatui::style::Color;
+
+    // Create a compact centered modal
+    let modal_width = 60u16.min(area.width - 4);
+    let modal_height = 9;
+    let x = (area.width.saturating_sub(modal_width)) / 2;
+    let y = (area.height.saturating_sub(modal_height)) / 2;
+
+    let modal_area = Rect {
+        x,
+        y,
+        width: modal_width,
+        height: modal_height,
+    };
+
+    // Clear the area behind the modal for better visibility
+    f.render_widget(Clear, modal_area);
+
+    // Use a solid, darker background for better visibility
+    let solid_bg = Color::Rgb(20, 20, 30); // Dark blue-gray
+
+    // Create the modal content with proper spacing
+    let inner_block = Block::default()
+        .borders(Borders::ALL)
+        .title(" ⚠ Set NULL Confirmation ")
+        .title_alignment(Alignment::Center)
+        .border_style(
+            Style::default()
+                .fg(theme.get_color("warning"))
+                .add_modifier(Modifier::BOLD),
+        )
+        .style(Style::default().bg(solid_bg));
+
+    f.render_widget(inner_block, modal_area);
+
+    // Calculate inner area for content
+    let inner_area = Rect {
+        x: modal_area.x + 2,
+        y: modal_area.y + 1,
+        width: modal_area.width.saturating_sub(4),
+        height: modal_area.height.saturating_sub(2),
+    };
+
+    // Truncate current value if too long
+    let display_value = if confirmation.current_value.len() > 30 {
+        format!("{}...", &confirmation.current_value[..27])
+    } else {
+        confirmation.current_value.clone()
+    };
+
+    // Build the content lines with proper formatting
+    let lines = vec![
+        Line::from(""),
+        Line::from(vec![
+            Span::styled(
+                "Set column ",
+                Style::default().fg(Color::White).bg(solid_bg),
+            ),
+            Span::styled(
+                format!("'{}'", confirmation.column_name),
+                Style::default()
+                    .fg(Color::Cyan)
+                    .bg(solid_bg)
+                    .add_modifier(Modifier::BOLD),
+            ),
+            Span::styled(" to ", Style::default().fg(Color::White).bg(solid_bg)),
+            Span::styled(
+                "NULL",
+                Style::default()
+                    .fg(Color::Yellow)
+                    .bg(solid_bg)
+                    .add_modifier(Modifier::BOLD),
+            ),
+            Span::styled("?", Style::default().fg(Color::White).bg(solid_bg)),
+        ]),
+        Line::from(vec![
+            Span::styled(
+                "Current value: ",
+                Style::default().fg(Color::Gray).bg(solid_bg),
+            ),
+            Span::styled(
+                format!("'{}'", display_value),
+                Style::default()
+                    .fg(Color::White)
+                    .bg(solid_bg)
+                    .add_modifier(Modifier::ITALIC),
+            ),
         ]),
         Line::from(""),
         Line::from("─────────────────")
@@ -1532,6 +1753,15 @@ fn render_help(f: &mut Frame, area: Rect, theme: &Theme) {
                     .add_modifier(Modifier::BOLD),
             ),
             Span::raw("H - Previous tab | L - Next tab | x - Close current tab"),
+        ]),
+        Line::from(vec![
+            Span::styled(
+                "Copy: ",
+                Style::default()
+                    .fg(theme.get_color("primary_highlight"))
+                    .add_modifier(Modifier::BOLD),
+            ),
+            Span::raw("yy - Copy row (CSV) | yc - Copy cell"),
         ]),
         Line::from(vec![
             Span::styled(

@@ -65,8 +65,67 @@ pub(crate) async fn handle(app: &mut App, key: KeyEvent) -> Result<()> {
             } else {
                 // First 'd' press - record timestamp
                 app.state.table_viewer_state.last_d_press = Some(now);
-                app.state.toast_manager.info("Press 'd' again to delete row");
+                app.state.toast_manager.info("Press 'd' again to delete row, or 'c' to set NULL");
             }
+        }
+        // 'c' - Set cell to NULL (after 'd' press) or Copy cell (after 'y' press)
+        KeyCode::Char('c') => {
+            let now = std::time::Instant::now();
+
+            // Check for 'yc' sequence - copy cell
+            let should_copy_cell = if let Some(last_press) = app.state.table_viewer_state.last_y_press {
+                // Check if within 500ms window after 'y' press
+                now.duration_since(last_press).as_millis() < 500
+            } else {
+                false
+            };
+
+            // Check for 'dc' sequence - set NULL
+            let should_set_null = if let Some(last_press) = app.state.table_viewer_state.last_d_press {
+                // Check if within 500ms window after 'd' press
+                now.duration_since(last_press).as_millis() < 500
+            } else {
+                false
+            };
+
+            if should_copy_cell {
+                // 'yc' sequence detected - copy cell to clipboard
+                match app.state.table_viewer_state.copy_cell() {
+                    Ok(()) => {
+                        app.state.toast_manager.success("Cell copied to clipboard");
+                    }
+                    Err(e) => {
+                        app.state.toast_manager.error(format!("Failed to copy cell: {e}"));
+                    }
+                }
+                // Reset the last press
+                app.state.table_viewer_state.last_y_press = None;
+            } else if should_set_null {
+                // 'dc' sequence detected - prepare set NULL confirmation
+                if let Some(confirmation) = app.state.table_viewer_state.prepare_set_null_confirmation() {
+                    app.state.table_viewer_state.set_null_confirmation = Some(confirmation);
+                } else {
+                    // Check why we can't set NULL
+                    if let Some(tab) = app.state.table_viewer_state.current_tab() {
+                        if tab.selected_col < tab.columns.len() {
+                            let column = &tab.columns[tab.selected_col];
+                            if !column.is_nullable {
+                                app.state.toast_manager.error(format!(
+                                    "Cannot set NULL: column '{}' is NOT NULL",
+                                    column.name
+                                ));
+                            } else if tab.primary_key_columns.is_empty() {
+                                app.state.toast_manager.error("Cannot set NULL: no primary key found");
+                            } else {
+                                app.state.toast_manager.error("Cannot set NULL on current cell");
+                            }
+                        }
+                    }
+                }
+                // Reset the last press
+                app.state.table_viewer_state.last_d_press = None;
+            }
+            // If 'c' pressed without prior 'd' or 'y', do nothing (ignore)
         }
         // 'y' - Copy current row (double-tap within 500ms)
         KeyCode::Char('y') => {
@@ -93,7 +152,7 @@ pub(crate) async fn handle(app: &mut App, key: KeyEvent) -> Result<()> {
             } else {
                 // First 'y' press - record timestamp
                 app.state.table_viewer_state.last_y_press = Some(now);
-                app.state.toast_manager.info("Press 'y' again to copy row");
+                app.state.toast_manager.info("Press 'y' again to copy row, or 'c' to copy cell");
             }
         }
         // '/' - Enter search mode

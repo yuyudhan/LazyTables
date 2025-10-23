@@ -255,6 +255,11 @@ impl App {
             return handlers::overlays::handle_table_delete_confirmation(self, key).await;
         }
 
+        // 4b. Handle table viewer set NULL confirmation
+        if self.state.table_viewer_state.set_null_confirmation.is_some() {
+            return handlers::overlays::handle_set_null_confirmation(self, key).await;
+        }
+
         // 5. Route to focused pane handler (main view)
         match self.state.ui.focused_pane {
             FocusedPane::Connections => handlers::connections::handle(self, key).await,
