@@ -207,10 +207,17 @@ make clean            # Clean build artifacts and target/ directory
 
 #### [4] Query Results / Table Viewer (Has Edit Mode)
 - **i** or **Enter** → Start editing current cell
-- **d** → Delete current row (with confirmation)
+- **dd** → Delete current row (double-tap within 500ms, with confirmation)
+- **yy** → Copy entire row to clipboard (double-tap within 500ms, CSV format)
+- **yc** → Copy current cell to clipboard (raw value)
+- **dc** → Set current cell to NULL (with confirmation)
 - **/** → Enter search mode
 - **h/j/k/l** or **arrows** → Navigate cells
-- **Ctrl+r** → Refresh table data
+- **t** → Toggle between Data and Schema view
+- **Ctrl+d/u** → Page down/up
+- **gg/G** → Jump to first/last row
+- **0/$** → Jump to first/last column
+- **Ctrl+r** or **r** → Refresh table data
 - **ESC** → Exit edit/search mode
 
 #### [5] SQL Query Editor (VIM-STYLE - Only Pane with Insert Mode)
