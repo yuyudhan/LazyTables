@@ -1,10 +1,8 @@
 ====================****====================
-DONE:
-pressing yy should copy the row.
-pressing yc should copy the cell.
+Pressing yy should copy the row.
+Pressing yc should copy the cell.
 
 ====================****====================
-DONE:
-Pressing dd should initiate deletion of row. confirmation needed
-pressing DD should initiate cascaded deletion of row. confirmation needed.
+Pressing dd should initiate deletion of row. Confirmation needed.
+Pressing DD should initiate cascaded deletion of row. Confirmation needed.
 
