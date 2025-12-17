@@ -6,3 +6,45 @@ Pressing yc should copy the cell.
 Pressing dd should initiate deletion of row. Confirmation needed.
 Pressing DD should initiate cascaded deletion of row. Confirmation needed.
 
+There should be some key to remove the content of the current cell because I want to delete everything so if the content is very long I have to press backspace many times after pressing I in the cell so this should be fixed
+
+====================****====================
+create and validate the SQL editor to have all the basic functionalities like pressing small 'o' to add a line below and enter insert mode there, press capital 'O' to add a line above and enter insert mode. The double 'd' should also work to delete the line. All basic Vim commands should be present and functioning one by one.
+
+## Insert Mode
+- `i` - Insert before cursor
+- `I` - Insert at beginning of line
+- `a` - Insert after cursor
+- `A` - Insert at end of line
+- `o` - Open new line below, enter insert mode
+- `O` - Open new line above, enter insert mode
+
+## Delete
+- `x` - Delete character under cursor
+- `dd` - Delete entire line
+- `D` - Delete from cursor to end of line
+
+## Navigation
+- `h` - Move left
+- `j` - Move down
+- `k` - Move up
+- `l` - Move right
+- `w` - Move to next word
+- `b` - Move to previous word
+- `0` - Move to start of line
+- `$` - Move to end of line
+- `gg` - Go to first line
+- `G` - Go to last line
+
+## Copy/Paste
+- `yy` - Copy line
+- `p` - Paste after
+- `P` - Paste before
+
+## Visual Mode
+- `v` - Enter visual mode
+- `V` - Enter visual line mode
+
+## Other
+- `ESC` - Exit to normal mode
+
