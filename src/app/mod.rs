@@ -447,19 +447,8 @@ impl App {
             }
         }
 
-        // Perform connection health check every 100 ticks (approximately every 25 seconds with 250ms intervals)
-        if self.tick_counter % 100 == 0 {
-            // Only check health if we have an active connection
-            if let Some(connection) = self.state.get_selected_connection() {
-                if matches!(
-                    connection.status,
-                    crate::database::ConnectionStatus::Connected
-                ) {
-                    // Perform health check in background - don't await to avoid blocking UI
-                    let _ = self.state.check_connection_health().await;
-                }
-            }
-        }
+        // Periodic connection health checks removed to reduce CPU/battery usage when idle
+        // Connections are checked lazily when operations are performed on them
 
         Ok(())
     }
