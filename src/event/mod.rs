@@ -3,7 +3,7 @@
 use crate::core::error::{Error, Result};
 use crossterm::event::{self, Event as CrosstermEvent, KeyEvent, MouseEvent};
 use std::{
-    sync::mpsc::{self, Receiver},
+    sync::mpsc::{self, Receiver, RecvTimeoutError},
     thread,
     time::Duration,
 };
@@ -36,10 +36,19 @@ impl EventHandler {
             let mut last_tick = std::time::Instant::now();
 
             loop {
-                let timeout = tick_rate
-                    .checked_sub(last_tick.elapsed())
-                    .unwrap_or_else(|| Duration::from_secs(0));
+                // Calculate remaining time until next tick
+                let timeout = tick_rate.saturating_sub(last_tick.elapsed());
 
+                // If tick is due, send it immediately without polling for events
+                if timeout.is_zero() {
+                    if sender.send(Event::Tick).is_err() {
+                        break;
+                    }
+                    last_tick = std::time::Instant::now();
+                    continue;
+                }
+
+                // Poll for events with remaining time until next tick
                 if event::poll(timeout).unwrap_or(false) {
                     match event::read() {
                         Ok(CrosstermEvent::Key(key)) => {
@@ -61,6 +70,7 @@ impl EventHandler {
                     }
                 }
 
+                // Check again if tick is due after processing events
                 if last_tick.elapsed() >= tick_rate {
                     if sender.send(Event::Tick).is_err() {
                         break;
@@ -81,12 +91,14 @@ impl EventHandler {
         Ok(())
     }
 
-    /// Get the next event if available
+    /// Get the next event, blocking with timeout to allow CPU to idle
     pub fn next(&self) -> Result<Option<Event>> {
-        match self.receiver.try_recv() {
+        // Use recv_timeout to block and allow CPU to enter idle states
+        // Timeout matches the tick rate to ensure timely UI updates
+        match self.receiver.recv_timeout(Duration::from_millis(250)) {
             Ok(event) => Ok(Some(event)),
-            Err(mpsc::TryRecvError::Empty) => Ok(None),
-            Err(mpsc::TryRecvError::Disconnected) => {
+            Err(RecvTimeoutError::Timeout) => Ok(None),
+            Err(RecvTimeoutError::Disconnected) => {
                 Err(Error::Event("Event handler disconnected".to_string()))
             }
         }
