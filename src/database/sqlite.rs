@@ -880,18 +880,5 @@ impl crate::database::connection_manager::ManagedConnection for SqliteConnection
     }
 }
 
-/// Implement Drop trait to ensure clean connection cleanup
-impl Drop for SqliteConnection {
-    fn drop(&mut self) {
-        if let Some(pool) = self.pool.take() {
-            // Try to close the pool asynchronously if we're in a tokio runtime context
-            // If not, the pool will be closed when it's dropped
-            if let Ok(handle) = tokio::runtime::Handle::try_current() {
-                handle.spawn(async move {
-                    pool.close().await;
-                });
-            }
-            // If no runtime is available, the pool's own Drop implementation will handle cleanup
-        }
-    }
-}
+// Drop implementation removed - connection pools are closed explicitly via disconnect() method
+// to avoid spawning background tasks that may not complete before app shutdown

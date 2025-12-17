@@ -1235,17 +1235,8 @@ impl crate::database::connection_manager::ManagedConnection for PostgresConnecti
     }
 }
 
-/// Implement Drop trait to ensure clean connection cleanup
-impl Drop for PostgresConnection {
-    fn drop(&mut self) {
-        if let Some(pool) = self.pool.take() {
-            // Close the pool asynchronously when the connection is dropped
-            tokio::spawn(async move {
-                pool.close().await;
-            });
-        }
-    }
-}
+// Drop implementation removed - connection pools are closed explicitly via close() method
+// to avoid spawning background tasks that may not complete before app shutdown
 
 /// Extract a PostgreSQL value from a row and column, handling different data types robustly
 fn extract_postgres_value(row: &sqlx::postgres::PgRow, col: &sqlx::postgres::PgColumn) -> String {
