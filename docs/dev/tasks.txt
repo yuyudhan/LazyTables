@@ -12,6 +12,7 @@ So there is something called cargo binstall. This installs the prebuilt binaries
 =======================================
 =======================================
 =======================================
+DONE:
 In the SQL Editor we have VIM modes active. In that VIM mode I want you to implement pressing X in normal mode to delete the character under cursor.
 
 =======================================

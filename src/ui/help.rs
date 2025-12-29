@@ -659,6 +659,13 @@ impl HelpSystem {
         Self::add_command(lines, "g/G", "File start/File end (gg for start)");
         lines.push(Line::from(""));
 
+        lines.push(Line::from(vec![
+            Span::styled("  ✂️ ", Style::default().fg(Color::Red)),
+            Span::raw("Text Deletion (Normal Mode):"),
+        ]));
+        Self::add_command(lines, "x", "Delete character under cursor");
+        lines.push(Line::from(""));
+
         // Insert Mode Features
         lines.push(Line::from(vec![Span::styled(
             "✏️ Insert Mode Features",

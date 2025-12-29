@@ -95,6 +95,12 @@ pub(crate) async fn handle(app: &mut App, key: KeyEvent) -> Result<()> {
         KeyCode::Char('G') => {
             app.state.query_editor.move_to_file_end();
         }
+        // 'x' - Delete character under cursor (vim motion)
+        KeyCode::Char('x') => {
+            app.state.query_editor.delete_char_under_cursor();
+            app.state.query_content = app.state.query_editor.get_content().to_string();
+            app.state.ui.query_modified = true;
+        }
         // ':' - Enter command mode
         KeyCode::Char(':') => {
             app.state.query_editor.enter_command_mode();
