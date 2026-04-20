@@ -1,5 +1,8 @@
 // FilePath: src/cli/theme_commands.rs
 
+// CLI subcommands for theme management: list, install, export, and dirs.
+// These run outside the TUI and print directly to stdout.
+
 use crate::ui::theme::ThemeLoader;
 use clap::Subcommand;
 use std::path::PathBuf;

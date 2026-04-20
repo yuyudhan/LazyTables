@@ -1,5 +1,8 @@
 // FilePath: src/event/mod.rs
 
+// Terminal event handler running on a dedicated thread. Polls crossterm for key,
+// mouse, and resize events and sends them over an mpsc channel to the main loop.
+
 use crate::core::error::{Error, Result};
 use crossterm::event::{self, Event as CrosstermEvent, KeyEvent, MouseEvent};
 use std::{

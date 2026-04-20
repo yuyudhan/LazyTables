@@ -1,5 +1,9 @@
 // FilePath: src/ui/mod.rs
 
+// Main UI module responsible for rendering the six-pane layout.
+// Orchestrates drawing of all panes, overlays, status bar, and contextual messages.
+// Delegates to specialized components in src/ui/components/ for complex widgets.
+
 use crate::{
     app::{AppState, FocusedPane},
     config::Config,

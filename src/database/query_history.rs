@@ -1,5 +1,9 @@
 // FilePath: src/database/query_history.rs
 
+// Persists SQL query history in a local SQLite database (~/.lazytables/).
+// Supports filtering by database type, text search, deduplication, and
+// cleanup of old entries.
+
 use crate::core::error::{LazyTablesError, Result};
 use crate::database::DatabaseType;
 use chrono::{DateTime, Utc};

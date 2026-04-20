@@ -1,5 +1,8 @@
 // FilePath: src/ui/theme/loader.rs
 
+// Discovers and loads TOML theme files from config, data, system, and bundled
+// directories. Also supports installing and exporting themes.
+
 use super::{Theme, ThemeManager};
 use std::fs;
 use std::path::{Path, PathBuf};

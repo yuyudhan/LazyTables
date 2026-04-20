@@ -1,6 +1,7 @@
-// FilePath: src/app/state/sql_files.rs
-//
-// SQL file operations
+// FilePath: src/app/state_new/sql_files.rs
+
+// SQL file browser state operations on AppState.
+// Will contain methods for listing, loading, saving, and managing saved SQL files.
 
 use crate::app::state::AppState;
 

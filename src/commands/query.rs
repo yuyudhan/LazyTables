@@ -1,5 +1,8 @@
 // FilePath: src/commands/query.rs
 
+// SQL query execution and management commands: execute, save, and create new queries.
+// Includes database-specific syntax validation for PostgreSQL, MySQL, and SQLite.
+
 use super::{Command, CommandAction, CommandCategory, CommandContext, CommandId, CommandResult};
 use crate::core::error::Result;
 use crate::database::DatabaseType;

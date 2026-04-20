@@ -1,6 +1,6 @@
 // FilePath: src/themes/mod.rs
 
-// This module is deprecated in favor of src/ui/theme/mod.rs
-// Keeping it for compatibility but redirecting to the new theme module
+// Deprecated compatibility shim. Redirects all theme types to src/ui/theme/mod.rs
+// which is now the canonical location for the theme system.
 
 pub use crate::ui::theme::*;

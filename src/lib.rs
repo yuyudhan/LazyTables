@@ -1,5 +1,8 @@
 // FilePath: src/lib.rs
 
+// Crate root that re-exports all public modules and commonly used types.
+// The prelude module provides convenient imports for internal use.
+
 pub mod app;
 pub mod cli;
 pub mod commands;

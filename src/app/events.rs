@@ -1,9 +1,7 @@
 // FilePath: src/app/events.rs
 
-//! Background task events system
-//!
-//! This module provides event types for communicating between background async tasks
-//! and the main UI thread, preventing UI freezes during long-running operations.
+// Background task event types for communicating between async operations
+// and the main UI thread, preventing UI freezes during long-running operations.
 
 use crate::database::{DatabaseObjectList, TableMetadata};
 
@@ -23,9 +21,7 @@ pub enum AppEvent {
     },
 
     /// Disconnect completed
-    DisconnectComplete {
-        connection_id: String,
-    },
+    DisconnectComplete { connection_id: String },
 
     /// File save operation completed
     FileSaveComplete {
@@ -40,9 +36,7 @@ pub enum AppEvent {
     },
 
     /// SQL files list loaded
-    SqlFilesLoaded {
-        files: Vec<String>,
-    },
+    SqlFilesLoaded { files: Vec<String> },
 
     /// Connection refresh completed
     ConnectionsRefreshComplete {

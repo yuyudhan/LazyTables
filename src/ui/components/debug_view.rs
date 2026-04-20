@@ -1,5 +1,8 @@
 // FilePath: src/ui/components/debug_view.rs
 
+// Live debug log viewer overlay toggled with Ctrl+B.
+// Displays structured tracing messages with level filtering and scrollable output.
+
 use crate::{logging::DebugMessage, ui::theme::Theme};
 use ratatui::{
     layout::{Alignment, Constraint, Direction, Layout, Rect},

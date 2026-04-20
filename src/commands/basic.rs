@@ -1,5 +1,8 @@
 // FilePath: src/commands/basic.rs
 
+// Basic application commands: quit, help, save, and open.
+// These are general-purpose commands available globally regardless of focused pane.
+
 use super::{Command, CommandAction, CommandCategory, CommandContext, CommandId, CommandResult};
 use crate::core::error::Result;
 

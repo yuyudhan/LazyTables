@@ -1,5 +1,8 @@
 // FilePath: src/constants.rs
 
+// Application-wide constants such as name and version.
+// Version is pulled from Cargo.toml at compile time.
+
 /// Application version
 pub const VERSION: &str = env!("CARGO_PKG_VERSION");
 

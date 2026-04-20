@@ -1,5 +1,8 @@
 // FilePath: src/state/view.rs
 
+// Defines the application view hierarchy: Main six-pane view vs full-screen overlays
+// (connection form, debug view, help). Also defines TextInputMode for vim-style editing.
+
 use crate::database::ConnectionConfig;
 use serde::{Deserialize, Serialize};
 

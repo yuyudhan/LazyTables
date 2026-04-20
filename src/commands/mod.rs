@@ -1,5 +1,9 @@
 // FilePath: src/commands/mod.rs
 
+// Command pattern implementation for LazyTables. Defines CommandId, Command trait,
+// CommandRegistry, and CommandResult types. All user actions flow through this system
+// for consistent execution, undo/redo support, and shortcut management.
+
 use crate::app::AppState;
 use crate::core::error::Result;
 use std::collections::HashMap;

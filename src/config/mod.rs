@@ -1,5 +1,9 @@
 // FilePath: src/config/mod.rs
 
+// Application configuration loaded from TOML (~/.config/lazytables/config.toml).
+// Manages theme, editor, connection, and keybinding settings. Also handles
+// data directory layout (~/.lazytables/) and initial file scaffolding.
+
 use crate::core::error::Result;
 // Removed directories crate, using dirs crate for home_dir
 use serde::{Deserialize, Serialize};

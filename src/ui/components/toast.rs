@@ -1,5 +1,8 @@
 // FilePath: src/ui/components/toast.rs
 
+// Timed toast notification system for success, error, warning, and info messages.
+// Manages a queue of notifications rendered as overlays with auto-dismiss.
+
 use crate::ui::theme::Theme;
 use ratatui::{
     layout::{Alignment, Rect},

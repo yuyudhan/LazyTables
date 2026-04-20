@@ -1,5 +1,8 @@
 // FilePath: src/ui/components/suggestion_popup.rs
 
+// Floating popup widget that renders the autocomplete suggestion list.
+// Positioned relative to the cursor in the query editor with keyboard navigation.
+
 use ratatui::{
     layout::Rect,
     style::{Color, Modifier, Style},

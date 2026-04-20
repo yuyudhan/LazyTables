@@ -1,5 +1,8 @@
 // FilePath: src/ui/components/sql_suggestions.rs
 
+// SQL autocomplete suggestion engine providing keyword, function, and table completions.
+// Generates context-aware suggestions based on cursor position and database type.
+
 use crate::database::DatabaseType;
 use std::collections::HashMap;
 

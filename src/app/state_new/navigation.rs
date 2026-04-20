@@ -1,6 +1,8 @@
-// FilePath: src/app/state/navigation.rs
-//
-// Navigation and focus management functions
+// FilePath: src/app/state_new/navigation.rs
+
+// Pane focus cycling and cursor movement methods on AppState.
+// Implements directional focus changes (Ctrl+h/j/k/l), Tab cycling,
+// and per-pane up/down/left/right selection with disabled-pane awareness.
 
 use crate::app::state::AppState;
 use crate::state::ui::FocusedPane;

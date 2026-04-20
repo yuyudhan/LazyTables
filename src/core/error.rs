@@ -1,5 +1,9 @@
 // FilePath: src/core/error.rs
 
+// Unified error types for LazyTables using thiserror. Defines LazyTablesError
+// for all failure modes (IO, DB, config, terminal, etc.) and ConnectionError
+// with structured user-friendly messages and recovery suggestions.
+
 use thiserror::Error;
 
 /// Result type alias for LazyTables
@@ -157,7 +161,11 @@ impl ConnectionError {
         let mut output = String::new();
 
         // Error category and message
-        output.push_str(&format!("{}: {}\n", self.error_type.category_name(), self.user_message));
+        output.push_str(&format!(
+            "{}: {}\n",
+            self.error_type.category_name(),
+            self.user_message
+        ));
 
         // Technical details (if different from user message)
         if self.technical_details != self.user_message {

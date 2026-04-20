@@ -1,5 +1,8 @@
 // FilePath: src/ui/layout/mod.rs
 
+// Calculates the six-pane terminal layout: left column (connections, tables, details)
+// and right area (query results, SQL editor, file browser). Enforces minimum terminal size.
+
 use ratatui::layout::{Constraint, Direction, Layout, Rect};
 
 /// Areas for each pane in the layout

@@ -1,5 +1,8 @@
 // FilePath: src/ui/components/mod.rs
 
+// Re-exports all UI component modules used by the main UI renderer.
+// Each component handles rendering and state for a specific widget or overlay.
+
 pub mod connection_modal;
 pub mod connection_mode;
 pub mod debug_view;

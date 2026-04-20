@@ -1,9 +1,7 @@
 // FilePath: src/io/mod.rs
 
-//! Async I/O operations module
-//!
-//! This module provides non-blocking async wrappers for file system operations
-//! to prevent UI freezes in the TUI application.
+// Async I/O operations module. Provides non-blocking file system wrappers
+// using tokio::fs with timeouts to prevent UI freezes.
 
 pub mod async_fs;
 

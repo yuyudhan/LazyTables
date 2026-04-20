@@ -1,6 +1,7 @@
-// FilePath: src/app/state/connections.rs
-//
-// Connection management functions
+// FilePath: src/app/state_new/connections.rs
+
+// Connection management methods on AppState.
+// Handles connection list selection, connect/disconnect lifecycle, and state updates.
 
 use crate::app::state::AppState;
 

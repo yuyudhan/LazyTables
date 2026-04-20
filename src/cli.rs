@@ -1,5 +1,8 @@
 // FilePath: src/cli.rs
 
+// CLI argument parsing using clap. Defines the command-line interface including
+// config path, log level, connection string, and subcommands like theme management.
+
 mod theme_commands;
 
 use clap::{Parser, Subcommand, ValueEnum};

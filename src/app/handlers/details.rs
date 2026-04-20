@@ -1,6 +1,7 @@
 // FilePath: src/app/handlers/details.rs
-//
-// Event handler for the Details pane (read-only scrolling of table metadata)
+
+// Event handler for the Details pane (read-only scrolling of table metadata).
+// Supports j/k navigation, page up/down, and gg/G jumps.
 
 use crate::{app::App, core::error::Result};
 use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
@@ -16,9 +17,7 @@ pub(crate) fn handle(app: &mut App, key: KeyEvent) -> Result<()> {
         }
         KeyCode::Char('d') if key.modifiers == KeyModifiers::CONTROL => {
             // Page down
-            if app.state.ui.details_viewport_offset + 10
-                < app.state.ui.details_max_scroll_offset
-            {
+            if app.state.ui.details_viewport_offset + 10 < app.state.ui.details_max_scroll_offset {
                 app.state.ui.details_viewport_offset += 10;
             } else {
                 app.state.ui.details_viewport_offset = app.state.ui.details_max_scroll_offset;

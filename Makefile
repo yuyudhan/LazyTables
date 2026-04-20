@@ -2,7 +2,7 @@
 
 # LazyTables Development Makefile
 
-.PHONY: help dev build test lint format clean
+.PHONY: help dev build test lint format clean quality fix quick-lint
 
 # Default target
 help:
@@ -23,6 +23,9 @@ help:
 	@echo "  make lint             - Run clippy linter"
 	@echo "  make format           - Format code with rustfmt"
 	@echo "  make check            - Run format check and clippy"
+	@echo "  make quality          - Run full quality check (format, lint, test, build)"
+	@echo "  make quick-lint       - Quick check (format + lint only)"
+	@echo "  make fix              - Auto-fix formatting and lint issues"
 	@echo ""
 	@echo "Cleanup:"
 	@echo "  make clean            - Clean build artifacts"
@@ -55,7 +58,7 @@ test:
 	cargo test --all-features
 
 lint:
-	cargo clippy -- -D warnings
+	cargo clippy --all-targets --all-features -- -D warnings
 
 format:
 	cargo fmt
@@ -65,6 +68,14 @@ format-check:
 
 check: format-check lint
 
+quality:
+	@./scripts/quality.sh
+
+quick-lint:
+	@./scripts/quality.sh --quick
+
+fix:
+	@./scripts/quality.sh --fix
 
 # Cleanup
 clean:

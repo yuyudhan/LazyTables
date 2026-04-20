@@ -1,6 +1,7 @@
 // FilePath: src/app/handlers/query_editor.rs
-//
-// Event handlers for the Query Editor pane (VIM-style SQL editor)
+
+// Event handlers for the Query Editor pane, the only pane with vim-style insert mode.
+// Supports normal/insert/command modes, query execution, and SQL file save/load.
 
 use crate::{app::App, core::error::Result};
 use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};

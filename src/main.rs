@@ -1,5 +1,9 @@
 // FilePath: src/main.rs
 
+// Entry point for the LazyTables application. Parses CLI args, initializes
+// logging, config, and terminal, then launches the main event loop.
+// Handles graceful shutdown and terminal restoration on exit.
+
 use clap::Parser;
 use lazytables::{app::App, cli::Cli, config::Config};
 

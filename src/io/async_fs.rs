@@ -1,10 +1,7 @@
 // FilePath: src/io/async_fs.rs
 
-//! Async file system operations
-//!
-//! This module provides async wrappers around file system operations using tokio::fs
-//! to prevent blocking the UI thread. All operations include timeout handling to
-//! prevent indefinite hangs.
+// Async file system primitives (read, write, mkdir, readdir, exists, remove, rename)
+// backed by tokio::fs. Each operation has a 5-second timeout to prevent hangs.
 
 use crate::core::error::{LazyTablesError, Result};
 use std::path::Path;

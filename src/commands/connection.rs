@@ -1,5 +1,8 @@
 // FilePath: src/commands/connection.rs
 
+// Database connection lifecycle commands: connect, disconnect, add, edit, delete,
+// refresh, and test. Operates on the Connections pane and manages ConnectionManager state.
+
 use super::{
     Command, CommandAction, CommandCategory, CommandContext, CommandId, CommandResult, ModalType,
 };

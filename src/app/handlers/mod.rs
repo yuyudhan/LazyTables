@@ -1,5 +1,5 @@
 // FilePath: src/app/handlers/mod.rs
-//
+
 // Event handler modules for different panes and overlays.
 // Each module contains handler functions that take `&mut App` and `KeyEvent`.
 

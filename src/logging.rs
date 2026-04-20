@@ -1,5 +1,9 @@
 // FilePath: src/logging.rs
 
+// Logging subsystem with dual-mode support: verbose file logging in dev,
+// error-only logging in production. Also provides in-memory log storage
+// for the debug view overlay (Ctrl+B) and convenience logging macros.
+
 use crate::{cli::LogLevel, config::Config, core::error::Result};
 use std::{
     collections::VecDeque,

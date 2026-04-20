@@ -1,5 +1,9 @@
 // FilePath: src/ui/theme/mod.rs
 
+// Theme system: defines Theme and ThemeColors structs with TOML-based loading,
+// hex color parsing, and built-in dark/light themes. ThemeManager handles
+// runtime theme switching and custom theme registration.
+
 mod loader;
 
 pub use loader::ThemeLoader;

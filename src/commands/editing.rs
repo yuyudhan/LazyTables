@@ -1,5 +1,8 @@
 // FilePath: src/commands/editing.rs
 
+// Insert/normal mode toggle commands for the SQL Query Editor pane.
+// Only the Query Editor supports vim-style insert mode; all other panes use direct bindings.
+
 use super::{Command, CommandCategory, CommandContext, CommandId, CommandResult};
 use crate::core::error::Result;
 

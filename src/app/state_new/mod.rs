@@ -1,6 +1,8 @@
-// FilePath: src/app/state/mod.rs
-//
-// Core application state structure and module exports
+// FilePath: src/app/state_new/mod.rs
+
+// Core application state (AppState) and module exports. Aggregates UIState, DatabaseState,
+// query editor, table viewer, toast manager, and connection manager into a single struct.
+// Sub-modules split state logic by domain: connections, modals, navigation, query, sql_files, tables.
 
 use crate::{
     config::Config,

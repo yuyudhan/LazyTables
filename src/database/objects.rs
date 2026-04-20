@@ -1,4 +1,8 @@
-// Database object types and representations
+// FilePath: src/database/objects.rs
+
+// Defines DatabaseObject, DatabaseObjectType, and DatabaseObjectList used to
+// represent tables, views, materialized views, and foreign tables across all
+// database adapters in the tables pane.
 
 use serde::{Deserialize, Serialize};
 

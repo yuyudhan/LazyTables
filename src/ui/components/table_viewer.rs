@@ -1,5 +1,9 @@
 // FilePath: src/ui/components/table_viewer.rs
 
+// Tabbed query results viewer with Data and Schema view modes.
+// Renders tabular data with cell navigation, editing support, and scrollable
+// schema information including columns, indexes, foreign keys, and statistics.
+
 use crate::ui::theme::Theme;
 use ratatui::{
     layout::{Alignment, Constraint, Direction, Layout, Rect},
@@ -928,10 +932,7 @@ fn render_delete_confirmation(
                     .bg(solid_bg)
                     .add_modifier(Modifier::BOLD),
             ),
-            Span::styled(
-                "Confirm  ",
-                Style::default().fg(Color::White).bg(solid_bg),
-            ),
+            Span::styled("Confirm  ", Style::default().fg(Color::White).bg(solid_bg)),
             Span::styled(
                 "[N/Esc] ",
                 Style::default()
@@ -1058,10 +1059,7 @@ fn render_set_null_confirmation(
                     .bg(solid_bg)
                     .add_modifier(Modifier::BOLD),
             ),
-            Span::styled(
-                "Confirm  ",
-                Style::default().fg(Color::White).bg(solid_bg),
-            ),
+            Span::styled("Confirm  ", Style::default().fg(Color::White).bg(solid_bg)),
             Span::styled(
                 "[N/Esc] ",
                 Style::default()
@@ -1441,10 +1439,7 @@ fn render_schema_view(
                     .add_modifier(Modifier::BOLD),
             ),
             Span::raw(" : "),
-            Span::styled(
-                &col.data_type,
-                Style::default().fg(theme.get_color("info")),
-            ),
+            Span::styled(&col.data_type, Style::default().fg(theme.get_color("info"))),
             Span::raw("  "),
             Span::styled(
                 nullable,
@@ -1556,15 +1551,9 @@ fn render_schema_view(
                 if let (Some(on_delete), Some(on_update)) = (&fk.on_delete, &fk.on_update) {
                     lines.push(Line::from(vec![
                         Span::raw("     ON DELETE "),
-                        Span::styled(
-                            on_delete,
-                            Style::default().fg(theme.get_color("warning")),
-                        ),
+                        Span::styled(on_delete, Style::default().fg(theme.get_color("warning"))),
                         Span::raw(" / ON UPDATE "),
-                        Span::styled(
-                            on_update,
-                            Style::default().fg(theme.get_color("warning")),
-                        ),
+                        Span::styled(on_update, Style::default().fg(theme.get_color("warning"))),
                     ]));
                 }
             }

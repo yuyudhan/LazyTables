@@ -1,5 +1,9 @@
 // FilePath: src/security/password.rs
 
+// Handles password encryption, decryption, and resolution from multiple sources
+// (environment variables, encrypted storage, or plain text). Uses AES-256-GCM
+// with Argon2 key derivation for secure at-rest credential storage.
+
 use aes_gcm::{
     aead::{Aead, KeyInit, OsRng},
     Aes256Gcm, Key, Nonce,
@@ -174,7 +178,6 @@ impl PasswordManager {
         Self::create_encrypted(plaintext, encryption_key, hint)
     }
 }
-
 
 #[cfg(test)]
 mod tests {

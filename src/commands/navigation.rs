@@ -1,5 +1,9 @@
 // FilePath: src/commands/navigation.rs
 
+// Pane and cursor navigation commands: directional movement (h/j/k/l),
+// pane cycling (Tab/Shift+Tab), and direct pane focus (number keys).
+// Handles pane-specific cursor behavior and disabled-pane skipping.
+
 use super::{Command, CommandCategory, CommandContext, CommandId, CommandResult};
 use crate::app::FocusedPane;
 use crate::core::error::Result;

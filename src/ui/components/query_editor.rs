@@ -1,5 +1,9 @@
 // FilePath: src/ui/components/query_editor.rs
 
+// Vim-style SQL query editor with syntax highlighting and autocomplete.
+// The only pane with insert/normal mode; supports cursor-based statement execution
+// and integrates with the SQL suggestion engine.
+
 use super::{SqlSuggestionEngine, SuggestionPopup};
 use crate::database::DatabaseType;
 use ratatui::{

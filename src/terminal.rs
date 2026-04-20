@@ -1,5 +1,9 @@
 // FilePath: src/terminal.rs
 
+// Terminal initialization and teardown using crossterm and ratatui.
+// Handles raw mode, alternate screen, and installs a panic hook
+// to restore the terminal on unexpected exits.
+
 use crate::core::error::{Error, Result};
 use crossterm::{
     cursor, execute,

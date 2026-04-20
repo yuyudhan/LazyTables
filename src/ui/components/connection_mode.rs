@@ -1,5 +1,8 @@
 // FilePath: src/ui/components/connection_mode.rs
 
+// Renders the connection form mode selector (connection string vs individual fields).
+// Provides the UI for toggling between input modes during connection setup.
+
 use crate::{
     database::{ConnectionConfig, DatabaseType, SslMode},
     state::view::ConnectionFormMode,

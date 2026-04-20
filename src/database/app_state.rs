@@ -1,5 +1,8 @@
 // FilePath: src/database/app_state.rs
 
+// Local SQLite-backed application state. Tracks the active database connection,
+// connection session history, and per-connection SQL file usage activity.
+
 use crate::config::Config;
 use crate::core::error::Result;
 use serde::{Deserialize, Serialize};

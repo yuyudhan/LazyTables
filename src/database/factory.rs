@@ -1,5 +1,9 @@
 // FilePath: src/database/factory.rs
 
+// Factory for creating database adapter connections. Handles automatic
+// database type detection from connection strings and instantiates the
+// appropriate adapter (Postgres, MySQL, SQLite).
+
 use crate::core::error::{LazyTablesError, Result};
 use crate::database::{
     mysql::MySqlConnection, postgres::PostgresConnection, sqlite::SqliteConnection, Connection,
