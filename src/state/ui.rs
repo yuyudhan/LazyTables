@@ -1,5 +1,9 @@
 // FilePath: src/state/ui.rs
 
+// UI state for the entire application: pane focus, selection indices, scroll offsets,
+// search/filter state, overlay management, and vim-style navigation helpers.
+// Persisted to disk via serde so sessions can be restored.
+
 use ratatui::widgets::ListState;
 use serde::{Deserialize, Serialize};
 use std::fs;
@@ -43,6 +47,8 @@ pub struct SelectableTableItem {
     pub is_selectable: bool,
     /// The index of this item in the display list
     pub display_index: usize,
+    /// If this is a schema header, contains the schema name for expansion toggle
+    pub schema_header_name: Option<String>,
 }
 
 impl SelectableTableItem {
@@ -61,6 +67,7 @@ impl SelectableTableItem {
             object_type,
             is_selectable: true,
             display_index,
+            schema_header_name: None,
         }
     }
 
@@ -73,7 +80,30 @@ impl SelectableTableItem {
             object_type: crate::database::objects::DatabaseObjectType::Table,
             is_selectable: false,
             display_index,
+            schema_header_name: None,
         }
+    }
+
+    /// Create a schema header item (non-selectable, but toggleable)
+    pub fn new_schema_header(
+        display_name: String,
+        schema_name: String,
+        display_index: usize,
+    ) -> Self {
+        Self {
+            display_name,
+            object_name: String::new(),
+            schema: Some(schema_name.clone()),
+            object_type: crate::database::objects::DatabaseObjectType::Table,
+            is_selectable: false,
+            display_index,
+            schema_header_name: Some(schema_name),
+        }
+    }
+
+    /// Check if this is a schema header
+    pub fn is_schema_header(&self) -> bool {
+        self.schema_header_name.is_some()
     }
 
     /// Get the qualified name for database operations
@@ -793,6 +823,27 @@ impl UIState {
         self.expanded_schemas.contains(schema_name)
     }
 
+    /// Expand all schemas and their default object groups (Tables, Views)
+    /// Called on initial connection to multi-schema database
+    pub fn expand_all_schemas(&mut self, schemas: &[String]) {
+        for schema in schemas {
+            self.expanded_schemas.insert(schema.clone());
+            // Also expand Tables and Views groups within each schema
+            self.expanded_object_groups
+                .insert(format!("schema:{}:Tables", schema));
+            self.expanded_object_groups
+                .insert(format!("schema:{}:Views", schema));
+        }
+    }
+
+    /// Clear all schema expansions (for when switching connections)
+    pub fn clear_schema_expansions(&mut self) {
+        self.expanded_schemas.clear();
+        // Remove schema-specific group expansions but keep global ones
+        self.expanded_object_groups
+            .retain(|key| !key.starts_with("schema:"));
+    }
+
     /// Toggle expansion state of an object group (Tables, Views, etc.)
     pub fn toggle_object_group_expansion(&mut self, group_name: &str) {
         if self.expanded_object_groups.contains(group_name) {
@@ -808,143 +859,66 @@ impl UIState {
     }
 
     /// Build the selectable table items list from database objects
+    /// When multiple schemas exist, groups items by schema first, then by object type
+    /// When only one schema exists, uses flat grouping by object type (cleaner for simple cases)
     pub fn build_selectable_table_items(
         &mut self,
         db_objects: &Option<crate::database::objects::DatabaseObjectList>,
     ) {
+        self.build_selectable_table_items_with_schemas(db_objects, &[], &None)
+    }
+
+    /// Build selectable items with schema awareness and optional schema filter
+    /// schemas: list of available schemas from the database
+    /// selected_schema: if Some, filter to only show objects from this schema
+    pub fn build_selectable_table_items_with_schemas(
+        &mut self,
+        db_objects: &Option<crate::database::objects::DatabaseObjectList>,
+        schemas: &[String],
+        selected_schema: &Option<String>,
+    ) {
         self.selectable_table_items.clear();
 
         if let Some(ref objects) = db_objects {
-            let mut display_index = 0;
+            // If a schema filter is active, filter objects and use flat view
+            if let Some(ref schema) = selected_schema {
+                let filtered = crate::database::objects::DatabaseObjectList {
+                    tables: objects
+                        .tables
+                        .iter()
+                        .filter(|o| o.schema.as_deref() == Some(schema))
+                        .cloned()
+                        .collect(),
+                    views: objects
+                        .views
+                        .iter()
+                        .filter(|o| o.schema.as_deref() == Some(schema))
+                        .cloned()
+                        .collect(),
+                    materialized_views: objects
+                        .materialized_views
+                        .iter()
+                        .filter(|o| o.schema.as_deref() == Some(schema))
+                        .cloned()
+                        .collect(),
+                    foreign_tables: objects
+                        .foreign_tables
+                        .iter()
+                        .filter(|o| o.schema.as_deref() == Some(schema))
+                        .cloned()
+                        .collect(),
+                    total_count: 0, // Will be ignored
+                    error: objects.error.clone(),
+                };
+                self.build_flat_grouped_items(&filtered);
+            } else {
+                // No filter: use schema grouping if multiple schemas
+                let unique_schemas = self.count_unique_schemas_with_objects(objects);
 
-            // Add tables section
-            if !objects.tables.is_empty() {
-                let is_expanded = self.is_object_group_expanded("Tables");
-                let arrow = if is_expanded { "▼" } else { "▶" };
-                self.selectable_table_items
-                    .push(SelectableTableItem::new_header(
-                        format!("{} Tables", arrow),
-                        display_index,
-                    ));
-                display_index += 1;
-
-                if is_expanded {
-                    for table in &objects.tables {
-                        self.selectable_table_items
-                            .push(SelectableTableItem::new_selectable(
-                                format!("  📋 {}", table.name),
-                                table.name.clone(),
-                                table.schema.clone(),
-                                table.object_type.clone(),
-                                display_index,
-                            ));
-                        display_index += 1;
-                    }
-                }
-            }
-
-            // Add views section
-            if !objects.views.is_empty() {
-                if !self.selectable_table_items.is_empty() {
-                    self.selectable_table_items
-                        .push(SelectableTableItem::new_header(
-                            "".to_string(),
-                            display_index,
-                        ));
-                    display_index += 1;
-                }
-
-                let is_expanded = self.is_object_group_expanded("Views");
-                let arrow = if is_expanded { "▼" } else { "▶" };
-                self.selectable_table_items
-                    .push(SelectableTableItem::new_header(
-                        format!("{} Views", arrow),
-                        display_index,
-                    ));
-                display_index += 1;
-
-                if is_expanded {
-                    for view in &objects.views {
-                        self.selectable_table_items
-                            .push(SelectableTableItem::new_selectable(
-                                format!("  👁️ {}", view.name),
-                                view.name.clone(),
-                                view.schema.clone(),
-                                view.object_type.clone(),
-                                display_index,
-                            ));
-                        display_index += 1;
-                    }
-                }
-            }
-
-            // Add materialized views section
-            if !objects.materialized_views.is_empty() {
-                if !self.selectable_table_items.is_empty() {
-                    self.selectable_table_items
-                        .push(SelectableTableItem::new_header(
-                            "".to_string(),
-                            display_index,
-                        ));
-                    display_index += 1;
-                }
-
-                let is_expanded = self.is_object_group_expanded("Materialized Views");
-                let arrow = if is_expanded { "▼" } else { "▶" };
-                self.selectable_table_items
-                    .push(SelectableTableItem::new_header(
-                        format!("{} Materialized Views", arrow),
-                        display_index,
-                    ));
-                display_index += 1;
-
-                if is_expanded {
-                    for mv in &objects.materialized_views {
-                        self.selectable_table_items
-                            .push(SelectableTableItem::new_selectable(
-                                format!("  🔄 {}", mv.name),
-                                mv.name.clone(),
-                                mv.schema.clone(),
-                                mv.object_type.clone(),
-                                display_index,
-                            ));
-                        display_index += 1;
-                    }
-                }
-            }
-
-            // Add foreign tables section
-            if !objects.foreign_tables.is_empty() {
-                if !self.selectable_table_items.is_empty() {
-                    self.selectable_table_items
-                        .push(SelectableTableItem::new_header(
-                            "".to_string(),
-                            display_index,
-                        ));
-                    display_index += 1;
-                }
-
-                let is_expanded = self.is_object_group_expanded("Foreign Tables");
-                let arrow = if is_expanded { "▼" } else { "▶" };
-                self.selectable_table_items
-                    .push(SelectableTableItem::new_header(
-                        format!("{} Foreign Tables", arrow),
-                        display_index,
-                    ));
-                display_index += 1;
-
-                if is_expanded {
-                    for ft in &objects.foreign_tables {
-                        self.selectable_table_items
-                            .push(SelectableTableItem::new_selectable(
-                                format!("  🔗 {}", ft.name),
-                                ft.name.clone(),
-                                ft.schema.clone(),
-                                ft.object_type.clone(),
-                                display_index,
-                            ));
-                        display_index += 1;
-                    }
+                if unique_schemas > 1 {
+                    self.build_schema_grouped_items(objects, schemas);
+                } else {
+                    self.build_flat_grouped_items(objects);
                 }
             }
         }
@@ -952,6 +926,413 @@ impl UIState {
         // Reset selection to first selectable item
         self.selected_table_item_index = self.find_first_selectable_index();
         self.update_tables_list_state_selection();
+    }
+
+    /// Count unique schemas that have at least one object
+    fn count_unique_schemas_with_objects(
+        &self,
+        objects: &crate::database::objects::DatabaseObjectList,
+    ) -> usize {
+        use std::collections::HashSet;
+        let mut schemas: HashSet<String> = HashSet::new();
+
+        for table in &objects.tables {
+            if let Some(schema) = &table.schema {
+                schemas.insert(schema.clone());
+            }
+        }
+        for view in &objects.views {
+            if let Some(schema) = &view.schema {
+                schemas.insert(schema.clone());
+            }
+        }
+        for mv in &objects.materialized_views {
+            if let Some(schema) = &mv.schema {
+                schemas.insert(schema.clone());
+            }
+        }
+        for ft in &objects.foreign_tables {
+            if let Some(schema) = &ft.schema {
+                schemas.insert(schema.clone());
+            }
+        }
+
+        schemas.len()
+    }
+
+    /// Build items grouped by schema (for multi-schema databases)
+    /// Structure: Schema > Object Type > Objects
+    fn build_schema_grouped_items(
+        &mut self,
+        objects: &crate::database::objects::DatabaseObjectList,
+        schemas: &[String],
+    ) {
+        use std::collections::BTreeMap;
+
+        // Group objects by schema
+        let mut schema_tables: BTreeMap<String, Vec<&crate::database::DatabaseObject>> =
+            BTreeMap::new();
+        let mut schema_views: BTreeMap<String, Vec<&crate::database::DatabaseObject>> =
+            BTreeMap::new();
+        let mut schema_mat_views: BTreeMap<String, Vec<&crate::database::DatabaseObject>> =
+            BTreeMap::new();
+        let mut schema_foreign: BTreeMap<String, Vec<&crate::database::DatabaseObject>> =
+            BTreeMap::new();
+
+        for table in &objects.tables {
+            let schema = table.schema.clone().unwrap_or_else(|| "public".to_string());
+            schema_tables.entry(schema).or_default().push(table);
+        }
+        for view in &objects.views {
+            let schema = view.schema.clone().unwrap_or_else(|| "public".to_string());
+            schema_views.entry(schema).or_default().push(view);
+        }
+        for mv in &objects.materialized_views {
+            let schema = mv.schema.clone().unwrap_or_else(|| "public".to_string());
+            schema_mat_views.entry(schema).or_default().push(mv);
+        }
+        for ft in &objects.foreign_tables {
+            let schema = ft.schema.clone().unwrap_or_else(|| "public".to_string());
+            schema_foreign.entry(schema).or_default().push(ft);
+        }
+
+        // Collect all schemas that have objects, preserving order from schemas list
+        // Put 'public' first if it exists, then others alphabetically
+        let mut ordered_schemas: Vec<String> = Vec::new();
+
+        // Add schemas in order: first from the provided list, then any remaining
+        if !schemas.is_empty() {
+            for schema in schemas {
+                if schema_tables.contains_key(schema)
+                    || schema_views.contains_key(schema)
+                    || schema_mat_views.contains_key(schema)
+                    || schema_foreign.contains_key(schema)
+                {
+                    ordered_schemas.push(schema.clone());
+                }
+            }
+        } else {
+            // No schema list provided, use alphabetical with 'public' first
+            let mut all_schemas: Vec<String> = schema_tables
+                .keys()
+                .chain(schema_views.keys())
+                .chain(schema_mat_views.keys())
+                .chain(schema_foreign.keys())
+                .cloned()
+                .collect::<std::collections::HashSet<_>>()
+                .into_iter()
+                .collect();
+            all_schemas.sort();
+
+            // Move 'public' to front if exists
+            if let Some(pos) = all_schemas.iter().position(|s| s == "public") {
+                let public = all_schemas.remove(pos);
+                ordered_schemas.push(public);
+            }
+            ordered_schemas.extend(all_schemas);
+        }
+
+        let mut display_index = 0;
+
+        for schema_name in ordered_schemas {
+            let tables = schema_tables.get(&schema_name);
+            let views = schema_views.get(&schema_name);
+            let mat_views = schema_mat_views.get(&schema_name);
+            let foreign = schema_foreign.get(&schema_name);
+
+            // Count objects in this schema
+            let total_objects = tables.map(|v| v.len()).unwrap_or(0)
+                + views.map(|v| v.len()).unwrap_or(0)
+                + mat_views.map(|v| v.len()).unwrap_or(0)
+                + foreign.map(|v| v.len()).unwrap_or(0);
+
+            if total_objects == 0 {
+                continue;
+            }
+
+            // Add blank line separator between schemas (except before first)
+            if display_index > 0 {
+                self.selectable_table_items
+                    .push(SelectableTableItem::new_header(
+                        "".to_string(),
+                        display_index,
+                    ));
+                display_index += 1;
+            }
+
+            // Schema header
+            let schema_key = format!("schema:{}", schema_name);
+            let schema_expanded = self.is_schema_expanded(&schema_name);
+            let schema_arrow = if schema_expanded { "▼" } else { "▶" };
+            self.selectable_table_items
+                .push(SelectableTableItem::new_schema_header(
+                    format!("{} {} ({})", schema_arrow, schema_name, total_objects),
+                    schema_name.clone(),
+                    display_index,
+                ));
+            display_index += 1;
+
+            if !schema_expanded {
+                continue;
+            }
+
+            // Add tables for this schema
+            if let Some(tables) = tables {
+                if !tables.is_empty() {
+                    let group_key = format!("{}:Tables", schema_key);
+                    let is_expanded = self.is_object_group_expanded(&group_key);
+                    let arrow = if is_expanded { "▼" } else { "▶" };
+                    self.selectable_table_items
+                        .push(SelectableTableItem::new_header(
+                            format!("  {} Tables ({})", arrow, tables.len()),
+                            display_index,
+                        ));
+                    display_index += 1;
+
+                    if is_expanded {
+                        for table in tables {
+                            self.selectable_table_items
+                                .push(SelectableTableItem::new_selectable(
+                                    format!("    📋 {}", table.name),
+                                    table.name.clone(),
+                                    table.schema.clone(),
+                                    table.object_type.clone(),
+                                    display_index,
+                                ));
+                            display_index += 1;
+                        }
+                    }
+                }
+            }
+
+            // Add views for this schema
+            if let Some(views) = views {
+                if !views.is_empty() {
+                    let group_key = format!("{}:Views", schema_key);
+                    let is_expanded = self.is_object_group_expanded(&group_key);
+                    let arrow = if is_expanded { "▼" } else { "▶" };
+                    self.selectable_table_items
+                        .push(SelectableTableItem::new_header(
+                            format!("  {} Views ({})", arrow, views.len()),
+                            display_index,
+                        ));
+                    display_index += 1;
+
+                    if is_expanded {
+                        for view in views {
+                            self.selectable_table_items
+                                .push(SelectableTableItem::new_selectable(
+                                    format!("    👁️ {}", view.name),
+                                    view.name.clone(),
+                                    view.schema.clone(),
+                                    view.object_type.clone(),
+                                    display_index,
+                                ));
+                            display_index += 1;
+                        }
+                    }
+                }
+            }
+
+            // Add materialized views for this schema
+            if let Some(mat_views) = mat_views {
+                if !mat_views.is_empty() {
+                    let group_key = format!("{}:Materialized Views", schema_key);
+                    let is_expanded = self.is_object_group_expanded(&group_key);
+                    let arrow = if is_expanded { "▼" } else { "▶" };
+                    self.selectable_table_items
+                        .push(SelectableTableItem::new_header(
+                            format!("  {} Mat. Views ({})", arrow, mat_views.len()),
+                            display_index,
+                        ));
+                    display_index += 1;
+
+                    if is_expanded {
+                        for mv in mat_views {
+                            self.selectable_table_items
+                                .push(SelectableTableItem::new_selectable(
+                                    format!("    🔄 {}", mv.name),
+                                    mv.name.clone(),
+                                    mv.schema.clone(),
+                                    mv.object_type.clone(),
+                                    display_index,
+                                ));
+                            display_index += 1;
+                        }
+                    }
+                }
+            }
+
+            // Add foreign tables for this schema
+            if let Some(foreign) = foreign {
+                if !foreign.is_empty() {
+                    let group_key = format!("{}:Foreign Tables", schema_key);
+                    let is_expanded = self.is_object_group_expanded(&group_key);
+                    let arrow = if is_expanded { "▼" } else { "▶" };
+                    self.selectable_table_items
+                        .push(SelectableTableItem::new_header(
+                            format!("  {} Foreign ({})", arrow, foreign.len()),
+                            display_index,
+                        ));
+                    display_index += 1;
+
+                    if is_expanded {
+                        for ft in foreign {
+                            self.selectable_table_items
+                                .push(SelectableTableItem::new_selectable(
+                                    format!("    🔗 {}", ft.name),
+                                    ft.name.clone(),
+                                    ft.schema.clone(),
+                                    ft.object_type.clone(),
+                                    display_index,
+                                ));
+                            display_index += 1;
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    /// Build items with flat grouping by object type (for single-schema databases)
+    /// Structure: Object Type > Objects
+    fn build_flat_grouped_items(&mut self, objects: &crate::database::objects::DatabaseObjectList) {
+        let mut display_index = 0;
+
+        // Add tables section
+        if !objects.tables.is_empty() {
+            let is_expanded = self.is_object_group_expanded("Tables");
+            let arrow = if is_expanded { "▼" } else { "▶" };
+            self.selectable_table_items
+                .push(SelectableTableItem::new_header(
+                    format!("{} Tables ({})", arrow, objects.tables.len()),
+                    display_index,
+                ));
+            display_index += 1;
+
+            if is_expanded {
+                for table in &objects.tables {
+                    self.selectable_table_items
+                        .push(SelectableTableItem::new_selectable(
+                            format!("  📋 {}", table.name),
+                            table.name.clone(),
+                            table.schema.clone(),
+                            table.object_type.clone(),
+                            display_index,
+                        ));
+                    display_index += 1;
+                }
+            }
+        }
+
+        // Add views section
+        if !objects.views.is_empty() {
+            if !self.selectable_table_items.is_empty() {
+                self.selectable_table_items
+                    .push(SelectableTableItem::new_header(
+                        "".to_string(),
+                        display_index,
+                    ));
+                display_index += 1;
+            }
+
+            let is_expanded = self.is_object_group_expanded("Views");
+            let arrow = if is_expanded { "▼" } else { "▶" };
+            self.selectable_table_items
+                .push(SelectableTableItem::new_header(
+                    format!("{} Views ({})", arrow, objects.views.len()),
+                    display_index,
+                ));
+            display_index += 1;
+
+            if is_expanded {
+                for view in &objects.views {
+                    self.selectable_table_items
+                        .push(SelectableTableItem::new_selectable(
+                            format!("  👁️ {}", view.name),
+                            view.name.clone(),
+                            view.schema.clone(),
+                            view.object_type.clone(),
+                            display_index,
+                        ));
+                    display_index += 1;
+                }
+            }
+        }
+
+        // Add materialized views section
+        if !objects.materialized_views.is_empty() {
+            if !self.selectable_table_items.is_empty() {
+                self.selectable_table_items
+                    .push(SelectableTableItem::new_header(
+                        "".to_string(),
+                        display_index,
+                    ));
+                display_index += 1;
+            }
+
+            let is_expanded = self.is_object_group_expanded("Materialized Views");
+            let arrow = if is_expanded { "▼" } else { "▶" };
+            self.selectable_table_items
+                .push(SelectableTableItem::new_header(
+                    format!(
+                        "{} Mat. Views ({})",
+                        arrow,
+                        objects.materialized_views.len()
+                    ),
+                    display_index,
+                ));
+            display_index += 1;
+
+            if is_expanded {
+                for mv in &objects.materialized_views {
+                    self.selectable_table_items
+                        .push(SelectableTableItem::new_selectable(
+                            format!("  🔄 {}", mv.name),
+                            mv.name.clone(),
+                            mv.schema.clone(),
+                            mv.object_type.clone(),
+                            display_index,
+                        ));
+                    display_index += 1;
+                }
+            }
+        }
+
+        // Add foreign tables section
+        if !objects.foreign_tables.is_empty() {
+            if !self.selectable_table_items.is_empty() {
+                self.selectable_table_items
+                    .push(SelectableTableItem::new_header(
+                        "".to_string(),
+                        display_index,
+                    ));
+                display_index += 1;
+            }
+
+            let is_expanded = self.is_object_group_expanded("Foreign Tables");
+            let arrow = if is_expanded { "▼" } else { "▶" };
+            self.selectable_table_items
+                .push(SelectableTableItem::new_header(
+                    format!("{} Foreign ({})", arrow, objects.foreign_tables.len()),
+                    display_index,
+                ));
+            display_index += 1;
+
+            if is_expanded {
+                for ft in &objects.foreign_tables {
+                    self.selectable_table_items
+                        .push(SelectableTableItem::new_selectable(
+                            format!("  🔗 {}", ft.name),
+                            ft.name.clone(),
+                            ft.schema.clone(),
+                            ft.object_type.clone(),
+                            display_index,
+                        ));
+                    display_index += 1;
+                }
+            }
+        }
     }
 
     /// Find the index of the first selectable item

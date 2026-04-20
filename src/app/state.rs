@@ -1,5 +1,8 @@
 // FilePath: src/app/state.rs
 
+// Aggregated application state combining UI, database, and component states.
+// Central data structure passed through the app for rendering and event handling.
+
 use crate::{
     config::Config,
     database::{AppStateDb, ConnectionConfig, ConnectionManager, ConnectionStatus},
@@ -571,6 +574,11 @@ impl AppState {
             // Clear previous tables and errors
             self.db.tables.clear();
             self.db.table_load_error = None;
+            self.db.schemas.clear();
+            self.db.selected_schema = None;
+
+            // Clear schema expansions when switching connections
+            self.ui.clear_schema_expansions();
 
             // Reset table viewer state when switching connections
             self.table_viewer_state = TableViewerState::new();
@@ -597,9 +605,18 @@ impl AppState {
                         if let Some(ref error) = objects.error {
                             self.db.table_load_error = Some(error.clone());
                         }
-                        // Update the selectable table items list
-                        self.ui
-                            .build_selectable_table_items(&self.db.database_objects);
+
+                        // Expand all schemas by default when multiple schemas exist
+                        if self.db.schemas.len() > 1 {
+                            self.ui.expand_all_schemas(&self.db.schemas);
+                        }
+
+                        // Update the selectable table items list with schema awareness
+                        self.ui.build_selectable_table_items_with_schemas(
+                            &self.db.database_objects,
+                            &self.db.schemas,
+                            &self.db.selected_schema,
+                        );
                     }
                     Err(error) => {
                         let error_msg = error.clone();
@@ -1951,6 +1968,55 @@ impl AppState {
         } else {
             self.query_editor.set_database_type(None);
         }
+    }
+
+    /// Rebuild the selectable table items list with current schema filter
+    pub fn rebuild_table_items(&mut self) {
+        self.ui.build_selectable_table_items_with_schemas(
+            &self.db.database_objects,
+            &self.db.schemas,
+            &self.db.selected_schema,
+        );
+    }
+
+    /// Cycle schema filter: None -> schema[0] -> schema[1] -> ... -> None
+    pub fn cycle_schema_filter(&mut self) {
+        if self.db.schemas.len() <= 1 {
+            return;
+        }
+
+        let next = match &self.db.selected_schema {
+            None => Some(self.db.schemas[0].clone()),
+            Some(current) => {
+                if let Some(pos) = self.db.schemas.iter().position(|s| s == current) {
+                    if pos + 1 < self.db.schemas.len() {
+                        Some(self.db.schemas[pos + 1].clone())
+                    } else {
+                        None
+                    }
+                } else {
+                    None
+                }
+            }
+        };
+
+        let label = match &next {
+            Some(s) => format!("Schema: {}", s),
+            None => "Schema: All".to_string(),
+        };
+        self.db.selected_schema = next;
+        self.rebuild_table_items();
+        self.toast_manager.info(label);
+    }
+
+    /// Reset schema filter to show all schemas
+    pub fn reset_schema_filter(&mut self) {
+        if self.db.selected_schema.is_none() {
+            return;
+        }
+        self.db.selected_schema = None;
+        self.rebuild_table_items();
+        self.toast_manager.info("Schema: All");
     }
 
     /// Set query editor focus state

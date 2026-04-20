@@ -1,5 +1,8 @@
 // FilePath: src/app/mod.rs
 
+// Core application module containing the main App struct and event loop.
+// Orchestrates UI rendering, event handling, and background task coordination.
+
 use crate::{
     commands::{CommandAction, CommandContext, CommandId, CommandRegistry, CommandResult},
     config::Config,
@@ -14,7 +17,9 @@ use std::time::Duration;
 pub mod handlers;
 pub mod state;
 
-pub use state::{AppState, AppView, ConnectionFormMode, FocusedPane, HelpMode, OverlayView, TextInputMode};
+pub use state::{
+    AppState, AppView, ConnectionFormMode, FocusedPane, HelpMode, OverlayView, TextInputMode,
+};
 
 /// Connection event sent from background tasks to main event loop
 #[derive(Debug)]
@@ -22,6 +27,7 @@ enum ConnectionEvent {
     Success {
         connection_index: usize,
         objects: crate::database::DatabaseObjectList,
+        schemas: Vec<String>,
     },
     Failed {
         connection_index: usize,
@@ -196,8 +202,16 @@ impl App {
                 // Note: Query execution is handled directly by key handlers (handle_query_editor_keys)
                 // via execute_query_at_cursor(). This action is kept for command system compatibility
                 // but actual execution happens in the async key handler.
-                self.state.toast_manager.info(format!("Query submitted: {}",
-                    query.lines().next().unwrap_or("").chars().take(50).collect::<String>()));
+                self.state.toast_manager.info(format!(
+                    "Query submitted: {}",
+                    query
+                        .lines()
+                        .next()
+                        .unwrap_or("")
+                        .chars()
+                        .take(50)
+                        .collect::<String>()
+                ));
             }
             CommandAction::ExecuteQueryWithContext {
                 query: _,
@@ -256,7 +270,12 @@ impl App {
         }
 
         // 4b. Handle table viewer set NULL confirmation
-        if self.state.table_viewer_state.set_null_confirmation.is_some() {
+        if self
+            .state
+            .table_viewer_state
+            .set_null_confirmation
+            .is_some()
+        {
             return handlers::overlays::handle_set_null_confirmation(self, key).await;
         }
 
@@ -312,6 +331,7 @@ impl App {
                     ConnectionEvent::Success {
                         connection_index,
                         objects,
+                        schemas,
                     } => {
                         // Connection succeeded! Update state
                         if let Some(conn) = self
@@ -326,6 +346,8 @@ impl App {
 
                         // Update database state
                         self.state.db.database_objects = Some(objects.clone());
+                        self.state.db.schemas = schemas.clone();
+                        self.state.db.selected_schema = None;
                         self.state.db.tables = objects
                             .tables
                             .iter()
@@ -338,10 +360,14 @@ impl App {
                             })
                             .collect();
 
-                        // Update UI
-                        self.state
-                            .ui
-                            .build_selectable_table_items(&self.state.db.database_objects);
+                        // Clear old schema expansions and expand all for multi-schema databases
+                        self.state.ui.clear_schema_expansions();
+                        if schemas.len() > 1 {
+                            self.state.ui.expand_all_schemas(&schemas);
+                        }
+
+                        // Update UI with schema awareness
+                        self.state.rebuild_table_items();
                         self.state.update_table_selection();
 
                         // Show success message
@@ -452,5 +478,4 @@ impl App {
 
         Ok(())
     }
-
 }

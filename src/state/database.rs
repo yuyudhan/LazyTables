@@ -1,5 +1,9 @@
 // FilePath: src/state/database.rs
 
+// Manages all database-related state: connections, table lists, metadata, and query execution.
+// Delegates to database-specific adapters (PostgreSQL, MySQL, SQLite) via the ConnectionManager
+// for data loading, cell updates, row deletion, and raw query execution.
+
 use crate::{
     database::{
         connection::{Connection, ConnectionStorage},
@@ -45,6 +49,35 @@ impl DatabaseState {
             table_load_error: None,
             current_table_metadata: None,
         }
+    }
+
+    /// Extract unique schema names from database objects (fallback when list_schemas fails)
+    fn extract_schemas_from_objects(objects: &DatabaseObjectList) -> Vec<String> {
+        use std::collections::BTreeSet;
+        let mut schemas: BTreeSet<String> = BTreeSet::new();
+
+        for table in &objects.tables {
+            if let Some(schema) = &table.schema {
+                schemas.insert(schema.clone());
+            }
+        }
+        for view in &objects.views {
+            if let Some(schema) = &view.schema {
+                schemas.insert(schema.clone());
+            }
+        }
+        for mv in &objects.materialized_views {
+            if let Some(schema) = &mv.schema {
+                schemas.insert(schema.clone());
+            }
+        }
+        for ft in &objects.foreign_tables {
+            if let Some(schema) = &ft.schema {
+                schemas.insert(schema.clone());
+            }
+        }
+
+        schemas.into_iter().collect()
     }
 
     /// Load table data for viewer
@@ -370,8 +403,12 @@ impl DatabaseState {
                     // Set NULL based on database type
                     match connection.database_type {
                         DatabaseType::PostgreSQL => {
-                            self.set_postgres_cell_to_null(&connection, confirmation, connection_manager)
-                                .await
+                            self.set_postgres_cell_to_null(
+                                &connection,
+                                confirmation,
+                                connection_manager,
+                            )
+                            .await
                         }
                         _ => Err(format!(
                             "Database type {} not yet supported for setting NULL",
@@ -543,6 +580,21 @@ impl DatabaseState {
 
                 self.database_objects = Some(objects.clone());
 
+                // Fetch available schemas for PostgreSQL
+                match connection_manager.list_schemas(&connection.id).await {
+                    Ok(schemas) => {
+                        self.schemas = schemas;
+                        // Default to showing all schemas (None = all)
+                        self.selected_schema = None;
+                    }
+                    Err(e) => {
+                        // Log error but don't fail - extract schemas from objects as fallback
+                        tracing::warn!("Failed to list schemas, extracting from objects: {}", e);
+                        self.schemas = Self::extract_schemas_from_objects(&objects);
+                        self.selected_schema = None;
+                    }
+                }
+
                 // Update legacy tables list with qualified names for non-public schemas
                 self.tables = objects
                     .tables
@@ -649,5 +701,4 @@ impl DatabaseState {
             )),
         }
     }
-
 }
