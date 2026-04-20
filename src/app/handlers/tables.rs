@@ -1,6 +1,7 @@
 // FilePath: src/app/handlers/tables.rs
-//
-// Event handler for the Tables pane (table/view navigation and selection)
+
+// Event handler for the Tables pane (table/view navigation and selection).
+// Handles browsing database objects, search filtering, and opening tables for viewing.
 
 use crate::{app::App, core::error::Result};
 use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
@@ -40,10 +41,21 @@ pub(crate) async fn handle(app: &mut App, key: KeyEvent) -> Result<()> {
         KeyCode::Enter | KeyCode::Char(' ') => {
             app.state.open_table_for_viewing().await;
         }
-        // 'r' - Refresh tables list
+        // 'r' - Refresh tables list (preserve schema filter)
         KeyCode::Char('r') => {
+            let saved_schema = app.state.db.selected_schema.clone();
             app.state.connect_to_selected_database().await;
+            app.state.db.selected_schema = saved_schema;
+            app.state.rebuild_table_items();
             app.state.toast_manager.info("Tables refreshed");
+        }
+        // 's' - Cycle schema filter
+        KeyCode::Char('s') => {
+            app.state.cycle_schema_filter();
+        }
+        // 'S' - Reset schema filter to All
+        KeyCode::Char('S') => {
+            app.state.reset_schema_filter();
         }
         // '/' - Enter search mode
         KeyCode::Char('/') => {
@@ -80,36 +92,59 @@ pub(crate) async fn handle(app: &mut App, key: KeyEvent) -> Result<()> {
         }
         // Tab - Toggle group expansion (when on a header)
         KeyCode::Tab if key.modifiers == KeyModifiers::NONE => {
-            if let Some(item) = app.state.ui.get_selected_item_raw() {
-                if !item.is_selectable {
-                    // It's a group header - extract group name and toggle expansion
+            // Extract header info first to avoid borrow issues
+            let header_info = app.state.ui.get_selected_item_raw().and_then(|item| {
+                if item.is_selectable {
+                    None
+                } else if let Some(ref schema_name) = item.schema_header_name {
+                    Some((true, schema_name.clone()))
+                } else {
                     let group_name = item
                         .display_name
                         .trim_start_matches("▼ ")
                         .trim_start_matches("▶ ")
                         .trim()
                         .to_string();
-
-                    if !group_name.is_empty() {
-                        let is_expanded_before =
-                            app.state.ui.is_object_group_expanded(&group_name);
-                        app.state.ui.toggle_object_group_expansion(&group_name);
-                        app.state
-                            .ui
-                            .build_selectable_table_items(&app.state.db.database_objects);
-                        app.state.toast_manager.info(format!(
-                            "{} {}",
-                            if !is_expanded_before {
-                                "Expanded"
-                            } else {
-                                "Collapsed"
-                            },
-                            group_name
-                        ));
+                    if group_name.is_empty() {
+                        None
+                    } else {
+                        Some((false, group_name))
                     }
                 }
-                // If it's not a header, Tab is handled by global keys for pane cycling
+            });
+
+            if let Some((is_schema, name)) = header_info {
+                if is_schema {
+                    // Schema header
+                    let is_expanded_before = app.state.ui.is_schema_expanded(&name);
+                    app.state.ui.toggle_schema_expansion(&name);
+                    app.state.rebuild_table_items();
+                    app.state.toast_manager.info(format!(
+                        "{} schema {}",
+                        if !is_expanded_before {
+                            "Expanded"
+                        } else {
+                            "Collapsed"
+                        },
+                        name
+                    ));
+                } else {
+                    // Regular object group header
+                    let is_expanded_before = app.state.ui.is_object_group_expanded(&name);
+                    app.state.ui.toggle_object_group_expansion(&name);
+                    app.state.rebuild_table_items();
+                    app.state.toast_manager.info(format!(
+                        "{} {}",
+                        if !is_expanded_before {
+                            "Expanded"
+                        } else {
+                            "Collapsed"
+                        },
+                        name
+                    ));
+                }
             }
+            // If it's not a header, Tab is handled by global keys for pane cycling
         }
         _ => {}
     }

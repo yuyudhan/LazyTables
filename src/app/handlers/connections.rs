@@ -1,6 +1,7 @@
 // FilePath: src/app/handlers/connections.rs
-//
-// Event handlers for the Connections pane and connection modal
+
+// Event handlers for the Connections pane and connection modal.
+// Manages connection list navigation, search, and the two-step connection creation flow.
 
 use crate::{
     app::{App, ConnectionEvent, TestConnectionEvent},
@@ -48,13 +49,7 @@ pub(crate) async fn handle(app: &mut App, key: KeyEvent) -> Result<()> {
                 app.state.connection_start_time = Some(std::time::Instant::now());
 
                 // Set status to connecting immediately
-                if let Some(conn) = app
-                    .state
-                    .db
-                    .connections
-                    .connections
-                    .get_mut(selected_index)
-                {
+                if let Some(conn) = app.state.db.connections.connections.get_mut(selected_index) {
                     conn.status = crate::database::ConnectionStatus::Connecting;
                     app.state
                         .toast_manager
@@ -78,20 +73,24 @@ pub(crate) async fn handle(app: &mut App, key: KeyEvent) -> Result<()> {
                                 .await
                             {
                                 Ok(objects) => {
-                                    // Send success event
+                                    // Also fetch schemas for PostgreSQL (others return empty)
+                                    let schemas = connection_manager
+                                        .list_schemas(&connection_config.id)
+                                        .await
+                                        .unwrap_or_default();
+
+                                    // Send success event with objects and schemas
                                     let _ = tx.send(ConnectionEvent::Success {
                                         connection_index: selected_index,
                                         objects,
+                                        schemas,
                                     });
                                 }
                                 Err(e) => {
                                     // Connection succeeded but listing objects failed
                                     let _ = tx.send(ConnectionEvent::Failed {
                                         connection_index: selected_index,
-                                        error: format!(
-                                            "Failed to load database objects: {}",
-                                            e
-                                        ),
+                                        error: format!("Failed to load database objects: {}", e),
                                     });
                                 }
                             }
@@ -180,13 +179,7 @@ pub(crate) async fn handle(app: &mut App, key: KeyEvent) -> Result<()> {
             app.state.connection_start_time = Some(std::time::Instant::now());
 
             // Set status to connecting immediately (for visual feedback)
-            if let Some(conn) = app
-                .state
-                .db
-                .connections
-                .connections
-                .get_mut(selected_index)
-            {
+            if let Some(conn) = app.state.db.connections.connections.get_mut(selected_index) {
                 conn.status = crate::database::ConnectionStatus::Connecting;
                 app.state
                     .toast_manager
@@ -194,8 +187,7 @@ pub(crate) async fn handle(app: &mut App, key: KeyEvent) -> Result<()> {
             }
 
             // Clone necessary data for background task
-            let connection_config =
-                app.state.db.connections.connections[selected_index].clone();
+            let connection_config = app.state.db.connections.connections[selected_index].clone();
             let connection_manager = app.state.connection_manager.clone();
             let tx = app.connection_events_tx.clone();
 
@@ -210,10 +202,17 @@ pub(crate) async fn handle(app: &mut App, key: KeyEvent) -> Result<()> {
                             .await
                         {
                             Ok(objects) => {
-                                // Send success event
+                                // Also fetch schemas for PostgreSQL (others return empty)
+                                let schemas = connection_manager
+                                    .list_schemas(&connection_config.id)
+                                    .await
+                                    .unwrap_or_default();
+
+                                // Send success event with objects and schemas
                                 let _ = tx.send(ConnectionEvent::Success {
                                     connection_index: selected_index,
                                     objects,
+                                    schemas,
                                 });
                             }
                             Err(e) => {
@@ -247,10 +246,16 @@ pub(crate) async fn handle(app: &mut App, key: KeyEvent) -> Result<()> {
                 let connection_name = connection.name.clone();
 
                 // Disconnect from the database
-                let _ = app.state.connection_manager.disconnect(&connection_id).await;
+                let _ = app
+                    .state
+                    .connection_manager
+                    .disconnect(&connection_id)
+                    .await;
                 app.state.disconnect_from_database().await;
 
-                app.state.toast_manager.info(format!("Disconnected from {}", connection_name));
+                app.state
+                    .toast_manager
+                    .info(format!("Disconnected from {}", connection_name));
             }
         }
         // '/' - Enter search mode
@@ -553,8 +558,8 @@ async fn test_connection_from_modal(app: &mut App) {
 
     // Spawn background task to test connection and store handle for abort capability
     let handle = tokio::spawn(async move {
-        use crate::database::{Connection, DatabaseType};
         use crate::core::error::LazyTablesError;
+        use crate::database::{Connection, DatabaseType};
 
         let result = match config.database_type {
             DatabaseType::PostgreSQL => {
@@ -669,8 +674,9 @@ fn abort_test_connection(app: &mut App) {
     }
 
     // Update status to show test was aborted
-    app.state.connection_modal_state.test_status =
-        Some(TestConnectionStatus::Failed("Test aborted by user".to_string()));
+    app.state.connection_modal_state.test_status = Some(TestConnectionStatus::Failed(
+        "Test aborted by user".to_string(),
+    ));
 
     // Clear all test-related state
     app.state.test_connection_in_progress = false;

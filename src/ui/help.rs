@@ -1,5 +1,8 @@
 // FilePath: src/ui/help.rs
 
+// Context-aware help overlay that displays keybinding reference for each pane.
+// Renders a centered modal with pane-specific shortcuts when '?' is pressed.
+
 use ratatui::{
     layout::{Alignment, Constraint, Direction, Layout, Rect},
     style::{Color, Modifier, Style},
@@ -286,6 +289,8 @@ impl HelpSystem {
                 .add_modifier(Modifier::BOLD | Modifier::UNDERLINED),
         )]));
         Self::add_command(lines, "r", "Refresh tables list");
+        Self::add_command(lines, "s", "Cycle schema filter");
+        Self::add_command(lines, "S", "Show all schemas (reset filter)");
         lines.push(Line::from(""));
 
         // Search & Filter
@@ -479,21 +484,21 @@ impl HelpSystem {
             Span::styled("  🏗️  ", Style::default().fg(Color::Yellow)),
             Span::raw("Schema View - Comprehensive table metadata:"),
         ]));
-        lines.push(Line::from(vec![
-            Span::raw("      • Columns (types, nullable, primary keys)"),
-        ]));
-        lines.push(Line::from(vec![
-            Span::raw("      • Indexes (type, uniqueness, size)"),
-        ]));
-        lines.push(Line::from(vec![
-            Span::raw("      • Foreign keys (relationships, ON DELETE/UPDATE)"),
-        ]));
-        lines.push(Line::from(vec![
-            Span::raw("      • Constraints (CHECK, UNIQUE, etc.)"),
-        ]));
-        lines.push(Line::from(vec![
-            Span::raw("      • Table statistics (rows, sizes, vacuum/analyze)"),
-        ]));
+        lines.push(Line::from(vec![Span::raw(
+            "      • Columns (types, nullable, primary keys)",
+        )]));
+        lines.push(Line::from(vec![Span::raw(
+            "      • Indexes (type, uniqueness, size)",
+        )]));
+        lines.push(Line::from(vec![Span::raw(
+            "      • Foreign keys (relationships, ON DELETE/UPDATE)",
+        )]));
+        lines.push(Line::from(vec![Span::raw(
+            "      • Constraints (CHECK, UNIQUE, etc.)",
+        )]));
+        lines.push(Line::from(vec![Span::raw(
+            "      • Table statistics (rows, sizes, vacuum/analyze)",
+        )]));
         lines.push(Line::from(""));
     }
 

@@ -1,4 +1,7 @@
-// Database-adaptive tables pane component
+// FilePath: src/ui/components/tables_pane.rs
+
+// Database-adaptive tables/views browser pane (Pane 2).
+// Renders the list of database objects with type indicators and search filtering.
 
 use crate::{app::AppState, database::objects::DatabaseObjectList};
 use ratatui::{
@@ -182,9 +185,10 @@ fn get_adaptive_title(
         let mut title_parts = Vec::new();
 
         // Add schema info for databases that support multiple schemas
-        if db_state.schemas.len() > 1 {
-            let schema = db_state.selected_schema.as_deref().unwrap_or("all");
-            title_parts.push(format!("Schema: {}", schema));
+        if let Some(ref s) = db_state.selected_schema {
+            title_parts.push(format!("Schema: {}", s));
+        } else if db_state.schemas.len() > 1 {
+            title_parts.push(format!("All ({} schemas)", db_state.schemas.len()));
         }
 
         // Add object counts
