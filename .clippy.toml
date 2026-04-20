@@ -1,0 +1,23 @@
+# FilePath: .clippy.toml
+# Clippy configuration tailored for a TUI application
+
+# Handlers often pass multiple state references around
+too-many-arguments-threshold = 10
+
+# Event handling logic can be inherently complex
+cognitive-complexity-threshold = 30
+
+# Complex generic types are common with ratatui
+type-complexity-threshold = 300
+
+# Allow longer functions for render/handler logic
+too-many-lines-threshold = 150
+
+# Relaxed rules for test code
+allow-unwrap-in-tests = true
+allow-expect-in-tests = true
+allow-panic-in-tests = true
+allow-dbg-in-tests = true
+
+# Module naming flexibility
+allow-private-module-inception = true
