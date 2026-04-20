@@ -1,5 +1,9 @@
 // FilePath: src/database/connection.rs
 
+// Defines the core Connection trait that all database adapters must implement,
+// along with ConnectionConfig, ConnectionStorage, and related types like
+// DatabaseType, SslMode, and DatabaseCapabilities.
+
 use crate::config::Config;
 use crate::core::error::Result;
 use crate::security::{PasswordManager, PasswordSource};
@@ -350,6 +354,12 @@ pub trait Connection: Send + Sync {
 
     /// List all database objects (tables, views, etc.)
     async fn list_database_objects(&self) -> Result<crate::database::DatabaseObjectList>;
+
+    /// List all schemas in the database (PostgreSQL) or databases (MySQL)
+    /// Returns empty vector for databases that don't support schemas (SQLite)
+    async fn list_schemas(&self) -> Result<Vec<String>> {
+        Ok(vec![])
+    }
 
     /// Get detailed metadata for a specific table
     async fn get_table_metadata(&self, table_name: &str) -> Result<crate::database::TableMetadata>;

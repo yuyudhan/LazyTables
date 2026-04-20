@@ -1,5 +1,9 @@
 // FilePath: src/database/sqlite.rs
 
+// SQLite adapter implementing the Connection and ManagedConnection traits.
+// Uses a single-connection pool, PRAGMA-based metadata queries, and
+// file-path-based connection strings. Enables foreign keys on connect.
+
 use crate::core::error::{LazyTablesError, Result};
 use crate::database::{
     connection::ConnectionConfig, Connection, DataType, TableColumn, TableMetadata,
@@ -38,7 +42,10 @@ impl SqliteConnection {
     }
 
     /// Parse SQLx error into structured ConnectionError with helpful suggestions
-    pub fn parse_connection_error(&self, error: &sqlx::Error) -> crate::core::error::ConnectionError {
+    pub fn parse_connection_error(
+        &self,
+        error: &sqlx::Error,
+    ) -> crate::core::error::ConnectionError {
         use crate::core::error::{ConnectionError, ConnectionErrorType};
 
         let error_str = error.to_string();
@@ -47,13 +54,17 @@ impl SqliteConnection {
 
         // Classify error and provide user-friendly message
         if error_lower.contains("unable to open database")
-            || error_lower.contains("no such file or directory") {
+            || error_lower.contains("no such file or directory")
+        {
             ConnectionError::new(
                 ConnectionErrorType::Configuration,
                 format!("Cannot open SQLite database at '{}'", db_path),
                 error_str,
             )
-            .with_suggestion(format!("Check if the path '{}' exists and is accessible", db_path))
+            .with_suggestion(format!(
+                "Check if the path '{}' exists and is accessible",
+                db_path
+            ))
             .with_suggestion("Verify the directory permissions allow read/write access")
             .with_suggestion("Ensure the parent directory exists")
             .with_suggestion("Check if the file path is correct (absolute or relative)")
@@ -502,7 +513,8 @@ impl SqliteConnection {
                             // Validate and escape table name to prevent SQL injection
                             match validate_sqlite_identifier(&name) {
                                 Ok(safe_name) => {
-                                    let count_query = format!("SELECT COUNT(*) as cnt FROM {}", safe_name);
+                                    let count_query =
+                                        format!("SELECT COUNT(*) as cnt FROM {}", safe_name);
                                     match sqlx::query(&count_query).fetch_one(pool).await {
                                         Ok(count_row) => {
                                             let count: i64 = count_row.get("cnt");
@@ -733,8 +745,10 @@ impl SqliteConnection {
                 .collect::<Vec<_>>()
                 .join(", ");
 
-            let query =
-                format!("SELECT {select_list} FROM {} LIMIT {} OFFSET {}", safe_table_name, limit, offset);
+            let query = format!(
+                "SELECT {select_list} FROM {} LIMIT {} OFFSET {}",
+                safe_table_name, limit, offset
+            );
 
             let rows = sqlx::query(&query).fetch_all(pool).await?;
 

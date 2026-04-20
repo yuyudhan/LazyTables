@@ -1,5 +1,9 @@
 // FilePath: src/database/connection_manager.rs
 
+// Manages persistent database connections to avoid connection churning.
+// Wraps active connections behind Arc<Mutex<>> for thread-safe access and
+// provides high-level methods for queries, metadata, and health checks.
+
 use crate::core::error::{LazyTablesError, Result};
 use crate::database::{connection::Connection, ConnectionConfig};
 use std::collections::HashMap;
@@ -29,6 +33,10 @@ pub trait ManagedConnection: Send + Sync + std::fmt::Debug {
     ) -> Result<Vec<crate::database::TableColumn>>;
     async fn get_table_metadata(&self, table_name: &str) -> Result<crate::database::TableMetadata>;
     async fn list_database_objects(&self) -> Result<crate::database::DatabaseObjectList>;
+    /// List all schemas in the database (PostgreSQL) or return empty for databases without schema support
+    async fn list_schemas(&self) -> Result<Vec<String>> {
+        Ok(vec![])
+    }
     fn is_connected(&self) -> bool;
 }
 
@@ -214,6 +222,15 @@ impl ConnectionManager {
         let connection_ref = self.get_connection(connection_id).await?;
         let connection = connection_ref.lock().await;
         connection.list_database_objects().await
+    }
+
+    /// List schemas using the persistent connection
+    /// For PostgreSQL, returns all user-accessible schemas
+    /// For MySQL/SQLite, returns empty vector (no schema support)
+    pub async fn list_schemas(&self, connection_id: &str) -> Result<Vec<String>> {
+        let connection_ref = self.get_connection(connection_id).await?;
+        let connection = connection_ref.lock().await;
+        connection.list_schemas().await
     }
 
     /// Check if a connection is healthy by trying to execute a simple query

@@ -1,6 +1,9 @@
 // FilePath: src/database/mod.rs
 
-// Database adapter modules
+// Root module for the database layer. Defines shared types (TableMetadata, DataType,
+// TableColumn, etc.) and re-exports adapter implementations, the connection manager,
+// and the factory for creating database connections.
+
 pub mod app_state;
 pub mod connection;
 pub mod connection_manager;

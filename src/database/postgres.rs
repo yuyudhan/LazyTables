@@ -1,5 +1,9 @@
 // FilePath: src/database/postgres.rs
 
+// PostgreSQL adapter implementing the Connection and ManagedConnection traits.
+// Handles connection pooling via sqlx PgPool, raw query execution with robust
+// type extraction, schema/table/view listing, and structured error reporting.
+
 use crate::core::error::{LazyTablesError, Result};
 use crate::database::{
     connection::ConnectionConfig, Connection, DataType, TableColumn, TableMetadata,
@@ -46,7 +50,10 @@ impl PostgresConnection {
     }
 
     /// Parse SQLx error into structured ConnectionError with helpful suggestions
-    pub fn parse_connection_error(&self, error: &sqlx::Error) -> crate::core::error::ConnectionError {
+    pub fn parse_connection_error(
+        &self,
+        error: &sqlx::Error,
+    ) -> crate::core::error::ConnectionError {
         use crate::core::error::{ConnectionError, ConnectionErrorType};
 
         let error_str = error.to_string();
@@ -60,19 +67,30 @@ impl PostgresConnection {
         };
 
         // Classify error and provide user-friendly message
-        if error_lower.contains("connection refused") || error_lower.contains("could not connect to server") {
+        if error_lower.contains("connection refused")
+            || error_lower.contains("could not connect to server")
+        {
             ConnectionError::new(
                 ConnectionErrorType::Network,
-                format!("Cannot reach PostgreSQL server at {}:{}", self.config.host, self.config.port),
+                format!(
+                    "Cannot reach PostgreSQL server at {}:{}",
+                    self.config.host, self.config.port
+                ),
                 error_str,
             )
-            .with_suggestion(format!("Check if PostgreSQL is running on {}:{}", self.config.host, self.config.port))
+            .with_suggestion(format!(
+                "Check if PostgreSQL is running on {}:{}",
+                self.config.host, self.config.port
+            ))
             .with_suggestion("Verify the host address and port number are correct")
             .with_suggestion("Check firewall settings allow connections to PostgreSQL")
-            .with_suggestion("If using Docker, ensure the container is running and ports are exposed")
+            .with_suggestion(
+                "If using Docker, ensure the container is running and ports are exposed",
+            )
         } else if error_lower.contains("password authentication failed")
             || error_lower.contains("authentication failed")
-            || error_code.as_deref() == Some("28P01") {
+            || error_code.as_deref() == Some("28P01")
+        {
             ConnectionError::new(
                 ConnectionErrorType::Authentication,
                 format!("Authentication failed for user '{}'", self.config.username),
@@ -83,7 +101,8 @@ impl PostgresConnection {
             .with_suggestion("Check if the user exists in PostgreSQL (try: \\du in psql)")
             .with_suggestion("Verify pg_hba.conf allows password authentication")
         } else if error_lower.contains("database") && error_lower.contains("does not exist")
-            || error_code.as_deref() == Some("3D000") {
+            || error_code.as_deref() == Some("3D000")
+        {
             let db_name = self.config.database.as_deref().unwrap_or("postgres");
             ConnectionError::new(
                 ConnectionErrorType::DatabaseNotFound,
@@ -93,7 +112,10 @@ impl PostgresConnection {
             .with_error_code(error_code.unwrap_or_else(|| "3D000".to_string()))
             .with_suggestion(format!("Check if database '{}' exists", db_name))
             .with_suggestion("List databases with: SELECT datname FROM pg_database;")
-            .with_suggestion(format!("Create database with: CREATE DATABASE {};", db_name))
+            .with_suggestion(format!(
+                "Create database with: CREATE DATABASE {};",
+                db_name
+            ))
         } else if error_lower.contains("ssl") || error_lower.contains("tls") {
             ConnectionError::new(
                 ConnectionErrorType::SslConfiguration,
@@ -113,7 +135,8 @@ impl PostgresConnection {
             .with_suggestion("Verify PostgreSQL is listening on the correct interface")
             .with_suggestion("Increase connection timeout if the server is slow to respond")
         } else if error_lower.contains("too many connections")
-            || error_code.as_deref() == Some("53300") {
+            || error_code.as_deref() == Some("53300")
+        {
             ConnectionError::new(
                 ConnectionErrorType::ServerError,
                 "PostgreSQL server has too many connections",
@@ -186,6 +209,10 @@ impl Connection for PostgresConnection {
 
     async fn list_database_objects(&self) -> Result<crate::database::DatabaseObjectList> {
         PostgresConnection::list_database_objects(self).await
+    }
+
+    async fn list_schemas(&self) -> Result<Vec<String>> {
+        PostgresConnection::list_schemas(self).await
     }
 
     async fn get_table_metadata(&self, table_name: &str) -> Result<crate::database::TableMetadata> {
@@ -512,7 +539,9 @@ impl PostgresConnection {
         if let Some(pool) = &self.pool {
             let mut result = DatabaseObjectList::default();
 
-            // Query for all objects with proper error handling for permissions
+            // Query for all objects with permission-safe size calculation
+            // Uses has_table_privilege to check access before calling pg_total_relation_size
+            // This prevents permission errors from failing the entire query
             let query = "
                 WITH object_info AS (
                     SELECT
@@ -530,7 +559,8 @@ impl PostgresConnection {
                             ELSE NULL
                         END AS row_count,
                         CASE
-                            WHEN c.relkind IN ('r', 'm') THEN pg_total_relation_size(c.oid)
+                            WHEN c.relkind IN ('r', 'm') AND has_table_privilege(c.oid, 'SELECT') THEN 
+                                pg_total_relation_size(c.oid)
                             ELSE NULL
                         END AS size_bytes
                     FROM pg_catalog.pg_class c
@@ -1225,6 +1255,10 @@ impl crate::database::connection_manager::ManagedConnection for PostgresConnecti
 
     async fn list_database_objects(&self) -> Result<crate::database::DatabaseObjectList> {
         PostgresConnection::list_database_objects(self).await
+    }
+
+    async fn list_schemas(&self) -> Result<Vec<String>> {
+        PostgresConnection::list_schemas(self).await
     }
 
     // Note: ManagedConnection trait doesn't have disconnect method anymore
