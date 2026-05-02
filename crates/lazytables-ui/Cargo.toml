@@ -1,0 +1,14 @@
+# FilePath: crates/lazytables-ui/Cargo.toml
+
+[package]
+name = "lazytables-ui"
+version = "0.2.3"
+edition = "2021"
+description = "UI rendering components for LazyTables"
+
+[dependencies]
+lazytables-core = { workspace = true }
+ratatui = { workspace = true }
+
+[lints]
+workspace = true

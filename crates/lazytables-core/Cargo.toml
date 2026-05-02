@@ -1,0 +1,19 @@
+# FilePath: crates/lazytables-core/Cargo.toml
+
+[package]
+name = "lazytables-core"
+version = "0.2.3"
+edition = "2021"
+description = "Core types and error definitions for LazyTables"
+
+[dependencies]
+thiserror = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+chrono = { workspace = true }
+uuid = { workspace = true }
+ratatui = { workspace = true }
+tracing = { workspace = true }
+
+[lints]
+workspace = true

@@ -1,96 +1,34 @@
 # FilePath: Cargo.toml
 
-[package]
-name = "lazytables"
-version = "0.2.3"
-edition = "2021"
-authors = ["LazyTables Team"]
-license = "MIT"
-description = "Terminal-based SQL database viewer and editor with vim-style navigation"
-repository = "https://github.com/yuyudhan/LazyTables"
-homepage = "https://github.com/yuyudhan/LazyTables"
-documentation = "https://github.com/yuyudhan/LazyTables/tree/main/docs"
-readme = "README.md"
-keywords = ["database", "sql", "tui", "terminal", "vim"]
-categories = ["command-line-utilities", "database"]
-exclude = ["/.github", "/scripts", "/docker", "/docs", "/.gitignore"]
+[workspace]
+members = [
+    "crates/lazytables-core",
+    "crates/lazytables-security",
+    "crates/lazytables-database",
+    "crates/lazytables-ui",
+]
 
-[[bin]]
-name = "lazytables"
-path = "src/main.rs"
-
-[dependencies]
-# TUI framework
-ratatui = { version = "0.29", features = ["crossterm"] }
-crossterm = { version = "0.28", features = ["event-stream"] }
-
-# Async runtime
-tokio = { version = "1.41", features = ["full"] }
-
-# Error handling
-color-eyre = "0.6"
-thiserror = "2.0"
-anyhow = "1.0"
-
-# Database drivers
-sqlx = { version = "0.8", features = [
-  "runtime-tokio-rustls",
-  "postgres",
-  "mysql",
-  "sqlite",
-  "chrono",
-  "uuid",
-] }
-async-trait = "0.1"
-
-# Configuration and serialization
+[workspace.dependencies]
+# Shared dependencies across workspace crates
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
-toml = "0.8"
-
-# Security - credential storage and encryption
-keyring = { version = "3.6", optional = true }
-aes-gcm = "0.10"
-argon2 = "0.5"
-base64 = "0.22"
-zeroize = "1.8"
-
-# Logging
-tracing = "0.1"
-tracing-subscriber = { version = "0.3", features = ["env-filter"] }
-lazy_static = "1.5"
-
-# Date/time handling
+tokio = { version = "1.41", features = ["full"] }
+ratatui = { version = "0.29", features = ["crossterm"] }
+crossterm = { version = "0.28", features = ["event-stream"] }
 chrono = { version = "0.4", features = ["serde"] }
-
-# UUID support
+tracing = "0.1"
+thiserror = "2.0"
 uuid = { version = "1.11", features = ["v4", "serde"] }
-
-# Directory management
+async-trait = "0.1"
 dirs = "5.0"
 
-# Clipboard support
-arboard = "3.4"
+# Workspace crates
+lazytables-core = { path = "crates/lazytables-core" }
+lazytables-security = { path = "crates/lazytables-security" }
+lazytables-database = { path = "crates/lazytables-database" }
+lazytables-ui = { path = "crates/lazytables-ui" }
 
-# Command line argument parsing
-clap = { version = "4.5", features = ["derive", "env"] }
-
-# Syntax highlighting
-syntect = "5.2"
-
-[dev-dependencies]
-tempfile = "3.14"
-pretty_assertions = "1.4"
-
-[features]
-default = ["secure-storage"]
-secure-storage = ["keyring"]
-# Future feature flags for additional databases
-mysql = []
-sqlite = []
-redis = []
-
-[lints.clippy]
+[workspace.lints.clippy]
 # Enable stricter lint groups
 nursery = { level = "warn", priority = -1 }
 pedantic = { level = "warn", priority = -1 }
@@ -115,7 +53,6 @@ wildcard_imports = "allow"
 redundant_closure_for_method_calls = "allow"
 option_if_let_else = "allow"
 significant_drop_tightening = "allow"
-# Pedantic lints that add noise in TUI/handler code
 unnested_or_patterns = "allow"
 match_same_arms = "allow"
 uninlined_format_args = "allow"
@@ -178,6 +115,102 @@ inefficient_to_string = "allow"
 needless_collect = "allow"
 comparison_chain = "allow"
 
+[package]
+name = "lazytables"
+version = "0.2.3"
+edition = "2021"
+authors = ["LazyTables Team"]
+license = "MIT"
+description = "Terminal-based SQL database viewer and editor with vim-style navigation"
+repository = "https://github.com/yuyudhan/LazyTables"
+homepage = "https://github.com/yuyudhan/LazyTables"
+documentation = "https://github.com/yuyudhan/LazyTables/tree/main/docs"
+readme = "README.md"
+keywords = ["database", "sql", "tui", "terminal", "vim"]
+categories = ["command-line-utilities", "database"]
+exclude = ["/.github", "/scripts", "/docker", "/docs", "/.gitignore"]
+
+[[bin]]
+name = "lazytables"
+path = "src/main.rs"
+
+[dependencies]
+# Workspace crates
+lazytables-core = { workspace = true }
+lazytables-security = { workspace = true }
+
+# TUI framework
+ratatui = { workspace = true }
+crossterm = { workspace = true }
+
+# Async runtime
+tokio = { workspace = true }
+
+# Error handling
+color-eyre = "0.6"
+thiserror = { workspace = true }
+anyhow = "1.0"
+
+# Database drivers
+sqlx = { version = "0.8", features = [
+  "runtime-tokio-rustls",
+  "postgres",
+  "mysql",
+  "sqlite",
+  "chrono",
+  "uuid",
+] }
+async-trait = { workspace = true }
+
+# Configuration and serialization
+serde = { workspace = true }
+serde_json = { workspace = true }
+toml = "0.8"
+
+# Security - credential storage and encryption
+keyring = { version = "3.6", optional = true }
+aes-gcm = "0.10"
+argon2 = "0.5"
+base64 = "0.22"
+zeroize = "1.8"
+
+# Logging
+tracing = { workspace = true }
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+lazy_static = "1.5"
+
+# Date/time handling
+chrono = { workspace = true }
+
+# UUID support
+uuid = { workspace = true }
+
+# Directory management
+dirs = { workspace = true }
+
+# Clipboard support
+arboard = "3.4"
+
+# Command line argument parsing
+clap = { version = "4.5", features = ["derive", "env"] }
+
+# Syntax highlighting
+syntect = "5.2"
+
+[dev-dependencies]
+tempfile = "3.14"
+pretty_assertions = "1.4"
+
+[features]
+default = ["secure-storage"]
+secure-storage = ["keyring"]
+# Future feature flags for additional databases
+mysql = []
+sqlite = []
+redis = []
+
+[lints]
+workspace = true
 
 [profile.release]
 opt-level = 3
@@ -192,4 +225,3 @@ opt-level = 0
 pkg-url = "{ repo }/releases/download/v{ version }/{ name }-v{ version }-{ target }.tar.gz"
 bin-dir = "{ name }{ binary-ext }"
 pkg-fmt = "tgz"
-

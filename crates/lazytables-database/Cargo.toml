@@ -1,0 +1,13 @@
+# FilePath: crates/lazytables-database/Cargo.toml
+
+[package]
+name = "lazytables-database"
+version = "0.2.3"
+edition = "2021"
+description = "Database adapters and connection management for LazyTables"
+
+[dependencies]
+lazytables-core = { workspace = true }
+
+[lints]
+workspace = true
