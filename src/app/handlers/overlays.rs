@@ -6,6 +6,7 @@
 use crate::{
     app::{App, AppView, HelpMode, OverlayView},
     core::error::Result,
+    database::connection::ConnectionStorageExt,
 };
 use crossterm::event::{KeyCode, KeyEvent};
 
@@ -128,12 +129,9 @@ pub(crate) async fn handle_confirmation_modal(app: &mut App, key: KeyEvent) -> R
                                 app.state
                                     .toast_manager
                                     .success("Connection deleted successfully");
-                                if app.state.ui.selected_connection
-                                    >= app.state.db.connections.connections.len()
-                                    && app.state.ui.selected_connection > 0
-                                {
-                                    app.state.ui.selected_connection -= 1;
-                                }
+                                // Clear search state since filtered indices are now invalid
+                                app.state.ui.exit_connections_search();
+                                app.state.clamp_connection_selection();
                             }
                         }
                     }

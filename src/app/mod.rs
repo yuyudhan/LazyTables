@@ -414,6 +414,19 @@ impl App {
                                 .toast_manager
                                 .error(format!("Connection failed: {}", error));
                         }
+
+                        // Clean up dependent state to avoid stale data
+                        self.state.db.database_objects = None;
+                        self.state.db.tables.clear();
+                        self.state.db.table_load_error = None;
+                        self.state.db.current_table_metadata = None;
+                        self.state.db.selected_schema = None;
+                        self.state.db.schemas.clear();
+                        self.state.ui.build_selectable_table_items(&None);
+                        self.state.update_table_selection();
+                        self.state.table_viewer_state =
+                            crate::ui::components::TableViewerState::new();
+
                         self.state.connecting_in_progress = None;
                         self.state.connection_start_time = None;
                     }

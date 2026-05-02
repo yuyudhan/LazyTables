@@ -7,6 +7,7 @@ use super::{
     Command, CommandAction, CommandCategory, CommandContext, CommandId, CommandResult, ModalType,
 };
 use crate::core::error::Result;
+use crate::database::connection::ConnectionStorageExt;
 
 /// Connect command - establishes database connection
 pub struct ConnectCommand;

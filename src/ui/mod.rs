@@ -29,24 +29,8 @@ pub mod widgets;
 use layout::LayoutManager;
 use theme::Theme;
 
-/// Confirmation modal for destructive actions
-#[derive(Debug, Clone)]
-pub struct ConfirmationModal {
-    pub title: String,
-    pub message: String,
-    pub action: ConfirmationAction,
-}
-
-/// Actions that can be confirmed
-#[derive(Debug, Clone)]
-pub enum ConfirmationAction {
-    DeleteConnection(usize),
-    DeleteTable(String),
-    DeleteSqlFile(usize),
-    ExitApplication,
-    QuitQueryEditor,
-    // Add more actions as needed
-}
+// Re-export UI types from lazytables-core
+pub use lazytables_core::ui::{ConfirmationAction, ConfirmationModal};
 
 /// Main UI structure
 pub struct UI {

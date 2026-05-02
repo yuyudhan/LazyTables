@@ -3,7 +3,7 @@
 // Event handlers for the Query Results / Table Viewer pane.
 // Supports cell navigation, inline editing, search, schema toggle, and clipboard operations.
 
-use crate::{app::App, core::error::Result};
+use crate::{app::App, core::error::Result, ui::components::table_viewer::TableViewerStateExt};
 use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
 
 /// Handle Query Results pane keys - has its own edit mode

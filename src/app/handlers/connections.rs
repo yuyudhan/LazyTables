@@ -80,27 +80,39 @@ pub(crate) async fn handle(app: &mut App, key: KeyEvent) -> Result<()> {
                                         .unwrap_or_default();
 
                                     // Send success event with objects and schemas
-                                    let _ = tx.send(ConnectionEvent::Success {
+                                    if let Err(e) = tx.send(ConnectionEvent::Success {
                                         connection_index: selected_index,
                                         objects,
                                         schemas,
-                                    });
+                                    }) {
+                                        tracing::warn!(
+                                            "Failed to send connection success event: {}",
+                                            e
+                                        );
+                                    }
                                 }
                                 Err(e) => {
                                     // Connection succeeded but listing objects failed
-                                    let _ = tx.send(ConnectionEvent::Failed {
+                                    if let Err(e) = tx.send(ConnectionEvent::Failed {
                                         connection_index: selected_index,
                                         error: format!("Failed to load database objects: {}", e),
-                                    });
+                                    }) {
+                                        tracing::warn!(
+                                            "Failed to send connection failed event: {}",
+                                            e
+                                        );
+                                    }
                                 }
                             }
                         }
                         Err(e) => {
                             // Connection failed
-                            let _ = tx.send(ConnectionEvent::Failed {
+                            if let Err(e) = tx.send(ConnectionEvent::Failed {
                                 connection_index: selected_index,
                                 error: e.to_string(),
-                            });
+                            }) {
+                                tracing::warn!("Failed to send connection failed event: {}", e);
+                            }
                         }
                     }
                 });
@@ -209,27 +221,36 @@ pub(crate) async fn handle(app: &mut App, key: KeyEvent) -> Result<()> {
                                     .unwrap_or_default();
 
                                 // Send success event with objects and schemas
-                                let _ = tx.send(ConnectionEvent::Success {
+                                if let Err(e) = tx.send(ConnectionEvent::Success {
                                     connection_index: selected_index,
                                     objects,
                                     schemas,
-                                });
+                                }) {
+                                    tracing::warn!(
+                                        "Failed to send connection success event: {}",
+                                        e
+                                    );
+                                }
                             }
                             Err(e) => {
                                 // Connection succeeded but listing objects failed
-                                let _ = tx.send(ConnectionEvent::Failed {
+                                if let Err(e) = tx.send(ConnectionEvent::Failed {
                                     connection_index: selected_index,
                                     error: format!("Failed to load database objects: {}", e),
-                                });
+                                }) {
+                                    tracing::warn!("Failed to send connection failed event: {}", e);
+                                }
                             }
                         }
                     }
                     Err(e) => {
                         // Connection failed
-                        let _ = tx.send(ConnectionEvent::Failed {
+                        if let Err(e) = tx.send(ConnectionEvent::Failed {
                             connection_index: selected_index,
                             error: e.to_string(),
-                        });
+                        }) {
+                            tracing::warn!("Failed to send connection failed event: {}", e);
+                        }
                     }
                 }
             });
@@ -315,6 +336,7 @@ pub(crate) async fn handle_connection_modal(app: &mut App, key: KeyEvent) -> Res
         }
         KeyCode::Char('c') if !app.state.connection_modal_state.is_text_field() => {
             // Cancel shortcut - works from any field except text input fields
+            abort_test_connection(app);
             if app.state.ui.current_view.is_connection_form() {
                 app.state.close_add_connection_modal();
             } else {
@@ -325,6 +347,7 @@ pub(crate) async fn handle_connection_modal(app: &mut App, key: KeyEvent) -> Res
         // PRIORITY 2: Navigation and special keys
         KeyCode::Esc => {
             // Close the appropriate modal
+            abort_test_connection(app);
             if app.state.ui.current_view.is_connection_form() {
                 app.state.close_add_connection_modal();
             } else {
@@ -652,7 +675,9 @@ async fn test_connection_from_modal(app: &mut App) {
             }
         };
 
-        let _ = tx.send(event);
+        if let Err(e) = tx.send(event) {
+            tracing::warn!("Failed to send test connection event: {}", e);
+        }
     });
 
     // Store task handle for abort capability

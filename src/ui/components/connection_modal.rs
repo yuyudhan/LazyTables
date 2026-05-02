@@ -651,11 +651,16 @@ impl ConnectionModalState {
                 return Err("Username is required".to_string());
             }
 
-            // Parse port
-            let port: u16 = if self.port_input.trim().is_empty()
-                && self.database_type == DatabaseType::SQLite
-            {
-                0 // SQLite doesn't use ports
+            // Parse port, defaulting to standard ports when empty
+            let port: u16 = if self.port_input.trim().is_empty() {
+                match self.database_type {
+                    DatabaseType::PostgreSQL => 5432,
+                    DatabaseType::MySQL | DatabaseType::MariaDB => 3306,
+                    DatabaseType::Oracle => 1521,
+                    DatabaseType::MongoDB => 27017,
+                    DatabaseType::Redis => 6379,
+                    DatabaseType::SQLite => 0,
+                }
             } else {
                 self.port_input
                     .trim()

@@ -4,7 +4,7 @@
 // Provides the UI for toggling between input modes during connection setup.
 
 use crate::{
-    database::{ConnectionConfig, DatabaseType, SslMode},
+    database::{connection::ConnectionConfigExt, ConnectionConfig, DatabaseType, SslMode},
     state::view::ConnectionFormMode,
     ui::theme::Theme,
 };

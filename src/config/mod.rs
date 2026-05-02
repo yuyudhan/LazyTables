@@ -4,7 +4,7 @@
 // Manages theme, editor, connection, and keybinding settings. Also handles
 // data directory layout (~/.lazytables/) and initial file scaffolding.
 
-use crate::core::error::Result;
+use crate::core::error::{Result, TomlSerResultExt};
 // Removed directories crate, using dirs crate for home_dir
 use serde::{Deserialize, Serialize};
 use std::{fs, path::PathBuf};
@@ -88,7 +88,7 @@ impl Config {
             fs::create_dir_all(parent)?;
         }
 
-        let contents = toml::to_string_pretty(self)?;
+        let contents = toml::to_string_pretty(self).map_toml_ser_err()?;
         fs::write(path, contents)?;
         Ok(())
     }

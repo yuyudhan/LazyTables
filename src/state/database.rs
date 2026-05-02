@@ -4,15 +4,13 @@
 // Delegates to database-specific adapters (PostgreSQL, MySQL, SQLite) via the ConnectionManager
 // for data loading, cell updates, row deletion, and raw query execution.
 
-use crate::{
-    database::{
-        connection::{Connection, ConnectionStorage},
-        ConnectionConfig, ConnectionStatus, DatabaseObjectList, DatabaseType, TableMetadata,
-    },
-    ui::components::{
-        table_viewer::{CellUpdate, ColumnInfo, DeleteConfirmation, SetNullConfirmation},
-        TableViewerState,
-    },
+use crate::database::{
+    connection::{Connection, ConnectionStorage, ConnectionStorageExt},
+    ConnectionConfig, ConnectionStatus, DatabaseObjectList, DatabaseType, TableMetadata,
+};
+use crate::ui::components::{
+    table_viewer::{CellUpdate, ColumnInfo, DeleteConfirmation, SetNullConfirmation},
+    TableViewerState,
 };
 
 /// Database-specific state separated from UI concerns

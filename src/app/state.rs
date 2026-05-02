@@ -5,7 +5,10 @@
 
 use crate::{
     config::Config,
-    database::{AppStateDb, ConnectionConfig, ConnectionManager, ConnectionStatus},
+    database::{
+        connection::ConnectionStorageExt, AppStateDb, ConnectionConfig, ConnectionManager,
+        ConnectionStatus,
+    },
     state::{ui::UIState, DatabaseState},
     ui::components::{
         ConnectionModalState, ConnectionMode, DebugView, QueryEditor, TableViewerState,
@@ -701,6 +704,8 @@ impl AppState {
             self.db.database_objects = None;
             self.db.tables.clear();
             self.db.table_load_error = None;
+            self.db.selected_schema = None;
+            self.db.schemas.clear();
             // Clear the selectable table items list
             self.ui.build_selectable_table_items(&None);
             self.update_table_selection();

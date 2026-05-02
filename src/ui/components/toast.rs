@@ -1,7 +1,7 @@
 // FilePath: src/ui/components/toast.rs
 
-// Timed toast notification system for success, error, warning, and info messages.
-// Manages a queue of notifications rendered as overlays with auto-dismiss.
+// Re-exports toast types from lazytables-core. Keeps rendering functions and
+// the get_style extension trait that depends on the Theme type.
 
 use crate::ui::theme::Theme;
 use ratatui::{
@@ -11,158 +11,41 @@ use ratatui::{
     widgets::{Block, Borders, Paragraph, Wrap},
     Frame,
 };
-use std::time::{Duration, Instant};
+use std::time::Duration;
 
-/// Toast notification types
-#[derive(Debug, Clone, PartialEq)]
-pub enum ToastType {
-    Success,
-    Error,
-    Warning,
-    Info,
-}
+// Re-export all types from lazytables-core::toast
+pub use lazytables_core::toast::*;
 
-/// A single toast notification
-#[derive(Debug, Clone)]
-pub struct Toast {
-    pub message: String,
-    pub toast_type: ToastType,
-    pub created_at: Instant,
-    pub duration: Duration,
-}
-
-impl Toast {
-    /// Create a new toast notification
-    pub fn new(message: impl Into<String>, toast_type: ToastType) -> Self {
-        Self {
-            message: message.into(),
-            toast_type,
-            created_at: Instant::now(),
-            duration: Duration::from_secs(3), // Default 3 seconds
-        }
-    }
-
-    /// Create a success toast
-    pub fn success(message: impl Into<String>) -> Self {
-        Self::new(message, ToastType::Success)
-    }
-
-    /// Create an error toast
-    pub fn error(message: impl Into<String>) -> Self {
-        let mut toast = Self::new(message, ToastType::Error);
-        toast.duration = Duration::from_secs(5); // Errors stay longer
-        toast
-    }
-
-    /// Create a warning toast
-    pub fn warning(message: impl Into<String>) -> Self {
-        let mut toast = Self::new(message, ToastType::Warning);
-        toast.duration = Duration::from_secs(4);
-        toast
-    }
-
-    /// Create an info toast
-    pub fn info(message: impl Into<String>) -> Self {
-        Self::new(message, ToastType::Info)
-    }
-
-    /// Check if the toast has expired
-    pub fn is_expired(&self) -> bool {
-        self.created_at.elapsed() > self.duration
-    }
-
+/// Extension trait for Toast to get theme-dependent styles
+pub trait ToastExt {
     /// Get the style for this toast type
+    fn get_style(&self, theme: &Theme) -> (Color, &str, Color);
+}
+
+impl ToastExt for Toast {
     fn get_style(&self, theme: &Theme) -> (Color, &str, Color) {
         match self.toast_type {
             ToastType::Success => (
                 theme.get_color("success"),
-                "✓",
+                "\u{2713}",
                 theme.get_color("toast_success_bg"),
             ),
             ToastType::Error => (
                 theme.get_color("error"),
-                "✗",
+                "\u{2717}",
                 theme.get_color("toast_error_bg"),
             ),
             ToastType::Warning => (
                 theme.get_color("warning"),
-                "⚠",
+                "\u{26a0}",
                 theme.get_color("toast_warning_bg"),
             ),
             ToastType::Info => (
                 theme.get_color("info"),
-                "ℹ",
+                "\u{2139}",
                 theme.get_color("toast_info_bg"),
             ),
         }
-    }
-}
-
-/// Toast manager to handle multiple notifications
-#[derive(Debug, Clone)]
-pub struct ToastManager {
-    toasts: Vec<Toast>,
-    max_toasts: usize,
-}
-
-impl ToastManager {
-    /// Create a new toast manager
-    pub fn new() -> Self {
-        Self {
-            toasts: Vec::new(),
-            max_toasts: 5, // Show max 5 toasts at once
-        }
-    }
-
-    /// Add a new toast
-    pub fn add(&mut self, toast: Toast) {
-        self.toasts.push(toast);
-
-        // Keep only the most recent toasts
-        if self.toasts.len() > self.max_toasts {
-            self.toasts.drain(0..self.toasts.len() - self.max_toasts);
-        }
-    }
-
-    /// Add a success toast
-    pub fn success(&mut self, message: impl Into<String>) {
-        self.add(Toast::success(message));
-    }
-
-    /// Add an error toast
-    pub fn error(&mut self, message: impl Into<String>) {
-        self.add(Toast::error(message));
-    }
-
-    /// Add a warning toast
-    pub fn warning(&mut self, message: impl Into<String>) {
-        self.add(Toast::warning(message));
-    }
-
-    /// Add an info toast
-    pub fn info(&mut self, message: impl Into<String>) {
-        self.add(Toast::info(message));
-    }
-
-    /// Remove expired toasts
-    pub fn cleanup(&mut self) {
-        self.toasts.retain(|toast| !toast.is_expired());
-    }
-
-    /// Check if there are any active toasts
-    pub fn has_toasts(&self) -> bool {
-        !self.toasts.is_empty()
-    }
-
-    /// Clear all toasts
-    pub fn clear(&mut self) {
-        self.toasts.clear();
-    }
-}
-
-impl Default for ToastManager {
-    fn default() -> Self {
-        Self::new()
     }
 }
 
@@ -180,7 +63,7 @@ pub fn render_toasts(f: &mut Frame, manager: &ToastManager, area: Rect, theme: &
     // Position toasts in the top-right corner with better positioning
     let x = area.x + area.width.saturating_sub(toast_width + padding);
 
-    for (idx, toast) in manager.toasts.iter().enumerate() {
+    for (idx, toast) in manager.toasts().iter().enumerate() {
         let y = area.y + padding + (idx as u16 * (toast_height + 1));
 
         // Don't render if we're out of vertical space
