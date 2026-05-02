@@ -4,9 +4,10 @@
 // Handles connection pooling via sqlx PgPool, raw query execution with robust
 // type extraction, schema/table/view listing, and structured error reporting.
 
-use crate::core::error::{LazyTablesError, Result};
+use crate::core::error::{LazyTablesError, Result, SqlxResultExt};
 use crate::database::{
-    connection::ConnectionConfig, Connection, DataType, TableColumn, TableMetadata,
+    connection::{ConnectionConfig, ConnectionConfigExt},
+    Connection, DataType, TableColumn, TableMetadata,
 };
 use async_trait::async_trait;
 use serde_json;
@@ -49,22 +50,15 @@ impl PostgresConnection {
         }
     }
 
-    /// Parse SQLx error into structured ConnectionError with helpful suggestions
-    pub fn parse_connection_error(
-        &self,
-        error: &sqlx::Error,
-    ) -> crate::core::error::ConnectionError {
+    /// Parse connection error into structured ConnectionError with helpful suggestions
+    pub fn parse_connection_error(&self, error: &str) -> crate::core::error::ConnectionError {
         use crate::core::error::{ConnectionError, ConnectionErrorType};
 
         let error_str = error.to_string();
         let error_lower = error_str.to_lowercase();
 
-        // Extract database-specific error code if available
-        let error_code = if let sqlx::Error::Database(ref db_err) = error {
-            db_err.code().map(|c| c.to_string())
-        } else {
-            None
-        };
+        // Error code extraction is no longer possible with string errors
+        // Error code unavailable when working with string errors
 
         // Classify error and provide user-friendly message
         if error_lower.contains("connection refused")
@@ -89,27 +83,24 @@ impl PostgresConnection {
             )
         } else if error_lower.contains("password authentication failed")
             || error_lower.contains("authentication failed")
-            || error_code.as_deref() == Some("28P01")
         {
             ConnectionError::new(
                 ConnectionErrorType::Authentication,
                 format!("Authentication failed for user '{}'", self.config.username),
                 error_str,
             )
-            .with_error_code(error_code.unwrap_or_else(|| "28P01".to_string()))
+            .with_error_code("28P01".to_string())
             .with_suggestion("Verify the username and password are correct")
             .with_suggestion("Check if the user exists in PostgreSQL (try: \\du in psql)")
             .with_suggestion("Verify pg_hba.conf allows password authentication")
-        } else if error_lower.contains("database") && error_lower.contains("does not exist")
-            || error_code.as_deref() == Some("3D000")
-        {
+        } else if error_lower.contains("database") && error_lower.contains("does not exist") {
             let db_name = self.config.database.as_deref().unwrap_or("postgres");
             ConnectionError::new(
                 ConnectionErrorType::DatabaseNotFound,
                 format!("Database '{}' does not exist", db_name),
                 error_str,
             )
-            .with_error_code(error_code.unwrap_or_else(|| "3D000".to_string()))
+            .with_error_code("3D000".to_string())
             .with_suggestion(format!("Check if database '{}' exists", db_name))
             .with_suggestion("List databases with: SELECT datname FROM pg_database;")
             .with_suggestion(format!(
@@ -134,15 +125,13 @@ impl PostgresConnection {
             .with_suggestion("Check network connectivity to the PostgreSQL server")
             .with_suggestion("Verify PostgreSQL is listening on the correct interface")
             .with_suggestion("Increase connection timeout if the server is slow to respond")
-        } else if error_lower.contains("too many connections")
-            || error_code.as_deref() == Some("53300")
-        {
+        } else if error_lower.contains("too many connections") {
             ConnectionError::new(
                 ConnectionErrorType::ServerError,
                 "PostgreSQL server has too many connections",
                 error_str,
             )
-            .with_error_code(error_code.unwrap_or_else(|| "53300".to_string()))
+            .with_error_code("53300".to_string())
             .with_suggestion("Close unused connections")
             .with_suggestion("Increase max_connections in postgresql.conf")
             .with_suggestion("Check for connection leaks in applications")
@@ -808,7 +797,8 @@ impl PostgresConnection {
                 .bind(schema)
                 .bind(table)
                 .fetch_optional(pool)
-                .await?;
+                .await
+                .map_sqlx_err()?;
 
             let is_view = if let Some(row) = type_row {
                 let relkind: String = row.get("relkind");
@@ -839,7 +829,8 @@ impl PostgresConnection {
                 .bind(schema)
                 .bind(table)
                 .fetch_one(pool)
-                .await?;
+                .await
+                .map_sqlx_err()?;
             let column_count: i64 = col_row.get(0);
 
             // Get table size
@@ -1037,7 +1028,8 @@ impl PostgresConnection {
                 .bind(schema)
                 .bind(actual_table_name)
                 .fetch_all(pool)
-                .await?;
+                .await
+                .map_sqlx_err()?;
 
             crate::log_debug!("get_table_columns returned {} rows", rows.len());
 
@@ -1079,7 +1071,7 @@ impl PostgresConnection {
             };
 
             let query = format!("SELECT COUNT(*) FROM {qualified_name}");
-            let row = sqlx::query(&query).fetch_one(pool).await?;
+            let row = sqlx::query(&query).fetch_one(pool).await.map_sqlx_err()?;
             let count: i64 = row.get(0);
             Ok(count as usize)
         } else {
@@ -1123,7 +1115,8 @@ impl PostgresConnection {
                 .bind(table)
                 .bind(schema)
                 .fetch_all(pool)
-                .await?;
+                .await
+                .map_sqlx_err()?;
 
             let column_names: Vec<String> = column_rows
                 .iter()
@@ -1156,7 +1149,7 @@ impl PostgresConnection {
                 "SELECT {select_list} FROM {qualified_name} ORDER BY 1 LIMIT {limit} OFFSET {offset}"
             );
 
-            let rows = sqlx::query(&query).fetch_all(pool).await?;
+            let rows = sqlx::query(&query).fetch_all(pool).await.map_sqlx_err()?;
 
             let mut result = Vec::new();
             for row in rows {
@@ -1184,7 +1177,7 @@ impl PostgresConnection {
             crate::log_debug!("execute_raw_query: Executing query: {}", query);
 
             // Execute the query
-            let rows = sqlx::query(query).fetch_all(pool).await?;
+            let rows = sqlx::query(query).fetch_all(pool).await.map_sqlx_err()?;
 
             if rows.is_empty() {
                 crate::log_debug!("execute_raw_query: No rows returned");

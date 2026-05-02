@@ -4,7 +4,7 @@
 // connection session history, and per-connection SQL file usage activity.
 
 use crate::config::Config;
-use crate::core::error::Result;
+use crate::core::error::{Result, SqlxResultExt};
 use serde::{Deserialize, Serialize};
 use sqlx::sqlite::SqlitePool;
 use sqlx::Row;
@@ -49,7 +49,7 @@ impl AppStateDb {
         let database_url = format!("sqlite://{}", db_path.display());
 
         // Create connection pool
-        let pool = SqlitePool::connect(&database_url).await?;
+        let pool = SqlitePool::connect(&database_url).await.map_sqlx_err()?;
 
         let app_db = Self { pool: Some(pool) };
 
@@ -82,7 +82,8 @@ impl AppStateDb {
                 "#,
             )
             .execute(pool)
-            .await?;
+            .await
+            .map_sqlx_err()?;
 
             // Create connection_sessions table to track connection history
             sqlx::query(
@@ -99,7 +100,8 @@ impl AppStateDb {
                 "#,
             )
             .execute(pool)
-            .await?;
+            .await
+            .map_sqlx_err()?;
 
             // Create sql_file_activity table to track SQL file usage per connection
             sqlx::query(
@@ -119,7 +121,8 @@ impl AppStateDb {
                 "#,
             )
             .execute(pool)
-            .await?;
+            .await
+            .map_sqlx_err()?;
         }
 
         Ok(())
@@ -138,7 +141,8 @@ impl AppStateDb {
             // First, clear any existing active connection
             sqlx::query("DELETE FROM active_connection")
                 .execute(pool)
-                .await?;
+                .await
+                .map_sqlx_err()?;
 
             // Insert the new active connection
             sqlx::query(
@@ -152,7 +156,7 @@ impl AppStateDb {
             .bind(database_type)
             .bind(now)
             .execute(pool)
-            .await?;
+            .await.map_sqlx_err()?;
 
             // Record this session in the history
             sqlx::query(
@@ -166,7 +170,7 @@ impl AppStateDb {
             .bind(database_type)
             .bind(now)
             .execute(pool)
-            .await?;
+            .await.map_sqlx_err()?;
         }
 
         Ok(())
@@ -185,12 +189,14 @@ impl AppStateDb {
             )
             .bind(chrono::Utc::now())
             .execute(pool)
-            .await?;
+            .await
+            .map_sqlx_err()?;
 
             // Clear the active connection
             sqlx::query("DELETE FROM active_connection")
                 .execute(pool)
-                .await?;
+                .await
+                .map_sqlx_err()?;
         }
 
         Ok(())
@@ -203,7 +209,7 @@ impl AppStateDb {
                 "SELECT connection_id, connection_name, database_type, connected_at FROM active_connection LIMIT 1"
             )
             .fetch_optional(pool)
-            .await?;
+            .await.map_sqlx_err()?;
 
             if let Some(row) = row {
                 return Ok(Some(ActiveConnectionState {
@@ -256,7 +262,7 @@ impl AppStateDb {
             .bind(now)
             .bind(now)
             .execute(pool)
-            .await?;
+            .await.map_sqlx_err()?;
         }
 
         Ok(())
@@ -275,7 +281,8 @@ impl AppStateDb {
             )
             .bind(connection_id)
             .fetch_all(pool)
-            .await?;
+            .await
+            .map_sqlx_err()?;
 
             let activities = rows
                 .into_iter()
@@ -315,7 +322,7 @@ impl AppStateDb {
                     .to_string()
             };
 
-            let rows = sqlx::query(&query).fetch_all(pool).await?;
+            let rows = sqlx::query(&query).fetch_all(pool).await.map_sqlx_err()?;
 
             let sessions = rows
                 .into_iter()

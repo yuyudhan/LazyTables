@@ -4,9 +4,10 @@
 // Uses sqlx MySqlPool for connection pooling, supports table/view listing,
 // metadata retrieval, and MySQL-specific error classification.
 
-use crate::core::error::{LazyTablesError, Result};
+use crate::core::error::{LazyTablesError, Result, SqlxResultExt};
 use crate::database::{
-    connection::ConnectionConfig, Connection, DataType, TableColumn, TableMetadata,
+    connection::{ConnectionConfig, ConnectionConfigExt},
+    Connection, DataType, TableColumn, TableMetadata,
 };
 use async_trait::async_trait;
 use sqlx::mysql::{MySqlPool, MySqlPoolOptions};
@@ -47,22 +48,15 @@ impl MySqlConnection {
         }
     }
 
-    /// Parse SQLx error into structured ConnectionError with helpful suggestions
-    pub fn parse_connection_error(
-        &self,
-        error: &sqlx::Error,
-    ) -> crate::core::error::ConnectionError {
+    /// Parse connection error into structured ConnectionError with helpful suggestions
+    pub fn parse_connection_error(&self, error: &str) -> crate::core::error::ConnectionError {
         use crate::core::error::{ConnectionError, ConnectionErrorType};
 
         let error_str = error.to_string();
         let error_lower = error_str.to_lowercase();
 
-        // Extract MySQL error number if available
-        let error_code = if let sqlx::Error::Database(ref db_err) = error {
-            db_err.code().map(|c| c.to_string())
-        } else {
-            None
-        };
+        // Error code extraction is no longer possible with string errors
+        // Error code unavailable when working with string errors
 
         // Classify error and provide user-friendly message based on MySQL error codes
         if error_lower.contains("connection refused") || error_lower.contains("can't connect") {
@@ -83,28 +77,24 @@ impl MySqlConnection {
             .with_suggestion(
                 "If using Docker, ensure the container is running and ports are exposed",
             )
-        } else if error_lower.contains("access denied")
-            || error_lower.contains("authentication")
-            || error_code.as_deref() == Some("1045")
-        {
+        } else if error_lower.contains("access denied") || error_lower.contains("authentication") {
             ConnectionError::new(
                 ConnectionErrorType::Authentication,
                 format!("Access denied for user '{}'", self.config.username),
                 error_str,
             )
-            .with_error_code(error_code.unwrap_or_else(|| "1045".to_string()))
+            .with_error_code("1045".to_string())
             .with_suggestion("Verify the username and password are correct")
             .with_suggestion("Check user privileges with: SELECT user, host FROM mysql.user;")
             .with_suggestion("Grant access with: GRANT ALL ON database.* TO 'user'@'host';")
-        } else if error_lower.contains("unknown database") || error_code.as_deref() == Some("1049")
-        {
+        } else if error_lower.contains("unknown database") {
             let db_name = self.config.database.as_deref().unwrap_or("mysql");
             ConnectionError::new(
                 ConnectionErrorType::DatabaseNotFound,
                 format!("Database '{}' does not exist", db_name),
                 error_str,
             )
-            .with_error_code(error_code.unwrap_or_else(|| "1049".to_string()))
+            .with_error_code("1049".to_string())
             .with_suggestion(format!("Check if database '{}' exists", db_name))
             .with_suggestion("List databases with: SHOW DATABASES;")
             .with_suggestion(format!(
@@ -129,15 +119,13 @@ impl MySqlConnection {
             .with_suggestion("Check network connectivity to the MySQL server")
             .with_suggestion("Verify MySQL is listening on the correct interface")
             .with_suggestion("Check wait_timeout and connect_timeout settings")
-        } else if error_lower.contains("too many connections")
-            || error_code.as_deref() == Some("1040")
-        {
+        } else if error_lower.contains("too many connections") {
             ConnectionError::new(
                 ConnectionErrorType::ServerError,
                 "MySQL server has too many connections",
                 error_str,
             )
-            .with_error_code(error_code.unwrap_or_else(|| "1040".to_string()))
+            .with_error_code("1040".to_string())
             .with_suggestion("Close unused connections")
             .with_suggestion("Increase max_connections in my.cnf")
             .with_suggestion("Check current connections: SHOW PROCESSLIST;")
@@ -638,7 +626,8 @@ impl MySqlConnection {
             let col_row = sqlx::query(columns_query)
                 .bind(table_name)
                 .fetch_one(pool)
-                .await?;
+                .await
+                .map_sqlx_err()?;
             let column_count: i64 = col_row.get(0);
 
             // Get table size
@@ -652,7 +641,8 @@ impl MySqlConnection {
             let size_row = sqlx::query(size_query)
                 .bind(table_name)
                 .fetch_one(pool)
-                .await?;
+                .await
+                .map_sqlx_err()?;
 
             let total_size: Option<i64> = size_row.get(0);
             let table_size: Option<i64> = size_row.get(1);
@@ -669,7 +659,8 @@ impl MySqlConnection {
             let pk_rows = sqlx::query(pk_query)
                 .bind(table_name)
                 .fetch_all(pool)
-                .await?;
+                .await
+                .map_sqlx_err()?;
 
             let primary_keys: Vec<String> =
                 pk_rows.iter().map(|row| row.get::<String, _>(0)).collect();
@@ -685,7 +676,8 @@ impl MySqlConnection {
             let fk_rows = sqlx::query(fk_query)
                 .bind(table_name)
                 .fetch_all(pool)
-                .await?;
+                .await
+                .map_sqlx_err()?;
 
             let foreign_keys: Vec<String> =
                 fk_rows.iter().map(|row| row.get::<String, _>(0)).collect();
@@ -700,7 +692,8 @@ impl MySqlConnection {
             let index_rows = sqlx::query(index_query)
                 .bind(table_name)
                 .fetch_all(pool)
-                .await?;
+                .await
+                .map_sqlx_err()?;
 
             let indexes: Vec<String> = index_rows
                 .iter()
@@ -716,7 +709,8 @@ impl MySqlConnection {
             let comment_row = sqlx::query(comment_query)
                 .bind(table_name)
                 .fetch_one(pool)
-                .await?;
+                .await
+                .map_sqlx_err()?;
 
             let comment: String = comment_row.get(0);
             let comment = if comment.is_empty() {
@@ -758,7 +752,11 @@ impl MySqlConnection {
                 AND table_name = ?
                 ORDER BY ordinal_position";
 
-            let rows = sqlx::query(query).bind(table_name).fetch_all(pool).await?;
+            let rows = sqlx::query(query)
+                .bind(table_name)
+                .fetch_all(pool)
+                .await
+                .map_sqlx_err()?;
 
             let columns = rows
                 .iter()
@@ -793,7 +791,7 @@ impl MySqlConnection {
             // Validate and escape table name
             let safe_name = validate_mysql_identifier(table_name)?;
             let query = format!("SELECT COUNT(*) FROM {}", safe_name);
-            let row = sqlx::query(&query).fetch_one(pool).await?;
+            let row = sqlx::query(&query).fetch_one(pool).await.map_sqlx_err()?;
             let count: i64 = row.get(0);
             Ok(count as usize)
         } else {
@@ -820,7 +818,8 @@ impl MySqlConnection {
             let column_rows = sqlx::query(columns_query)
                 .bind(table_name)
                 .fetch_all(pool)
-                .await?;
+                .await
+                .map_sqlx_err()?;
 
             let column_names: Vec<String> = column_rows
                 .iter()
@@ -846,7 +845,7 @@ impl MySqlConnection {
                 safe_table_name, limit, offset
             );
 
-            let rows = sqlx::query(&query).fetch_all(pool).await?;
+            let rows = sqlx::query(&query).fetch_all(pool).await.map_sqlx_err()?;
 
             let mut result = Vec::new();
             for row in rows {
@@ -870,7 +869,10 @@ impl MySqlConnection {
     /// Get MySQL version
     pub async fn get_mysql_version(&self) -> Result<String> {
         if let Some(pool) = &self.pool {
-            let row = sqlx::query("SELECT VERSION()").fetch_one(pool).await?;
+            let row = sqlx::query("SELECT VERSION()")
+                .fetch_one(pool)
+                .await
+                .map_sqlx_err()?;
             Ok(row.get::<String, _>(0))
         } else {
             Err(LazyTablesError::Connection(
@@ -884,7 +886,8 @@ impl MySqlConnection {
         if let Some(pool) = &self.pool {
             let row = sqlx::query("SELECT @@character_set_database")
                 .fetch_one(pool)
-                .await?;
+                .await
+                .map_sqlx_err()?;
             Ok(row.get::<String, _>(0))
         } else {
             Err(LazyTablesError::Connection(
@@ -896,7 +899,10 @@ impl MySqlConnection {
     /// Get current timezone
     pub async fn get_timezone(&self) -> Result<String> {
         if let Some(pool) = &self.pool {
-            let row = sqlx::query("SELECT @@time_zone").fetch_one(pool).await?;
+            let row = sqlx::query("SELECT @@time_zone")
+                .fetch_one(pool)
+                .await
+                .map_sqlx_err()?;
             Ok(row.get::<String, _>(0))
         } else {
             Err(LazyTablesError::Connection(
@@ -910,7 +916,8 @@ impl MySqlConnection {
         if let Some(pool) = &self.pool {
             let row = sqlx::query("SHOW STATUS LIKE 'Uptime'")
                 .fetch_one(pool)
-                .await?;
+                .await
+                .map_sqlx_err()?;
             let uptime_str: String = row.get("Value");
             Ok(uptime_str.parse().unwrap_or(0))
         } else {
@@ -925,10 +932,12 @@ impl MySqlConnection {
         if let Some(pool) = &self.pool {
             let threads_row = sqlx::query("SHOW STATUS LIKE 'Threads_connected'")
                 .fetch_one(pool)
-                .await?;
+                .await
+                .map_sqlx_err()?;
             let max_row = sqlx::query("SHOW VARIABLES LIKE 'max_connections'")
                 .fetch_one(pool)
-                .await?;
+                .await
+                .map_sqlx_err()?;
 
             let active_str: String = threads_row.get("Value");
             let max_str: String = max_row.get("Value");
@@ -948,7 +957,7 @@ impl MySqlConnection {
     pub async fn execute_raw_query(&self, query: &str) -> Result<(Vec<String>, Vec<Vec<String>>)> {
         if let Some(pool) = &self.pool {
             // Try to execute the query
-            let rows = sqlx::query(query).fetch_all(pool).await?;
+            let rows = sqlx::query(query).fetch_all(pool).await.map_sqlx_err()?;
 
             if rows.is_empty() {
                 return Ok((Vec::new(), Vec::new()));

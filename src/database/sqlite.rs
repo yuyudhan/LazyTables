@@ -4,7 +4,7 @@
 // Uses a single-connection pool, PRAGMA-based metadata queries, and
 // file-path-based connection strings. Enables foreign keys on connect.
 
-use crate::core::error::{LazyTablesError, Result};
+use crate::core::error::{LazyTablesError, Result, SqlxResultExt};
 use crate::database::{
     connection::ConnectionConfig, Connection, DataType, TableColumn, TableMetadata,
 };
@@ -41,11 +41,8 @@ impl SqliteConnection {
         format!("sqlite://{db_path}")
     }
 
-    /// Parse SQLx error into structured ConnectionError with helpful suggestions
-    pub fn parse_connection_error(
-        &self,
-        error: &sqlx::Error,
-    ) -> crate::core::error::ConnectionError {
+    /// Parse connection error into structured ConnectionError with helpful suggestions
+    pub fn parse_connection_error(&self, error: &str) -> crate::core::error::ConnectionError {
         use crate::core::error::{ConnectionError, ConnectionErrorType};
 
         let error_str = error.to_string();
@@ -151,7 +148,8 @@ impl Connection for SqliteConnection {
         // Enable foreign key constraints
         sqlx::query("PRAGMA foreign_keys = ON")
             .execute(&pool)
-            .await?;
+            .await
+            .map_sqlx_err()?;
 
         self.pool = Some(pool);
         Ok(())
@@ -593,7 +591,10 @@ impl SqliteConnection {
 
             // Get column info (PRAGMA is safe with string interpolation for table names)
             let pragma_query = format!("PRAGMA table_info({})", safe_name);
-            let col_rows = sqlx::query(&pragma_query).fetch_all(pool).await?;
+            let col_rows = sqlx::query(&pragma_query)
+                .fetch_all(pool)
+                .await
+                .map_sqlx_err()?;
             let column_count = col_rows.len();
 
             // Get primary keys
@@ -605,7 +606,10 @@ impl SqliteConnection {
 
             // Get foreign keys
             let fk_query = format!("PRAGMA foreign_key_list({})", safe_name);
-            let fk_rows = sqlx::query(&fk_query).fetch_all(pool).await?;
+            let fk_rows = sqlx::query(&fk_query)
+                .fetch_all(pool)
+                .await
+                .map_sqlx_err()?;
 
             let foreign_keys: Vec<String> = fk_rows
                 .iter()
@@ -619,7 +623,10 @@ impl SqliteConnection {
 
             // Get indexes
             let index_query = format!("PRAGMA index_list({})", safe_name);
-            let index_rows = sqlx::query(&index_query).fetch_all(pool).await?;
+            let index_rows = sqlx::query(&index_query)
+                .fetch_all(pool)
+                .await
+                .map_sqlx_err()?;
 
             let indexes: Vec<String> = index_rows
                 .iter()
@@ -669,7 +676,7 @@ impl SqliteConnection {
             let safe_name = validate_sqlite_identifier(table_name)?;
             let query = format!("PRAGMA table_info({})", safe_name);
 
-            let rows = sqlx::query(&query).fetch_all(pool).await?;
+            let rows = sqlx::query(&query).fetch_all(pool).await.map_sqlx_err()?;
 
             let columns = rows
                 .iter()
@@ -704,7 +711,7 @@ impl SqliteConnection {
             // Validate and escape table name
             let safe_name = validate_sqlite_identifier(table_name)?;
             let query = format!("SELECT COUNT(*) FROM {}", safe_name);
-            let row = sqlx::query(&query).fetch_one(pool).await?;
+            let row = sqlx::query(&query).fetch_one(pool).await.map_sqlx_err()?;
             let count: i64 = row.get(0);
             Ok(count as usize)
         } else {
@@ -727,7 +734,10 @@ impl SqliteConnection {
 
             // Get column names first to maintain order
             let pragma_query = format!("PRAGMA table_info({})", safe_table_name);
-            let column_rows = sqlx::query(&pragma_query).fetch_all(pool).await?;
+            let column_rows = sqlx::query(&pragma_query)
+                .fetch_all(pool)
+                .await
+                .map_sqlx_err()?;
 
             let column_names: Vec<String> = column_rows
                 .iter()
@@ -750,7 +760,7 @@ impl SqliteConnection {
                 safe_table_name, limit, offset
             );
 
-            let rows = sqlx::query(&query).fetch_all(pool).await?;
+            let rows = sqlx::query(&query).fetch_all(pool).await.map_sqlx_err()?;
 
             let mut result = Vec::new();
             for row in rows {
@@ -775,7 +785,7 @@ impl SqliteConnection {
     pub async fn execute_raw_query(&self, query: &str) -> Result<(Vec<String>, Vec<Vec<String>>)> {
         if let Some(pool) = &self.pool {
             // Try to execute the query
-            let rows = sqlx::query(query).fetch_all(pool).await?;
+            let rows = sqlx::query(query).fetch_all(pool).await.map_sqlx_err()?;
 
             if rows.is_empty() {
                 return Ok((Vec::new(), Vec::new()));

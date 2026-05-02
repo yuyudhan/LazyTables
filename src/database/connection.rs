@@ -1,187 +1,33 @@
 // FilePath: src/database/connection.rs
 
-// Defines the core Connection trait that all database adapters must implement,
-// along with ConnectionConfig, ConnectionStorage, and related types like
-// DatabaseType, SslMode, and DatabaseCapabilities.
+// Re-exports core database types from lazytables-core and defines the Connection
+// trait, plus extension traits for ConnectionConfig and ConnectionStorage that
+// depend on crate-specific imports (PasswordManager, Config, async_fs, toml).
 
 use crate::config::Config;
 use crate::core::error::Result;
-use crate::security::{PasswordManager, PasswordSource};
-use serde::{Deserialize, Serialize};
-// Removed: use std::fs; (now using async file I/O)
+use crate::security::PasswordManager;
 
-/// Database type
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
-pub enum DatabaseType {
-    PostgreSQL,
-    MySQL,
-    MariaDB,
-    SQLite,
-    Oracle,
-    Redis,
-    MongoDB,
+// Re-export all types from lazytables-core::database
+pub use lazytables_core::database::*;
+
+/// Extension trait for ConnectionConfig methods that depend on crate-specific imports
+pub trait ConnectionConfigExt {
+    /// Resolve the actual password for this connection
+    fn resolve_password(&self, encryption_key: Option<&str>) -> Result<String>;
+
+    /// Migrate plain text password to encrypted
+    fn migrate_to_encrypted_password(
+        &mut self,
+        encryption_key: &str,
+        hint: Option<String>,
+    ) -> Result<()>;
 }
 
-impl DatabaseType {
-    /// Get display name for the database type
-    pub fn display_name(&self) -> &'static str {
-        match self {
-            Self::PostgreSQL => "postgres",
-            Self::MySQL => "mysql",
-            Self::MariaDB => "mariadb",
-            Self::SQLite => "sqlite",
-            Self::Oracle => "oracle",
-            Self::Redis => "redis",
-            Self::MongoDB => "mongodb",
-        }
-    }
-}
-
-/// SSL/TLS mode for database connections
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub enum SslMode {
-    Disable,
-    Allow,
-    Prefer,
-    Require,
-    VerifyCA,
-    VerifyFull,
-}
-
-/// Connection status
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
-pub enum ConnectionStatus {
-    /// Not connected
-    Disconnected,
-    /// Currently connecting
-    Connecting,
-    /// Successfully connected
-    Connected,
-    /// Connection failed
-    Failed(String), // Error message
-}
-
-impl Default for ConnectionStatus {
-    fn default() -> Self {
-        Self::Disconnected
-    }
-}
-
-impl Default for SslMode {
-    fn default() -> Self {
-        Self::Prefer
-    }
-}
-
-/// Database connection configuration
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct ConnectionConfig {
-    /// Unique identifier for this connection
-    pub id: String,
-    /// Display name for the connection
-    pub name: String,
-    /// Database type
-    pub database_type: DatabaseType,
-    /// Host address
-    pub host: String,
-    /// Port number
-    pub port: u16,
-    /// Database name (optional for some database types)
-    pub database: Option<String>,
-    /// Username for authentication
-    pub username: String,
-    /// Password source (environment variable or encrypted)
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub password_source: Option<PasswordSource>,
-    /// Legacy password field (for backward compatibility)
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub password: Option<String>,
-    /// SSL/TLS configuration
-    pub ssl_mode: SslMode,
-    /// Connection timeout in seconds
-    pub timeout: Option<u64>,
-    /// Connection status (not persisted, always starts as Disconnected)
-    #[serde(skip)]
-    pub status: ConnectionStatus,
-}
-
-impl ConnectionConfig {
-    /// Create a new connection configuration
-    pub fn new(
-        name: String,
-        database_type: DatabaseType,
-        host: String,
-        port: u16,
-        username: String,
-    ) -> Self {
-        Self {
-            id: uuid::Uuid::new_v4().to_string(),
-            name,
-            database_type,
-            host,
-            port,
-            database: None,
-            username,
-            password: None,
-            password_source: None,
-            ssl_mode: SslMode::default(),
-            timeout: Some(30),
-            status: ConnectionStatus::default(),
-        }
-    }
-
-    /// Get connection display string (e.g., "jatayu (postgres)")
-    pub fn display_string(&self) -> String {
-        format!("{} ({})", self.name, self.database_type.display_name())
-    }
-
-    /// Get status display text
-    pub fn status_text(&self) -> &str {
-        match &self.status {
-            ConnectionStatus::Disconnected => "Disconnected",
-            ConnectionStatus::Connecting => "Connecting...",
-            ConnectionStatus::Connected => "Connected",
-            ConnectionStatus::Failed(_) => "Failed",
-        }
-    }
-
-    /// Get status indicator symbol
-    pub fn status_symbol(&self) -> &str {
-        match &self.status {
-            ConnectionStatus::Disconnected => "—", // Em dash for disconnected
-            ConnectionStatus::Connecting => "⟳",   // Rotation symbol for connecting
-            ConnectionStatus::Connected => "✓",    // Check mark for connected
-            ConnectionStatus::Failed(_) => "✗",    // X mark for failed
-        }
-    }
-
-    /// Check if connection is currently connected
-    pub fn is_connected(&self) -> bool {
-        matches!(self.status, ConnectionStatus::Connected)
-    }
-
-    /// Check if connection is currently connecting
-    pub fn is_connecting(&self) -> bool {
-        matches!(self.status, ConnectionStatus::Connecting)
-    }
-
-    /// Check if connection failed
-    pub fn is_failed(&self) -> bool {
-        matches!(self.status, ConnectionStatus::Failed(_))
-    }
-
-    /// Get error message if connection failed
-    pub fn get_error(&self) -> Option<&String> {
-        if let ConnectionStatus::Failed(ref error) = self.status {
-            Some(error)
-        } else {
-            None
-        }
-    }
-
+impl ConnectionConfigExt for ConnectionConfig {
     /// Resolve the actual password for this connection
     /// Takes an optional encryption key for encrypted passwords
-    pub fn resolve_password(&self, encryption_key: Option<&str>) -> Result<String> {
+    fn resolve_password(&self, encryption_key: Option<&str>) -> Result<String> {
         // First check if we have a password source
         if let Some(ref source) = self.password_source {
             PasswordManager::resolve_password(source, encryption_key)
@@ -196,36 +42,8 @@ impl ConnectionConfig {
         }
     }
 
-    /// Set password using a source (environment variable or encrypted)
-    pub fn set_password_source(&mut self, source: PasswordSource) {
-        self.password_source = Some(source);
-        // Clear legacy password field when using new source
-        self.password = None;
-    }
-
-    /// Set plain text password (deprecated, for backward compatibility)
-    pub fn set_plain_password(&mut self, password: String) {
-        self.password = Some(password);
-        self.password_source = None;
-    }
-
-    /// Check if this connection requires an encryption key
-    pub fn requires_encryption_key(&self) -> bool {
-        self.password_source
-            .as_ref()
-            .map(PasswordManager::requires_encryption_key)
-            .unwrap_or(false)
-    }
-
-    /// Get hint for encrypted password if available
-    pub fn get_password_hint(&self) -> Option<String> {
-        self.password_source
-            .as_ref()
-            .and_then(PasswordManager::get_hint)
-    }
-
     /// Migrate plain text password to encrypted
-    pub fn migrate_to_encrypted_password(
+    fn migrate_to_encrypted_password(
         &mut self,
         encryption_key: &str,
         hint: Option<String>,
@@ -243,35 +61,43 @@ impl ConnectionConfig {
     }
 }
 
-/// Container for all saved connections
-#[derive(Debug, Clone, Serialize, Deserialize, Default)]
-pub struct ConnectionStorage {
-    pub connections: Vec<ConnectionConfig>,
-    /// Version for future migration compatibility
-    #[serde(default = "default_version")]
-    pub version: String,
-}
-
-fn default_version() -> String {
-    "1.0.0".to_string()
-}
-
-impl ConnectionStorage {
+/// Extension trait for ConnectionStorage methods that depend on crate-specific imports
+#[async_trait::async_trait]
+pub trait ConnectionStorageExt {
     /// Load connections from storage asynchronously (non-blocking)
-    pub async fn load() -> Result<Self> {
+    async fn load() -> Result<ConnectionStorage>;
+
+    /// Save connections to storage asynchronously (non-blocking)
+    async fn save(&self) -> Result<()>;
+
+    /// Add a new connection asynchronously
+    async fn add_connection(&mut self, connection: ConnectionConfig) -> Result<()>;
+
+    /// Remove a connection by ID asynchronously
+    async fn remove_connection(&mut self, id: &str) -> Result<()>;
+
+    /// Update a connection asynchronously
+    async fn update_connection(&mut self, connection: ConnectionConfig) -> Result<()>;
+}
+
+#[async_trait::async_trait]
+impl ConnectionStorageExt for ConnectionStorage {
+    /// Load connections from storage asynchronously (non-blocking)
+    async fn load() -> Result<ConnectionStorage> {
         let path = Config::connections_path();
 
         if path.exists() {
             let contents = crate::io::async_fs::read_to_string(&path).await?;
-            let storage: ConnectionStorage = toml::from_str(&contents)?;
+            let storage: ConnectionStorage =
+                toml::from_str(&contents).map_err(crate::core::error::from_toml_de_error)?;
             Ok(storage)
         } else {
-            Ok(Self::default())
+            Ok(ConnectionStorage::default())
         }
     }
 
     /// Save connections to storage asynchronously (non-blocking)
-    pub async fn save(&self) -> Result<()> {
+    async fn save(&self) -> Result<()> {
         let path = Config::connections_path();
 
         // Create parent directory if it doesn't exist
@@ -279,13 +105,14 @@ impl ConnectionStorage {
             crate::io::async_fs::create_dir_all(parent).await?;
         }
 
-        let contents = toml::to_string_pretty(self)?;
+        let contents =
+            toml::to_string_pretty(self).map_err(crate::core::error::from_toml_ser_error)?;
         crate::io::async_fs::write(path, contents).await?;
         Ok(())
     }
 
     /// Add a new connection asynchronously
-    pub async fn add_connection(&mut self, connection: ConnectionConfig) -> Result<()> {
+    async fn add_connection(&mut self, connection: ConnectionConfig) -> Result<()> {
         // Check for duplicate names
         if self.connections.iter().any(|c| c.name == connection.name) {
             return Err(crate::core::error::LazyTablesError::ConnectionExists(
@@ -298,13 +125,13 @@ impl ConnectionStorage {
     }
 
     /// Remove a connection by ID asynchronously
-    pub async fn remove_connection(&mut self, id: &str) -> Result<()> {
+    async fn remove_connection(&mut self, id: &str) -> Result<()> {
         self.connections.retain(|c| c.id != id);
         self.save().await
     }
 
     /// Update a connection asynchronously
-    pub async fn update_connection(&mut self, connection: ConnectionConfig) -> Result<()> {
+    async fn update_connection(&mut self, connection: ConnectionConfig) -> Result<()> {
         if let Some(index) = self.connections.iter().position(|c| c.id == connection.id) {
             self.connections[index] = connection;
             self.save().await
@@ -313,16 +140,6 @@ impl ConnectionStorage {
                 connection.id,
             ))
         }
-    }
-
-    /// Get connection by ID
-    pub fn get_connection(&self, id: &str) -> Option<&ConnectionConfig> {
-        self.connections.iter().find(|c| c.id == id)
-    }
-
-    /// Get mutable connection by ID
-    pub fn get_connection_mut(&mut self, id: &str) -> Option<&mut ConnectionConfig> {
-        self.connections.iter_mut().find(|c| c.id == id)
     }
 }
 
@@ -407,71 +224,4 @@ pub trait Connection: Send + Sync {
 
     /// Get database-specific functions for autocomplete
     fn get_functions(&self) -> Vec<String>;
-}
-
-/// Database-specific capabilities and features
-#[derive(Debug, Clone)]
-pub struct DatabaseCapabilities {
-    pub supports_schemas: bool,
-    pub supports_transactions: bool,
-    pub supports_foreign_keys: bool,
-    pub supports_json: bool,
-    pub supports_arrays: bool,
-    pub supports_stored_procedures: bool,
-    pub supports_triggers: bool,
-    pub supports_views: bool,
-    pub supports_materialized_views: bool,
-    pub supports_window_functions: bool,
-    pub supports_cte: bool, // Common Table Expressions
-    pub max_identifier_length: usize,
-    pub max_query_length: Option<usize>,
-    pub supported_isolation_levels: Vec<String>,
-}
-
-/// Health status for connection monitoring
-#[derive(Debug, Clone)]
-pub struct HealthStatus {
-    pub is_healthy: bool,
-    pub response_time_ms: u64,
-    pub last_error: Option<String>,
-    pub database_version: Option<String>,
-    pub active_connections: u32,
-    pub max_connections: u32,
-    pub uptime_seconds: Option<u64>,
-}
-
-/// Server information for database instance
-#[derive(Debug, Clone)]
-pub struct ServerInfo {
-    pub version: String,
-    pub build_info: Option<String>,
-    pub server_name: Option<String>,
-    pub charset: Option<String>,
-    pub timezone: Option<String>,
-    pub uptime_seconds: Option<u64>,
-    pub current_database: Option<String>,
-    pub current_user: Option<String>,
-}
-
-/// Connection pool status
-#[derive(Debug, Clone)]
-pub struct PoolStatus {
-    pub size: u32,
-    pub active: u32,
-    pub idle: u32,
-    pub waiting: u32,
-    pub max_size: u32,
-    pub min_size: u32,
-}
-
-/// Formatted error with recovery suggestions
-#[derive(Debug, Clone)]
-pub struct FormattedError {
-    pub original_error: String,
-    pub user_message: String,
-    pub error_code: Option<String>,
-    pub recovery_suggestions: Vec<String>,
-    pub is_connection_error: bool,
-    pub is_syntax_error: bool,
-    pub is_permission_error: bool,
 }
