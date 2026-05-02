@@ -25,9 +25,27 @@ cargo --version
 
 ## Installation Methods
 
-### Method 1: Install from crates.io (Recommended)
+### Method 1: Shell Installer (Recommended)
 
-The easiest way to install LazyTables is from crates.io:
+The fastest way to install LazyTables — no dependencies required:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/yuyudhan/LazyTables/main/scripts/install.sh | sh
+```
+
+This downloads a pre-built binary for your platform and installs it to `~/.local/bin`.
+
+You can override the install directory with the `LAZYTABLES_INSTALL_DIR` environment variable:
+
+```bash
+LAZYTABLES_INSTALL_DIR=/usr/local/bin curl -fsSL https://raw.githubusercontent.com/yuyudhan/LazyTables/main/scripts/install.sh | sh
+```
+
+**Supported platforms:** macOS (Intel + Apple Silicon), Linux (x86_64 + ARM64)
+
+**Installation time:** ~10 seconds
+
+### Method 2: Install from crates.io
 
 ```bash
 cargo install lazytables
@@ -37,7 +55,7 @@ This will download, compile, and install the latest stable version.
 
 **Installation time:** 3-5 minutes (compiles from source)
 
-### Method 2: Install with cargo-binstall (Faster)
+### Method 3: Install with cargo-binstall (Faster)
 
 For faster installation using pre-built binaries:
 
@@ -51,7 +69,7 @@ cargo binstall lazytables
 
 **Installation time:** 30-60 seconds (downloads binary)
 
-### Method 3: Install from Source
+### Method 4: Install from Source
 
 For the latest development version or to contribute:
 
@@ -64,7 +82,7 @@ cd LazyTables
 cargo install --path .
 ```
 
-### Method 4: Build for Development
+### Method 5: Build for Development
 
 If you're developing LazyTables:
 
@@ -110,6 +128,9 @@ On first launch, LazyTables will:
 To update to the latest version:
 
 ```bash
+# If installed via shell installer — just run it again
+curl -fsSL https://raw.githubusercontent.com/yuyudhan/LazyTables/main/scripts/install.sh | sh
+
 # If installed via cargo install
 cargo install lazytables --force
 

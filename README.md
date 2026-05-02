@@ -27,17 +27,25 @@ Fast, terminal-based SQL database viewer and editor with vim-style navigation. B
 ### Quick Install (Recommended)
 
 ```bash
+curl -fsSL https://raw.githubusercontent.com/yuyudhan/LazyTables/main/scripts/install.sh | sh
+```
+
+Downloads a pre-built binary for your platform. No dependencies required.
+
+### With Cargo
+
+```bash
 cargo install lazytables
 ```
 
-### Faster Install with Pre-built Binaries
+### With cargo-binstall (pre-built binary via cargo)
 
 ```bash
-cargo install cargo-binstall
 cargo binstall lazytables
 ```
 
-### From Source
+<details>
+<summary>From Source</summary>
 
 ```bash
 git clone https://github.com/yuyudhan/LazyTables.git
@@ -45,7 +53,11 @@ cd LazyTables
 cargo install --path .
 ```
 
-**Prerequisites**: Rust 1.70+, Terminal with 256 color support, macOS or Linux
+**Prerequisites**: Rust 1.70+
+
+</details>
+
+**Supported platforms**: macOS (Intel + Apple Silicon), Linux (x86_64 + ARM64)
 
 📖 [Detailed Installation Guide](docs/user/installation.md)
 

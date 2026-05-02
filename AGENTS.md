@@ -3,7 +3,7 @@
 ## Critical Rules
 
 1. **Code MUST compile** - Run `cargo check` or `cargo build` after every change. Never leave the codebase in a broken state.
-2. **Clean logs are CRITICAL** - Run `make lint` after changes. Resolve all clippy warnings/errors properly — don't suppress them.
+2. **Clean logs are CRITICAL** - Run `just lint` after changes. Resolve all clippy warnings/errors properly — don't suppress them.
 3. **NO stubbed code** - Write complete implementations unless explicitly asked for a stub.
 4. **Never use `println!` or `dbg!`** - They corrupt the TUI. Use `tracing::debug!()`, `tracing::info!()`, etc.
 5. **500-line limit** - Refactor files exceeding this into modules.
@@ -21,7 +21,7 @@ When multiple AI agents work on this codebase simultaneously:
 
 2. **Quality standards** - Before considering your task complete:
    - Code compiles cleanly (`cargo check`)
-   - Clippy passes (`make lint`)
+   - Clippy passes (`just lint`)
    - Your changes are logically correct, not just syntactically valid
    - Related tests pass (`cargo test`)
 
@@ -39,36 +39,43 @@ Always use context7 MCP tools when you need code generation, setup steps, or lib
 
 ```bash
 # Development
-make dev              # Run with cargo watch for auto-reload (requires cargo-watch)
-make run              # Run debug build
-make run-debug        # Run with debug logging enabled
-make build            # Build release binary
+just dev              # Run with cargo watch for auto-reload (requires cargo-watch)
+just run              # Run debug build
+just run-debug        # Run with debug logging enabled
+just build            # Build release binary
 cargo run             # Run directly with cargo
 cargo check           # Fast compilation check (no binary output)
 
 # Testing & Quality
-make test             # Run all tests
-cargo test            # Run all tests (same as make test)
+just test             # Run all tests
+cargo test            # Run all tests (same as just test)
 cargo test test_name  # Run specific test by name
 cargo test test_name -- --nocapture  # Run with output (for debugging)
 cargo test --package lazytables --lib database::postgres::tests  # Run module tests
-make lint             # Run clippy linter with warnings as errors
+just lint             # Run clippy linter with warnings as errors
 cargo clippy --all-targets --all-features -- -D warnings  # Full clippy
-make format           # Auto-format code with rustfmt
-make format-check     # Check formatting without modifying files
-make check            # Run format check and clippy (CI-friendly)
+just format           # Auto-format code with rustfmt
+just format-check     # Check formatting without modifying files
+just check            # Run format check and clippy (CI-friendly)
+just quality          # Full quality check (format, lint, test, build)
+just quick-lint       # Quick check (format + lint only)
+just fix              # Auto-fix formatting and lint issues
+./scripts/quality.sh  # Direct quality script (supports --fix, --quick)
 
 # Installation
-make install          # Install LazyTables via cargo
-make install-deps     # Install development dependencies (cargo-watch, cargo-audit)
+just install          # Install LazyTables via cargo
+just install-deps     # Install development dependencies (cargo-watch, cargo-audit)
+
+# Diagnostics
+just doctor           # Check that required tools are installed
 
 # Cleanup
-make clean            # Clean build artifacts and target/ directory
+just clean            # Clean build artifacts and target/ directory
 ```
 
 **Important notes:**
 - The application requires a terminal environment. It will not work when piped or run in non-interactive mode.
-- Use `make dev` for development with auto-reload (requires `cargo install cargo-watch`)
+- Use `just dev` for development with auto-reload (requires `cargo install cargo-watch`)
 - Tests may require database connections; some need environment variables for connection strings
 
 ## Code Style - Rust
@@ -251,14 +258,14 @@ src/
 
 ### Debugging Issues
 
-1. Run `make run-debug` to enable debug logging
+1. Run `just run-debug` to enable debug logging
 2. Check logs at `~/.lazytables/logs/lazytables.log`
 3. Use `Ctrl+B` in-app to toggle debug view
 4. Never use `println!` — it corrupts the TUI
 
 ## Testing Strategy
 
-Run tests with: `make test` or `cargo test`
+Run tests with: `just test` or `cargo test`
 
 - Unit tests inline with module code using `#[cfg(test)]`
 - Integration tests for database adapters in module tests
@@ -286,11 +293,13 @@ Run tests with: `make test` or `cargo test`
 ## Before Committing
 
 1. Code compiles: `cargo check` shows no errors
-2. Linter passes: `make lint` (clippy with `-D warnings`)
-3. Formatting clean: `make format-check`
+2. Linter passes: `just lint` (clippy with `-D warnings`)
+3. Formatting clean: `just format-check`
 4. No `println!`, `dbg!`, or debug statements left behind
 5. Help text updated if key bindings changed
-6. Tests pass: `make test`
+6. Tests pass: `just test`
+
+Or run `just quality` to check all of the above in one step.
 
 ## Releasing
 
