@@ -1,5 +1,7 @@
 // FilePath: src/commands/connection.rs
 
+#![forbid(unsafe_code)]
+
 use super::{
     Command, CommandAction, CommandCategory, CommandContext, CommandId, CommandResult, ModalType,
 };

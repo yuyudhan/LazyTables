@@ -1,5 +1,7 @@
 // FilePath: src/ui/components/sql_suggestions.rs
 
+#![forbid(unsafe_code)]
+
 use crate::database::DatabaseType;
 use std::collections::HashMap;
 

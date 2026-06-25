@@ -1,5 +1,7 @@
 // Database-adaptive tables pane component
 
+#![forbid(unsafe_code)]
+
 use crate::{app::AppState, database::objects::DatabaseObjectList};
 use ratatui::{
     layout::Rect,

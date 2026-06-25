@@ -5,6 +5,8 @@
 //! This module provides event types for communicating between background async tasks
 //! and the main UI thread, preventing UI freezes during long-running operations.
 
+#![forbid(unsafe_code)]
+
 use crate::database::{DatabaseObjectList, TableMetadata};
 
 /// Events sent from background tasks to the main UI thread

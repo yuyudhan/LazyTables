@@ -1,5 +1,7 @@
 // FilePath: src/database/query_history.rs
 
+#![forbid(unsafe_code)]
+
 use crate::core::error::{LazyTablesError, Result};
 use crate::database::DatabaseType;
 use chrono::{DateTime, Utc};

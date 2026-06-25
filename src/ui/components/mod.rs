@@ -1,5 +1,7 @@
 // FilePath: src/ui/components/mod.rs
 
+#![forbid(unsafe_code)]
+
 pub mod connection_modal;
 pub mod connection_mode;
 pub mod debug_view;

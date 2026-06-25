@@ -1,5 +1,7 @@
 // FilePath: src/database/factory.rs
 
+#![forbid(unsafe_code)]
+
 use crate::core::error::{LazyTablesError, Result};
 use crate::database::{
     mysql::MySqlConnection, postgres::PostgresConnection, sqlite::SqliteConnection, Connection,

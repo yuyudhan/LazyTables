@@ -1,5 +1,7 @@
 // FilePath: src/ui/components/debug_view.rs
 
+#![forbid(unsafe_code)]
+
 use crate::{logging::DebugMessage, ui::theme::Theme};
 use ratatui::{
     layout::{Alignment, Constraint, Direction, Layout, Rect},

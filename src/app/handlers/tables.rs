@@ -2,6 +2,8 @@
 //
 // Event handler for the Tables pane (table/view navigation and selection)
 
+#![forbid(unsafe_code)]
+
 use crate::{app::App, core::error::Result};
 use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
 

@@ -1,5 +1,7 @@
 // Database object types and representations
 
+#![forbid(unsafe_code)]
+
 use serde::{Deserialize, Serialize};
 
 /// Type of database object

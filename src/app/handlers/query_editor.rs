@@ -2,6 +2,8 @@
 //
 // Event handlers for the Query Editor pane (VIM-style SQL editor)
 
+#![forbid(unsafe_code)]
+
 use crate::{app::App, core::error::Result};
 use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
 

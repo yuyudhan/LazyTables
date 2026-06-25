@@ -1,5 +1,7 @@
 // FilePath: src/core/error.rs
 
+#![forbid(unsafe_code)]
+
 use thiserror::Error;
 
 /// Result type alias for LazyTables

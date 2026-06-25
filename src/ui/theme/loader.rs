@@ -1,5 +1,7 @@
 // FilePath: src/ui/theme/loader.rs
 
+#![forbid(unsafe_code)]
+
 use super::{Theme, ThemeManager};
 use std::fs;
 use std::path::{Path, PathBuf};

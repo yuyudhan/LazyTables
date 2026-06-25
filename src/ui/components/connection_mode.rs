@@ -1,5 +1,7 @@
 // FilePath: src/ui/components/connection_mode.rs
 
+#![forbid(unsafe_code)]
+
 use crate::{
     database::{ConnectionConfig, DatabaseType, SslMode},
     state::view::ConnectionFormMode,

@@ -1,5 +1,7 @@
 // FilePath: src/app/mod.rs
 
+#![forbid(unsafe_code)]
+
 use crate::{
     commands::{CommandAction, CommandContext, CommandId, CommandRegistry, CommandResult},
     config::Config,

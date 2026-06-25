@@ -1,5 +1,7 @@
 // FilePath: src/ui/help.rs
 
+#![forbid(unsafe_code)]
+
 use ratatui::{
     layout::{Alignment, Constraint, Direction, Layout, Rect},
     style::{Color, Modifier, Style},

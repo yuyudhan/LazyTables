@@ -1,5 +1,7 @@
 // FilePath: src/state/mod.rs
 
+#![forbid(unsafe_code)]
+
 pub mod database;
 pub mod ui;
 pub mod view;

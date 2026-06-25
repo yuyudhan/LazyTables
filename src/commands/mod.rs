@@ -1,5 +1,7 @@
 // FilePath: src/commands/mod.rs
 
+#![forbid(unsafe_code)]
+
 use crate::app::AppState;
 use crate::core::error::Result;
 use std::collections::HashMap;

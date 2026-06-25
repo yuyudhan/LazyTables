@@ -1,5 +1,7 @@
 // FilePath: src/security/password.rs
 
+#![forbid(unsafe_code)]
+
 use aes_gcm::{
     aead::{Aead, KeyInit, OsRng},
     Aes256Gcm, Key, Nonce,

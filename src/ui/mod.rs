@@ -1,5 +1,7 @@
 // FilePath: src/ui/mod.rs
 
+#![forbid(unsafe_code)]
+
 use crate::{
     app::{AppState, FocusedPane},
     config::Config,

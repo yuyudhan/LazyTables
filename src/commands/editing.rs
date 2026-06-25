@@ -1,5 +1,7 @@
 // FilePath: src/commands/editing.rs
 
+#![forbid(unsafe_code)]
+
 use super::{Command, CommandCategory, CommandContext, CommandId, CommandResult};
 use crate::core::error::Result;
 

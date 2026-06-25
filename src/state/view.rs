@@ -1,5 +1,7 @@
 // FilePath: src/state/view.rs
 
+#![forbid(unsafe_code)]
+
 use crate::database::ConnectionConfig;
 use serde::{Deserialize, Serialize};
 

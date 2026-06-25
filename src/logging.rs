@@ -1,5 +1,7 @@
 // FilePath: src/logging.rs
 
+#![forbid(unsafe_code)]
+
 use crate::{cli::LogLevel, config::Config, core::error::Result};
 use std::{
     collections::VecDeque,

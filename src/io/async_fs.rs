@@ -6,6 +6,8 @@
 //! to prevent blocking the UI thread. All operations include timeout handling to
 //! prevent indefinite hangs.
 
+#![forbid(unsafe_code)]
+
 use crate::core::error::{LazyTablesError, Result};
 use std::path::Path;
 use std::time::Duration;

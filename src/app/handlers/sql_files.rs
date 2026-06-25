@@ -2,6 +2,8 @@
 //
 // Event handlers for the SQL Files pane (file browser and management)
 
+#![forbid(unsafe_code)]
+
 use crate::{app::App, core::error::Result};
 use crossterm::event::{KeyCode, KeyEvent};
 

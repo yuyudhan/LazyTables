@@ -1,5 +1,7 @@
 // FilePath: src/database/app_state.rs
 
+#![forbid(unsafe_code)]
+
 use crate::config::Config;
 use crate::core::error::Result;
 use serde::{Deserialize, Serialize};

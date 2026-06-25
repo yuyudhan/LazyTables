@@ -1,5 +1,7 @@
 // FilePath: src/commands/navigation.rs
 
+#![forbid(unsafe_code)]
+
 use super::{Command, CommandCategory, CommandContext, CommandId, CommandResult};
 use crate::app::FocusedPane;
 use crate::core::error::Result;

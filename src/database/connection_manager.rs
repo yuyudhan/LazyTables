@@ -1,5 +1,7 @@
 // FilePath: src/database/connection_manager.rs
 
+#![forbid(unsafe_code)]
+
 use crate::core::error::{LazyTablesError, Result};
 use crate::database::{connection::Connection, ConnectionConfig};
 use std::collections::HashMap;
@@ -230,7 +232,3 @@ impl Default for ConnectionManager {
         Self::new()
     }
 }
-
-// Ensure ConnectionManager is thread-safe
-unsafe impl Send for ConnectionManager {}
-unsafe impl Sync for ConnectionManager {}

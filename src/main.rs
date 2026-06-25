@@ -1,5 +1,7 @@
 // FilePath: src/main.rs
 
+#![forbid(unsafe_code)]
+
 use clap::Parser;
 use lazytables::{app::App, cli::Cli, config::Config};
 

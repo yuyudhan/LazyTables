@@ -1,5 +1,7 @@
 // FilePath: src/ui/theme/mod.rs
 
+#![forbid(unsafe_code)]
+
 mod loader;
 
 pub use loader::ThemeLoader;

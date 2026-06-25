@@ -1,5 +1,7 @@
 // FilePath: src/ui/layout/mod.rs
 
+#![forbid(unsafe_code)]
+
 use ratatui::layout::{Constraint, Direction, Layout, Rect};
 
 /// Areas for each pane in the layout

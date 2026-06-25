@@ -2,6 +2,8 @@
 //
 // Event handlers for overlay views (modals, debug view, help)
 
+#![forbid(unsafe_code)]
+
 use crate::{
     app::{App, AppView, HelpMode, OverlayView},
     core::error::Result,

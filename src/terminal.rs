@@ -1,5 +1,7 @@
 // FilePath: src/terminal.rs
 
+#![forbid(unsafe_code)]
+
 use crate::core::error::{Error, Result};
 use crossterm::{
     cursor, execute,

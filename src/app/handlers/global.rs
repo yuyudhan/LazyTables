@@ -2,6 +2,8 @@
 //
 // Global event handlers that work across all panes and overlays
 
+#![forbid(unsafe_code)]
+
 use crate::{
     app::{App, FocusedPane},
     commands::CommandId,

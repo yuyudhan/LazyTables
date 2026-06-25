@@ -1,5 +1,7 @@
 // FilePath: src/ui/components/query_editor.rs
 
+#![forbid(unsafe_code)]
+
 use super::{SqlSuggestionEngine, SuggestionPopup};
 use crate::database::DatabaseType;
 use ratatui::{

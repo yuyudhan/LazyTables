@@ -3,6 +3,8 @@
 // Event handler modules for different panes and overlays.
 // Each module contains handler functions that take `&mut App` and `KeyEvent`.
 
+#![forbid(unsafe_code)]
+
 pub mod connections;
 pub mod details;
 pub mod global;

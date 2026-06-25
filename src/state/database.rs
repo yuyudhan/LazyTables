@@ -1,5 +1,7 @@
 // FilePath: src/state/database.rs
 
+#![forbid(unsafe_code)]
+
 use crate::{
     database::{
         connection::{Connection, ConnectionStorage},

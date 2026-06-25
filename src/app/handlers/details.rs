@@ -2,6 +2,8 @@
 //
 // Event handler for the Details pane (read-only scrolling of table metadata)
 
+#![forbid(unsafe_code)]
+
 use crate::{app::App, core::error::Result};
 use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
 

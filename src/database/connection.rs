@@ -1,5 +1,7 @@
 // FilePath: src/database/connection.rs
 
+#![forbid(unsafe_code)]
+
 use crate::config::Config;
 use crate::core::error::Result;
 use crate::security::{PasswordManager, PasswordSource};

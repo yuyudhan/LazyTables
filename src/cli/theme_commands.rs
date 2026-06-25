@@ -1,5 +1,7 @@
 // FilePath: src/cli/theme_commands.rs
 
+#![forbid(unsafe_code)]
+
 use crate::ui::theme::ThemeLoader;
 use clap::Subcommand;
 use std::path::PathBuf;

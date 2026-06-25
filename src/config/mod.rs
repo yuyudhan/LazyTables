@@ -1,5 +1,7 @@
 // FilePath: src/config/mod.rs
 
+#![forbid(unsafe_code)]
+
 use crate::core::error::Result;
 // Removed directories crate, using dirs crate for home_dir
 use serde::{Deserialize, Serialize};

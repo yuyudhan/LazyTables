@@ -2,6 +2,8 @@
 //
 // Navigation and focus management functions
 
+#![forbid(unsafe_code)]
+
 use crate::app::state::AppState;
 use crate::state::ui::FocusedPane;
 

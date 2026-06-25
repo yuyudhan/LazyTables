@@ -1,5 +1,7 @@
 // FilePath: src/ui/components/suggestion_popup.rs
 
+#![forbid(unsafe_code)]
+
 use ratatui::{
     layout::Rect,
     style::{Color, Modifier, Style},

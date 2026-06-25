@@ -2,6 +2,8 @@
 //
 // SQL file operations
 
+#![forbid(unsafe_code)]
+
 use crate::app::state::AppState;
 
 impl AppState {

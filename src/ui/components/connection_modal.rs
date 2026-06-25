@@ -1,5 +1,7 @@
 // FilePath: src/ui/components/connection_modal.rs
 
+#![forbid(unsafe_code)]
+
 use crate::database::connection::{ConnectionConfig, DatabaseType, SslMode};
 use crate::security::PasswordSource;
 use ratatui::{

@@ -1,5 +1,7 @@
 // FilePath: src/event/mod.rs
 
+#![forbid(unsafe_code)]
+
 use crate::core::error::{Error, Result};
 use crossterm::event::{self, Event as CrosstermEvent, KeyEvent, MouseEvent};
 use std::{

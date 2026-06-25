@@ -2,6 +2,8 @@
 //
 // Table operations and management
 
+#![forbid(unsafe_code)]
+
 use crate::app::state::AppState;
 
 impl AppState {

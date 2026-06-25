@@ -1,6 +1,8 @@
 // FilePath: src/database/mod.rs
 
 // Database adapter modules
+#![forbid(unsafe_code)]
+
 pub mod app_state;
 pub mod connection;
 pub mod connection_manager;

@@ -2,6 +2,8 @@
 //
 // Core application state structure and module exports
 
+#![forbid(unsafe_code)]
+
 use crate::{
     config::Config,
     database::{AppStateDb, ConnectionConfig, ConnectionManager, ConnectionStatus},

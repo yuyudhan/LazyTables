@@ -1,5 +1,7 @@
 // FilePath: src/ui/components/table_viewer.rs
 
+#![forbid(unsafe_code)]
+
 use crate::ui::theme::Theme;
 use ratatui::{
     layout::{Alignment, Constraint, Direction, Layout, Rect},

@@ -1,5 +1,7 @@
 // FilePath: src/database/postgres.rs
 
+#![forbid(unsafe_code)]
+
 use crate::core::error::{LazyTablesError, Result};
 use crate::database::{
     connection::ConnectionConfig, Connection, DataType, TableColumn, TableMetadata,

@@ -2,6 +2,8 @@
 //
 // Event handlers for the Connections pane and connection modal
 
+#![forbid(unsafe_code)]
+
 use crate::{
     app::{App, ConnectionEvent, TestConnectionEvent},
     core::error::Result,

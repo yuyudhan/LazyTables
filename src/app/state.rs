@@ -1,5 +1,7 @@
 // FilePath: src/app/state.rs
 
+#![forbid(unsafe_code)]
+
 use crate::{
     config::Config,
     database::{AppStateDb, ConnectionConfig, ConnectionManager, ConnectionStatus},

@@ -1,5 +1,7 @@
 // FilePath: src/cli.rs
 
+#![forbid(unsafe_code)]
+
 mod theme_commands;
 
 use clap::{Parser, Subcommand, ValueEnum};

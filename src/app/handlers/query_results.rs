@@ -2,6 +2,8 @@
 //
 // Event handlers for the Query Results / Table Viewer pane
 
+#![forbid(unsafe_code)]
+
 use crate::{app::App, core::error::Result};
 use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
 
