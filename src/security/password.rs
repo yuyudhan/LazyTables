@@ -177,7 +177,6 @@ impl PasswordManager {
     }
 }
 
-
 #[cfg(test)]
 mod tests {
     use super::*;

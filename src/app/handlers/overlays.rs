@@ -117,9 +117,7 @@ pub(crate) async fn handle_confirmation_modal(app: &mut App, key: KeyEvent) -> R
                 match &modal.action {
                     crate::ui::ConfirmationAction::DeleteConnection(index) => {
                         let index = *index;
-                        if let Some(connection) =
-                            app.state.db.connections.connections.get(index)
-                        {
+                        if let Some(connection) = app.state.db.connections.connections.get(index) {
                             let conn_id = connection.id.clone();
                             if let Err(e) =
                                 app.state.db.connections.remove_connection(&conn_id).await
@@ -210,7 +208,9 @@ pub(crate) async fn handle_set_null_confirmation(app: &mut App, key: KeyEvent) -
                         .toast_manager
                         .error(format!("Failed to set NULL: {e}"));
                 } else {
-                    app.state.toast_manager.success("Cell set to NULL successfully");
+                    app.state
+                        .toast_manager
+                        .success("Cell set to NULL successfully");
                     let tab_idx = app.state.table_viewer_state.active_tab;
                     let _ = app.state.load_table_data(tab_idx).await;
                 }

@@ -123,22 +123,15 @@ async fn handle_rename_mode(app: &mut App, key: KeyEvent) -> Result<()> {
                 let filtered_files = app.state.get_filtered_sql_files();
                 let selected_index = app.state.get_filtered_sql_file_selection();
                 if let Some(old_name) = filtered_files.get(selected_index) {
-                    if let Some(original_index) = app
-                        .state
-                        .saved_sql_files
-                        .iter()
-                        .position(|f| f == old_name)
+                    if let Some(original_index) =
+                        app.state.saved_sql_files.iter().position(|f| f == old_name)
                     {
-                        if let Err(e) =
-                            app.state.rename_sql_file(original_index, &new_name).await
-                        {
+                        if let Err(e) = app.state.rename_sql_file(original_index, &new_name).await {
                             app.state
                                 .toast_manager
                                 .error(format!("Failed to rename file: {e}"));
                         } else {
-                            app.state
-                                .toast_manager
-                                .success("File renamed successfully");
+                            app.state.toast_manager.success("File renamed successfully");
                         }
                     }
                 }
@@ -170,9 +163,7 @@ async fn handle_create_mode(app: &mut App, key: KeyEvent) -> Result<()> {
                         .toast_manager
                         .error(format!("Failed to create file: {e}"));
                 } else {
-                    app.state
-                        .toast_manager
-                        .success("File created successfully");
+                    app.state.toast_manager.success("File created successfully");
                     // Load the new file
                     let _ = app.state.load_query_file(&filename);
                 }

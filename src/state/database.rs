@@ -372,8 +372,12 @@ impl DatabaseState {
                     // Set NULL based on database type
                     match connection.database_type {
                         DatabaseType::PostgreSQL => {
-                            self.set_postgres_cell_to_null(&connection, confirmation, connection_manager)
-                                .await
+                            self.set_postgres_cell_to_null(
+                                &connection,
+                                confirmation,
+                                connection_manager,
+                            )
+                            .await
                         }
                         _ => Err(format!(
                             "Database type {} not yet supported for setting NULL",
@@ -651,5 +655,4 @@ impl DatabaseState {
             )),
         }
     }
-
 }

@@ -1020,9 +1020,7 @@ fn render_modal_header_with_hints(
         vec![Line::from(vec![
             Span::styled(
                 "Ctrl+C",
-                Style::default()
-                    .fg(Color::Red)
-                    .add_modifier(Modifier::BOLD),
+                Style::default().fg(Color::Red).add_modifier(Modifier::BOLD),
             ),
             Span::styled(" - Abort Test", Style::default().fg(Color::Gray)),
         ])]
@@ -1615,16 +1613,10 @@ fn render_modal_status(
                             ))
                         } else if trimmed.starts_with("Details:") {
                             // Details section - gray
-                            Line::from(Span::styled(
-                                trimmed,
-                                Style::default().fg(Color::Gray),
-                            ))
+                            Line::from(Span::styled(trimmed, Style::default().fg(Color::Gray)))
                         } else if trimmed.starts_with("Error Code:") {
                             // Error code - cyan
-                            Line::from(Span::styled(
-                                trimmed,
-                                Style::default().fg(Color::Cyan),
-                            ))
+                            Line::from(Span::styled(trimmed, Style::default().fg(Color::Cyan)))
                         } else if trimmed.starts_with("Try the following:") {
                             // Suggestions header - yellow
                             Line::from(Span::styled(

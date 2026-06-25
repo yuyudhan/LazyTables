@@ -1,5 +1,5 @@
 // FilePath: src/app/handlers/global.rs
-//
+
 // Global event handlers that work across all panes and overlays
 
 #![forbid(unsafe_code)]
@@ -38,7 +38,10 @@ pub(crate) fn handle(app: &mut App, key: KeyEvent) -> Result<Option<()>> {
         (KeyModifiers::NONE, KeyCode::Char(c @ '1'..='6')) if app.state.ui.is_in_main() => {
             // Check if we're in table viewer edit mode
             let in_table_edit_mode = app.state.ui.focused_pane == FocusedPane::TabularOutput
-                && app.state.table_viewer_state.current_tab()
+                && app
+                    .state
+                    .table_viewer_state
+                    .current_tab()
                     .map(|tab| tab.in_edit_mode)
                     .unwrap_or(false);
 

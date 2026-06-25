@@ -48,7 +48,8 @@ pub(crate) async fn handle(app: &mut App, key: KeyEvent) -> Result<()> {
         // 'd' - Delete current row (double-tap within 500ms)
         KeyCode::Char('d') => {
             let now = std::time::Instant::now();
-            let should_delete = if let Some(last_press) = app.state.table_viewer_state.last_d_press {
+            let should_delete = if let Some(last_press) = app.state.table_viewer_state.last_d_press
+            {
                 // Check if within 500ms window
                 now.duration_since(last_press).as_millis() < 500
             } else {
@@ -57,17 +58,23 @@ pub(crate) async fn handle(app: &mut App, key: KeyEvent) -> Result<()> {
 
             if should_delete {
                 // Double-tap detected - prepare delete confirmation
-                if let Some(confirmation) = app.state.table_viewer_state.prepare_delete_confirmation() {
+                if let Some(confirmation) =
+                    app.state.table_viewer_state.prepare_delete_confirmation()
+                {
                     app.state.table_viewer_state.delete_confirmation = Some(confirmation);
                 } else {
-                    app.state.toast_manager.error("Cannot delete row: no primary key found");
+                    app.state
+                        .toast_manager
+                        .error("Cannot delete row: no primary key found");
                 }
                 // Reset the last press
                 app.state.table_viewer_state.last_d_press = None;
             } else {
                 // First 'd' press - record timestamp
                 app.state.table_viewer_state.last_d_press = Some(now);
-                app.state.toast_manager.info("Press 'd' again to delete row, or 'c' to set NULL");
+                app.state
+                    .toast_manager
+                    .info("Press 'd' again to delete row, or 'c' to set NULL");
             }
         }
         // 'c' - Set cell to NULL (after 'd' press) or Copy cell (after 'y' press)
@@ -75,20 +82,22 @@ pub(crate) async fn handle(app: &mut App, key: KeyEvent) -> Result<()> {
             let now = std::time::Instant::now();
 
             // Check for 'yc' sequence - copy cell
-            let should_copy_cell = if let Some(last_press) = app.state.table_viewer_state.last_y_press {
-                // Check if within 500ms window after 'y' press
-                now.duration_since(last_press).as_millis() < 500
-            } else {
-                false
-            };
+            let should_copy_cell =
+                if let Some(last_press) = app.state.table_viewer_state.last_y_press {
+                    // Check if within 500ms window after 'y' press
+                    now.duration_since(last_press).as_millis() < 500
+                } else {
+                    false
+                };
 
             // Check for 'dc' sequence - set NULL
-            let should_set_null = if let Some(last_press) = app.state.table_viewer_state.last_d_press {
-                // Check if within 500ms window after 'd' press
-                now.duration_since(last_press).as_millis() < 500
-            } else {
-                false
-            };
+            let should_set_null =
+                if let Some(last_press) = app.state.table_viewer_state.last_d_press {
+                    // Check if within 500ms window after 'd' press
+                    now.duration_since(last_press).as_millis() < 500
+                } else {
+                    false
+                };
 
             if should_copy_cell {
                 // 'yc' sequence detected - copy cell to clipboard
@@ -97,14 +106,18 @@ pub(crate) async fn handle(app: &mut App, key: KeyEvent) -> Result<()> {
                         app.state.toast_manager.success("Cell copied to clipboard");
                     }
                     Err(e) => {
-                        app.state.toast_manager.error(format!("Failed to copy cell: {e}"));
+                        app.state
+                            .toast_manager
+                            .error(format!("Failed to copy cell: {e}"));
                     }
                 }
                 // Reset the last press
                 app.state.table_viewer_state.last_y_press = None;
             } else if should_set_null {
                 // 'dc' sequence detected - prepare set NULL confirmation
-                if let Some(confirmation) = app.state.table_viewer_state.prepare_set_null_confirmation() {
+                if let Some(confirmation) =
+                    app.state.table_viewer_state.prepare_set_null_confirmation()
+                {
                     app.state.table_viewer_state.set_null_confirmation = Some(confirmation);
                 } else {
                     // Check why we can't set NULL
@@ -117,9 +130,13 @@ pub(crate) async fn handle(app: &mut App, key: KeyEvent) -> Result<()> {
                                     column.name
                                 ));
                             } else if tab.primary_key_columns.is_empty() {
-                                app.state.toast_manager.error("Cannot set NULL: no primary key found");
+                                app.state
+                                    .toast_manager
+                                    .error("Cannot set NULL: no primary key found");
                             } else {
-                                app.state.toast_manager.error("Cannot set NULL on current cell");
+                                app.state
+                                    .toast_manager
+                                    .error("Cannot set NULL on current cell");
                             }
                         }
                     }
@@ -143,10 +160,14 @@ pub(crate) async fn handle(app: &mut App, key: KeyEvent) -> Result<()> {
                 // Double-tap detected - copy row to clipboard
                 match app.state.table_viewer_state.copy_row_csv() {
                     Ok(()) => {
-                        app.state.toast_manager.success("Row copied to clipboard (CSV format)");
+                        app.state
+                            .toast_manager
+                            .success("Row copied to clipboard (CSV format)");
                     }
                     Err(e) => {
-                        app.state.toast_manager.error(format!("Failed to copy row: {e}"));
+                        app.state
+                            .toast_manager
+                            .error(format!("Failed to copy row: {e}"));
                     }
                 }
                 // Reset the last press
@@ -154,7 +175,9 @@ pub(crate) async fn handle(app: &mut App, key: KeyEvent) -> Result<()> {
             } else {
                 // First 'y' press - record timestamp
                 app.state.table_viewer_state.last_y_press = Some(now);
-                app.state.toast_manager.info("Press 'y' again to copy row, or 'c' to copy cell");
+                app.state
+                    .toast_manager
+                    .info("Press 'y' again to copy row, or 'c' to copy cell");
             }
         }
         // '/' - Enter search mode
@@ -228,13 +251,18 @@ pub(crate) async fn handle(app: &mut App, key: KeyEvent) -> Result<()> {
         }
         // 'x' - Close current tab
         KeyCode::Char('x') => {
-            let table_name = app.state.table_viewer_state.current_tab()
+            let table_name = app
+                .state
+                .table_viewer_state
+                .current_tab()
                 .map(|tab| tab.table_name.clone());
 
             app.state.table_viewer_state.close_current_tab();
 
             if let Some(name) = table_name {
-                app.state.toast_manager.info(format!("Closed tab: {}", name));
+                app.state
+                    .toast_manager
+                    .info(format!("Closed tab: {}", name));
             }
         }
         // 'g' - First press of gg (jump to top)
@@ -242,9 +270,7 @@ pub(crate) async fn handle(app: &mut App, key: KeyEvent) -> Result<()> {
             if app.state.ui.pending_gg_command {
                 // Second 'g' press - jump to top
                 if let Some(tab) = app.state.table_viewer_state.current_tab_mut() {
-                    if tab.view_mode
-                        == crate::ui::components::table_viewer::TableViewMode::Schema
-                    {
+                    if tab.view_mode == crate::ui::components::table_viewer::TableViewMode::Schema {
                         tab.jump_to_top_schema();
                     } else {
                         tab.jump_to_first();
@@ -259,8 +285,7 @@ pub(crate) async fn handle(app: &mut App, key: KeyEvent) -> Result<()> {
         // 'G' - Jump to bottom
         KeyCode::Char('G') => {
             if let Some(tab) = app.state.table_viewer_state.current_tab_mut() {
-                if tab.view_mode == crate::ui::components::table_viewer::TableViewMode::Schema
-                {
+                if tab.view_mode == crate::ui::components::table_viewer::TableViewMode::Schema {
                     tab.jump_to_bottom_schema();
                 } else {
                     tab.jump_to_last();
@@ -301,9 +326,7 @@ async fn handle_edit_mode(app: &mut App, key: KeyEvent) -> Result<()> {
                             .toast_manager
                             .error(format!("Failed to update cell: {e}"));
                     } else {
-                        app.state
-                            .toast_manager
-                            .success("Cell updated successfully");
+                        app.state.toast_manager.success("Cell updated successfully");
                     }
                 }
             }

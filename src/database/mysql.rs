@@ -46,7 +46,10 @@ impl MySqlConnection {
     }
 
     /// Parse SQLx error into structured ConnectionError with helpful suggestions
-    pub fn parse_connection_error(&self, error: &sqlx::Error) -> crate::core::error::ConnectionError {
+    pub fn parse_connection_error(
+        &self,
+        error: &sqlx::Error,
+    ) -> crate::core::error::ConnectionError {
         use crate::core::error::{ConnectionError, ConnectionErrorType};
 
         let error_str = error.to_string();
@@ -63,16 +66,25 @@ impl MySqlConnection {
         if error_lower.contains("connection refused") || error_lower.contains("can't connect") {
             ConnectionError::new(
                 ConnectionErrorType::Network,
-                format!("Cannot reach MySQL server at {}:{}", self.config.host, self.config.port),
+                format!(
+                    "Cannot reach MySQL server at {}:{}",
+                    self.config.host, self.config.port
+                ),
                 error_str,
             )
-            .with_suggestion(format!("Check if MySQL is running on {}:{}", self.config.host, self.config.port))
+            .with_suggestion(format!(
+                "Check if MySQL is running on {}:{}",
+                self.config.host, self.config.port
+            ))
             .with_suggestion("Verify the host address and port number (default: 3306)")
             .with_suggestion("Check firewall settings allow connections to MySQL")
-            .with_suggestion("If using Docker, ensure the container is running and ports are exposed")
+            .with_suggestion(
+                "If using Docker, ensure the container is running and ports are exposed",
+            )
         } else if error_lower.contains("access denied")
             || error_lower.contains("authentication")
-            || error_code.as_deref() == Some("1045") {
+            || error_code.as_deref() == Some("1045")
+        {
             ConnectionError::new(
                 ConnectionErrorType::Authentication,
                 format!("Access denied for user '{}'", self.config.username),
@@ -82,7 +94,8 @@ impl MySqlConnection {
             .with_suggestion("Verify the username and password are correct")
             .with_suggestion("Check user privileges with: SELECT user, host FROM mysql.user;")
             .with_suggestion("Grant access with: GRANT ALL ON database.* TO 'user'@'host';")
-        } else if error_lower.contains("unknown database") || error_code.as_deref() == Some("1049") {
+        } else if error_lower.contains("unknown database") || error_code.as_deref() == Some("1049")
+        {
             let db_name = self.config.database.as_deref().unwrap_or("mysql");
             ConnectionError::new(
                 ConnectionErrorType::DatabaseNotFound,
@@ -92,7 +105,10 @@ impl MySqlConnection {
             .with_error_code(error_code.unwrap_or_else(|| "1049".to_string()))
             .with_suggestion(format!("Check if database '{}' exists", db_name))
             .with_suggestion("List databases with: SHOW DATABASES;")
-            .with_suggestion(format!("Create database with: CREATE DATABASE {};", db_name))
+            .with_suggestion(format!(
+                "Create database with: CREATE DATABASE {};",
+                db_name
+            ))
         } else if error_lower.contains("ssl") || error_lower.contains("tls") {
             ConnectionError::new(
                 ConnectionErrorType::SslConfiguration,
@@ -111,7 +127,9 @@ impl MySqlConnection {
             .with_suggestion("Check network connectivity to the MySQL server")
             .with_suggestion("Verify MySQL is listening on the correct interface")
             .with_suggestion("Check wait_timeout and connect_timeout settings")
-        } else if error_lower.contains("too many connections") || error_code.as_deref() == Some("1040") {
+        } else if error_lower.contains("too many connections")
+            || error_code.as_deref() == Some("1040")
+        {
             ConnectionError::new(
                 ConnectionErrorType::ServerError,
                 "MySQL server has too many connections",
@@ -554,7 +572,12 @@ impl MySqlConnection {
 
                         let obj = DatabaseObject {
                             name,
-                            schema: Some(self.config.database.clone().unwrap_or_else(|| "default".to_string())),
+                            schema: Some(
+                                self.config
+                                    .database
+                                    .clone()
+                                    .unwrap_or_else(|| "default".to_string()),
+                            ),
                             object_type: object_type.clone(),
                             row_count,
                             size_bytes,
@@ -816,8 +839,10 @@ impl MySqlConnection {
                 .collect::<Vec<_>>()
                 .join(", ");
 
-            let query =
-                format!("SELECT {select_list} FROM {} LIMIT {} OFFSET {}", safe_table_name, limit, offset);
+            let query = format!(
+                "SELECT {select_list} FROM {} LIMIT {} OFFSET {}",
+                safe_table_name, limit, offset
+            );
 
             let rows = sqlx::query(&query).fetch_all(pool).await?;
 

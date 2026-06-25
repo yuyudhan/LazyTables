@@ -16,7 +16,9 @@ use std::time::Duration;
 pub mod handlers;
 pub mod state;
 
-pub use state::{AppState, AppView, ConnectionFormMode, FocusedPane, HelpMode, OverlayView, TextInputMode};
+pub use state::{
+    AppState, AppView, ConnectionFormMode, FocusedPane, HelpMode, OverlayView, TextInputMode,
+};
 
 /// Connection event sent from background tasks to main event loop
 #[derive(Debug)]
@@ -198,8 +200,16 @@ impl App {
                 // Note: Query execution is handled directly by key handlers (handle_query_editor_keys)
                 // via execute_query_at_cursor(). This action is kept for command system compatibility
                 // but actual execution happens in the async key handler.
-                self.state.toast_manager.info(format!("Query submitted: {}",
-                    query.lines().next().unwrap_or("").chars().take(50).collect::<String>()));
+                self.state.toast_manager.info(format!(
+                    "Query submitted: {}",
+                    query
+                        .lines()
+                        .next()
+                        .unwrap_or("")
+                        .chars()
+                        .take(50)
+                        .collect::<String>()
+                ));
             }
             CommandAction::ExecuteQueryWithContext {
                 query: _,
@@ -258,7 +268,12 @@ impl App {
         }
 
         // 4b. Handle table viewer set NULL confirmation
-        if self.state.table_viewer_state.set_null_confirmation.is_some() {
+        if self
+            .state
+            .table_viewer_state
+            .set_null_confirmation
+            .is_some()
+        {
             return handlers::overlays::handle_set_null_confirmation(self, key).await;
         }
 
@@ -454,5 +469,4 @@ impl App {
 
         Ok(())
     }
-
 }

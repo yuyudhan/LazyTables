@@ -93,8 +93,7 @@ pub(crate) async fn handle(app: &mut App, key: KeyEvent) -> Result<()> {
                         .to_string();
 
                     if !group_name.is_empty() {
-                        let is_expanded_before =
-                            app.state.ui.is_object_group_expanded(&group_name);
+                        let is_expanded_before = app.state.ui.is_object_group_expanded(&group_name);
                         app.state.ui.toggle_object_group_expansion(&group_name);
                         app.state
                             .ui
