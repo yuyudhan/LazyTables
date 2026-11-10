@@ -1,0 +1,229 @@
+# FilePath: docker/compose.yml
+#
+# LazyTables test databases. Every service sits in a profile; start one profile at a
+# time through scripts/testdb.sh (or `make db-up PROFILE=<profile>`).
+# Ports bind to 127.0.0.1 only. `scripts/testdb.sh down` removes the volumes, so every
+# `up` starts from the seed scripts. Throwaway test credentials default to
+# lazy/lazy, lazytables/lazy for MySQL/MariaDB app users (override with LT_DB_PASSWORD / LT_REPL_PASSWORD).
+# Connection strings: docs/dev/test-databases.md.
+
+name: lt-testdb
+
+x-pg-env: &pg-env
+  POSTGRES_USER: lazy
+  POSTGRES_PASSWORD: ${LT_DB_PASSWORD:-lazy}
+  POSTGRES_DB: lazytables
+
+x-mysql-env: &mysql-env
+  MYSQL_ROOT_PASSWORD: ${LT_DB_PASSWORD:-lazy}
+  MYSQL_DATABASE: test_db
+  MYSQL_USER: lazytables
+  MYSQL_PASSWORD: ${LT_DB_PASSWORD:-lazy}
+
+x-mariadb-env: &mariadb-env
+  MARIADB_ROOT_PASSWORD: ${LT_DB_PASSWORD:-lazy}
+  MARIADB_DATABASE: test_db
+  MARIADB_USER: lazytables
+  MARIADB_PASSWORD: ${LT_DB_PASSWORD:-lazy}
+
+x-pg-health: &pg-health
+  test: ["CMD-SHELL", "pg_isready -U lazy -d lazytables -h 127.0.0.1"]
+  interval: 3s
+  timeout: 3s
+  retries: 60
+  start_period: 10s
+
+x-mysql-health: &mysql-health
+  test: ["CMD-SHELL", "mysqladmin ping -h 127.0.0.1 -uroot -p\"$$MYSQL_ROOT_PASSWORD\" --silent"]
+  interval: 3s
+  timeout: 3s
+  retries: 80
+  start_period: 20s
+
+x-mariadb-health: &mariadb-health
+  test: ["CMD", "healthcheck.sh", "--connect", "--innodb_initialized"]
+  interval: 3s
+  timeout: 3s
+  retries: 80
+  start_period: 20s
+
+# healthcheck.sh needs the per-datadir .my-healthcheck.cnf, which SST does not copy to
+# joining nodes, so Galera nodes check wsrep state with the root login instead.
+x-galera-health: &galera-health
+  test: ["CMD-SHELL", "mariadb -h 127.0.0.1 -uroot -p\"$$MARIADB_ROOT_PASSWORD\" -N -e \"SHOW STATUS LIKE 'wsrep_local_state_comment'\" | grep -q Synced"]
+  interval: 3s
+  timeout: 3s
+  retries: 100
+  start_period: 20s
+
+services:
+  # ---- profile: pg (single instances) -----------------------------------
+  lt-pg16:
+    profiles: ["pg"]
+    image: postgres:16
+    container_name: lt-pg16
+    environment: *pg-env
+    ports: ["127.0.0.1:15432:5432"]
+    volumes:
+      - ./postgres/init:/docker-entrypoint-initdb.d:ro
+    healthcheck: *pg-health
+
+  lt-pg13:
+    profiles: ["pg"]
+    image: postgres:13
+    container_name: lt-pg13
+    environment: *pg-env
+    ports: ["127.0.0.1:15433:5432"]
+    volumes:
+      - ./postgres/init:/docker-entrypoint-initdb.d:ro
+    healthcheck: *pg-health
+
+  # ---- profile: pg-cluster (primary + streaming hot-standby replica) ----
+  lt-pg-primary:
+    profiles: ["pg-cluster"]
+    image: postgres:16
+    container_name: lt-pg-primary
+    environment:
+      <<: *pg-env
+      LT_REPLICATION_PASSWORD: ${LT_REPL_PASSWORD:-replpass}
+    command: ["postgres", "-c", "wal_level=replica", "-c", "max_wal_senders=5", "-c", "hot_standby=on"]
+    ports: ["127.0.0.1:15442:5432"]
+    volumes:
+      - ./postgres/init:/docker-entrypoint-initdb.d:ro
+    healthcheck: *pg-health
+
+  lt-pg-replica:
+    profiles: ["pg-cluster"]
+    image: postgres:16
+    container_name: lt-pg-replica
+    user: postgres
+    environment:
+      PGPASSWORD: ${LT_REPL_PASSWORD:-replpass}
+    depends_on:
+      lt-pg-primary:
+        condition: service_healthy
+    entrypoint:
+      - bash
+      - -c
+      - |
+        set -e
+        if [ ! -s /var/lib/postgresql/data/PG_VERSION ]; then
+          pg_basebackup -h lt-pg-primary -U replicator -D /var/lib/postgresql/data -R -X stream
+          chmod 700 /var/lib/postgresql/data
+        fi
+        exec postgres -c hot_standby=on
+    ports: ["127.0.0.1:15443:5432"]
+    volumes:
+      - pg-replica-data:/var/lib/postgresql/data
+    healthcheck: *pg-health
+
+  # ---- profile: mysql (single instance) ---------------------------------
+  lt-mysql8:
+    profiles: ["mysql"]
+    image: mysql:8.4
+    container_name: lt-mysql8
+    environment: *mysql-env
+    command: ["--character-set-server=utf8mb4", "--collation-server=utf8mb4_unicode_ci"]
+    ports: ["127.0.0.1:13306:3306"]
+    volumes:
+      - ./mysql/init:/docker-entrypoint-initdb.d:ro
+    healthcheck: *mysql-health
+
+  # ---- profile: mysql-cluster (GTID source + read-only replica) ---------
+  lt-mysql-source:
+    profiles: ["mysql-cluster"]
+    image: mysql:8.4
+    container_name: lt-mysql-source
+    environment:
+      <<: *mysql-env
+      LT_REPLICATION_PASSWORD: ${LT_REPL_PASSWORD:-replpass}
+    command:
+      - --server-id=1
+      - --log-bin=mysql-bin
+      - --gtid-mode=ON
+      - --enforce-gtid-consistency=ON
+      - --character-set-server=utf8mb4
+      - --collation-server=utf8mb4_unicode_ci
+    ports: ["127.0.0.1:13316:3306"]
+    volumes:
+      - ./mysql/init:/docker-entrypoint-initdb.d:ro
+    healthcheck: *mysql-health
+
+  lt-mysql-replica:
+    profiles: ["mysql-cluster"]
+    image: mysql:8.4
+    container_name: lt-mysql-replica
+    environment:
+      MYSQL_ROOT_PASSWORD: ${LT_DB_PASSWORD:-lazy}
+      LT_REPLICATION_PASSWORD: ${LT_REPL_PASSWORD:-replpass}
+    depends_on:
+      lt-mysql-source:
+        condition: service_healthy
+    command:
+      - --server-id=2
+      - --gtid-mode=ON
+      - --enforce-gtid-consistency=ON
+      - --read-only=ON
+      - --character-set-server=utf8mb4
+      - --collation-server=utf8mb4_unicode_ci
+    ports: ["127.0.0.1:13317:3306"]
+    volumes:
+      - ./mysql/replica:/docker-entrypoint-initdb.d:ro
+    healthcheck: *mysql-health
+
+  # ---- profile: mariadb (single instance) -------------------------------
+  lt-mariadb11:
+    profiles: ["mariadb"]
+    image: mariadb:11.4
+    container_name: lt-mariadb11
+    environment: *mariadb-env
+    ports: ["127.0.0.1:13307:3306"]
+    volumes:
+      - ./mariadb/init:/docker-entrypoint-initdb.d:ro
+    healthcheck: *mariadb-health
+
+  # ---- profile: mariadb-cluster (3-node Galera, multi-primary) ----------
+  lt-galera-1:
+    profiles: ["mariadb-cluster"]
+    image: mariadb:11.4
+    container_name: lt-galera-1
+    environment: *mariadb-env
+    command: ["--wsrep-new-cluster", "--wsrep_node_name=lt-galera-1", "--wsrep_node_address=lt-galera-1", "--wsrep_sst_auth=root:${LT_DB_PASSWORD:-lazy}"]
+    ports: ["127.0.0.1:13321:3306"]
+    volumes:
+      - ./mariadb/init:/docker-entrypoint-initdb.d:ro
+      - ./mariadb/galera/galera.cnf:/etc/mysql/conf.d/galera.cnf:ro
+    healthcheck: *galera-health
+
+  lt-galera-2:
+    profiles: ["mariadb-cluster"]
+    image: mariadb:11.4
+    container_name: lt-galera-2
+    environment:
+      MARIADB_ROOT_PASSWORD: ${LT_DB_PASSWORD:-lazy}
+    depends_on:
+      lt-galera-1:
+        condition: service_healthy
+    command: ["--wsrep_node_name=lt-galera-2", "--wsrep_node_address=lt-galera-2", "--wsrep_sst_auth=root:${LT_DB_PASSWORD:-lazy}"]
+    ports: ["127.0.0.1:13322:3306"]
+    volumes:
+      - ./mariadb/galera/galera.cnf:/etc/mysql/conf.d/galera.cnf:ro
+    healthcheck: *galera-health
+
+  lt-galera-3:
+    profiles: ["mariadb-cluster"]
+    image: mariadb:11.4
+    container_name: lt-galera-3
+    environment:
+      MARIADB_ROOT_PASSWORD: ${LT_DB_PASSWORD:-lazy}
+    depends_on:
+      lt-galera-2:
+        condition: service_healthy
+    command: ["--wsrep_node_name=lt-galera-3", "--wsrep_node_address=lt-galera-3", "--wsrep_sst_auth=root:${LT_DB_PASSWORD:-lazy}"]
+    ports: ["127.0.0.1:13323:3306"]
+    volumes:
+      - ./mariadb/galera/galera.cnf:/etc/mysql/conf.d/galera.cnf:ro
+    healthcheck: *galera-health
+
+volumes:
+  pg-replica-data:

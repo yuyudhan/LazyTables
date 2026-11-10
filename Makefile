@@ -2,7 +2,7 @@
 
 # LazyTables Development Makefile
 
-.PHONY: help dev build test lint format clean
+.PHONY: help dev build test lint format clean db-up db-down db-reset db-probe db-status
 
 # Default target
 help:
@@ -23,6 +23,14 @@ help:
 	@echo "  make lint             - Run clippy linter"
 	@echo "  make format           - Format code with rustfmt"
 	@echo "  make check            - Run format check and clippy"
+	@echo ""
+	@echo "Test databases (docker, see docs/dev/test-databases.md):"
+	@echo "  make db-up PROFILE=pg     - Start a profile (pg, pg-cluster, mysql, mysql-cluster,"
+	@echo "                              mariadb, mariadb-cluster, sqlite) and wait until healthy"
+	@echo "  make db-probe PROFILE=pg  - Run the SQL probe against a running profile"
+	@echo "  make db-reset PROFILE=pg  - Recreate a profile from the seed scripts"
+	@echo "  make db-down [PROFILE=pg] - Stop a profile (default: all) and drop its data"
+	@echo "  make db-status            - List running test-database containers"
 	@echo ""
 	@echo "Cleanup:"
 	@echo "  make clean            - Clean build artifacts"
@@ -64,6 +72,22 @@ format-check:
 	cargo fmt -- --check
 
 check: format-check lint
+
+# Test databases (docker/compose.yml via scripts/testdb.sh)
+db-up:
+	scripts/testdb.sh up $(PROFILE)
+
+db-probe:
+	scripts/testdb.sh probe $(PROFILE)
+
+db-reset:
+	scripts/testdb.sh reset $(PROFILE)
+
+db-down:
+	scripts/testdb.sh down $(PROFILE)
+
+db-status:
+	scripts/testdb.sh status
 
 
 # Cleanup

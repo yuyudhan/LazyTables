@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- **Docker test databases** (`docker/compose.yml`, `scripts/testdb.sh`, `make db-*`): Postgres 16 and 13, MySQL 8.4, MariaDB 11.4 and a SQLite file, plus Postgres primary/hot-standby, MySQL GTID source/replica and a 3-node MariaDB Galera cluster, seeded with multi-schema, all-types and 100k-row fixtures. See `docs/dev/test-databases.md`.
+
+### Fixed
+- MySQL/MariaDB seed scripts failed on a fresh container (grant to a missing `lazytables` user, category ids assumed to start at 21).
+
 ## [0.2.3] - 2025-10-14
 
 Major bug fixes, code refactoring, and user experience improvements.
