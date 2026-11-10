@@ -26,17 +26,17 @@ INSERT INTO users (username, email, full_name, is_active) VALUES
 ('ryan_howard', 'ryan@dundermifflin.com', 'Ryan Howard', FALSE),
 ('kelly_kapoor', 'kelly@dundermifflin.com', 'Kelly Kapoor', TRUE);
 
--- Insert more categories
-INSERT INTO categories (name, description, parent_id) VALUES
-('Home & Garden', 'Home improvement and gardening', NULL),
-('Furniture', 'Home and office furniture', 21),
-('Tools', 'Hand and power tools', 21),
-('Sports & Outdoors', 'Sporting goods and outdoor equipment', NULL),
-('Fitness', 'Exercise and fitness equipment', 24),
-('Camping', 'Camping and hiking gear', 24),
-('Toys & Games', 'Children toys and games', NULL),
-('Board Games', 'Family board games', 27),
-('Video Games', 'Console and PC games', 27);
+-- Insert more categories (explicit ids: 02 seeds ids 1-9, products below reference 21-29)
+INSERT INTO categories (id, name, description, parent_id) VALUES
+(21, 'Home & Garden', 'Home improvement and gardening', NULL),
+(22, 'Furniture', 'Home and office furniture', 21),
+(23, 'Tools', 'Hand and power tools', 21),
+(24, 'Sports & Outdoors', 'Sporting goods and outdoor equipment', NULL),
+(25, 'Fitness', 'Exercise and fitness equipment', 24),
+(26, 'Camping', 'Camping and hiking gear', 24),
+(27, 'Toys & Games', 'Children toys and games', NULL),
+(28, 'Board Games', 'Family board games', 27),
+(29, 'Video Games', 'Console and PC games', 27);
 
 -- Insert more products (100+ products)
 INSERT INTO products (name, description, price, stock_quantity, category_id) VALUES

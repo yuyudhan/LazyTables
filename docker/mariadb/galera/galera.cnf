@@ -1,0 +1,18 @@
+# FilePath: docker/mariadb/galera/galera.cnf
+# Shared Galera settings for the mariadb-cluster profile (3 nodes, lt-galera-1..3).
+# Node-specific values (wsrep_node_name, wsrep_node_address) and wsrep_sst_auth (it
+# carries the root password) come from the command line in docker/compose.yml.
+
+[mysqld]
+binlog_format = ROW
+default_storage_engine = InnoDB
+innodb_autoinc_lock_mode = 2
+innodb_buffer_pool_size = 128M
+bind-address = 0.0.0.0
+
+wsrep_on = ON
+wsrep_provider = /usr/lib/galera/libgalera_smm.so
+wsrep_cluster_name = lt_galera
+wsrep_cluster_address = gcomm://lt-galera-1,lt-galera-2,lt-galera-3
+wsrep_sst_method = mariabackup
+wsrep_provider_options = "gcache.size=64M"
